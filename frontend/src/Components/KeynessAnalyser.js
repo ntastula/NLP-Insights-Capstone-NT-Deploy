@@ -1,22 +1,31 @@
 // src/Components/KeynessAnalyser.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Charts from "./Charts";
-import ResultsTable from "./ResultsTable";
+import { BarChart3, Loader2 } from "lucide-react";
 import ResultsSummary from "./ResultsSummary";
-import { Loader2, BarChart3 } from "lucide-react";
+import KeynessResultsGrid from "./KeynessResultsGrid";
+import ResultsTable from "./ResultsTable";
 
-const KeynessAnalyser = ({ uploadedText }) => {
-  const [results, setResults] = useState(null);
+const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method = "NLTK" }) => {
+  const [comparisonResults, setComparisonResults] = useState([]);
+  const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [analysisDone, setAnalysisDone] = useState(false);
 
+  // Perform keyness analysis
   const performAnalysis = async () => {
+    console.log("Perform analysis clicked. Uploaded text:", uploadedText);
+if (!uploadedText) return;
+
     if (!uploadedText) return;
     setLoading(true);
     setError("");
-    setResults(null);
+    setAnalysisDone(false);
+    
 
     try {
+      console.log("Button clicked!");
       const response = await fetch("http://localhost:8000/api/analyse-keyness/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -24,13 +33,34 @@ const KeynessAnalyser = ({ uploadedText }) => {
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      console.log("Received data:", data);
+      // if (data.error) throw new Error(data.error);
 
-      const analysisResults = await response.json();
-      if (analysisResults.error) throw new Error(analysisResults.error);
+      // const results = data.nltk || [];
+      // setComparisonResults(results);
 
-      setResults(analysisResults);
+      // // Calculate stats
+      // setStats({
+      //   uploadedTotal: uploadedText.split(/\s+/).length,
+      //   corpusTotal: data.corpus_total || 0,
+      // });
+      // Set state using the correct data shape
+    setComparisonResults(data.results || []); 
+    setStats({
+  uploadedTotal: uploadedText.split(/\s+/).length,
+  corpusTotal: data.corpus_total || 0
+});
+
+    setAnalysisDone(true);
+    console.log("stats:", stats);
+console.log("comparisonResults:", comparisonResults);
+
+    
+
+      // setAnalysisDone(true);
     } catch (err) {
-      console.error(err);
+      console.error("Analysis error:", err);
       setError("Analysis failed: " + err.message);
     } finally {
       setLoading(false);
@@ -38,7 +68,7 @@ const KeynessAnalyser = ({ uploadedText }) => {
   };
 
   return (
-    <div className="mt-6">
+    <div>
       {/* Analyse Button */}
       <div className="text-center mb-6">
         <button
@@ -54,28 +84,45 @@ const KeynessAnalyser = ({ uploadedText }) => {
           ) : (
             <>
               <BarChart3 className="w-6 h-6" />
-              Analyse Keyness Statistics
+              Analyse Keyness
             </>
           )}
         </button>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
+      
 
-      {/* Results */}
-      {results && (
-        <>
-          <ResultsSummary results={results} />
-          <Charts results={results} />
-          <ResultsTable results={results} />
-        </>
-      )}
+{/* Analysis Summary */}
+{analysisDone && (
+  <>
+{/* Summary */}
+          <ResultsSummary
+    uploadedTotal={stats.uploadedTotal}
+    corpusTotal={stats.corpusTotal}
+    sigKeywords={comparisonResults.length}
+    method={method}
+  />
+
+          {/* Significant keywords grid */}
+          <KeynessResultsGrid results={comparisonResults} />
+
+          {/* Charts */}
+          <Charts results={comparisonResults} />
+
+          {/* Results Table */}
+          {analysisDone && comparisonResults.length > 0 && (
+          <ResultsTable results={comparisonResults} />
+)}
+
+
+          </>
+)}
+
+      {/* Loading / Error messages */}
+      {loading && <p className="text-center text-gray-600">Loading analysis...</p>}
+      {error && <p className="text-center text-red-500">{error}</p>}
     </div>
+    
   );
 };
 

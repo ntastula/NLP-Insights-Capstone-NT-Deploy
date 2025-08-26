@@ -1,0 +1,13 @@
+numpy
+scipy
+scikit-learn
+nltk
+spacy>=3.0.0
+corpus-toolkit
+python-docx
+django
+djangorestframework
+django-cors-headers
+flask
+flask-cors
+gensim

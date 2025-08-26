@@ -2,7 +2,7 @@
 import React from "react";
 
 const ResultsTable = ({ results }) => {
-  if (!results) return null;
+  if (!results || results.length === 0) return null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6 overflow-x-auto">
@@ -18,17 +18,18 @@ const ResultsTable = ({ results }) => {
           </tr>
         </thead>
         <tbody>
-          {results.results.map((row, idx) => (
-            <tr key={idx} className="hover:bg-gray-50">
-              <td className="px-4 py-2 border-b">{row.word}</td>
-              <td className="px-4 py-2 border-b">{row.uploaded_count}</td>
-              <td className="px-4 py-2 border-b">{row.sample_count}</td>
-              <td className="px-4 py-2 border-b">{row.effect_size}</td>
-              <td className="px-4 py-2 border-b">{row.log_likelihood}</td>
-              <td className="px-4 py-2 border-b">{row.keyness}</td>
-            </tr>
-          ))}
-        </tbody>
+  {results.map((row, idx) => (
+    <tr key={idx} className="hover:bg-gray-50">
+      <td className="px-4 py-2 border-b">{row.word}</td>
+      <td className="px-4 py-2 border-b">{row.uploaded_count}</td>
+      <td className="px-4 py-2 border-b">{row.sample_count}</td>
+      <td className="px-4 py-2 border-b">{row.effect_size}</td>
+      <td className="px-4 py-2 border-b">{row.log_likelihood}</td>
+      <td className="px-4 py-2 border-b">{row.keyness}</td>
+    </tr>
+  ))}
+</tbody>
+
       </table>
     </div>
   );
