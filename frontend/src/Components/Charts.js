@@ -1,4 +1,3 @@
-// src/Components/Charts.js
 import React from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -7,7 +6,7 @@ import {
 import { TrendingUp } from "lucide-react";
 
 const Charts = ({ results }) => {
-  if (!results) return null;
+  if (!results || results.length === 0) return null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
@@ -24,7 +23,7 @@ const Charts = ({ results }) => {
         <div style={{ width: "100%", height: 400 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={results.results.slice(0, 15)}
+              data={results.slice(0, 15)}
               margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
@@ -47,7 +46,7 @@ const Charts = ({ results }) => {
         <h4 className="font-semibold text-gray-700 mb-4">Keyness Analysis Scatter Plot</h4>
         <div style={{ width: "100%", height: 400 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart data={results.results} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+            <ScatterChart data={results} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="log_likelihood" name="Log-Likelihood" label={{ value: "Log-Likelihood", position: "insideBottom", offset: -10 }} />
               <YAxis dataKey="effect_size" name="Effect Size" label={{ value: "Effect Size", angle: -90, position: "insideLeft" }} />
@@ -59,8 +58,8 @@ const Charts = ({ results }) => {
                 }
                 contentStyle={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
               />
-              <Scatter name="Positive Keyness" data={results.results.filter(r => r.keyness === "Positive")} fill="#3b82f6" />
-              <Scatter name="Negative Keyness" data={results.results.filter(r => r.keyness === "Negative")} fill="#ef4444" />
+              <Scatter name="Positive Keyness" data={results.filter(r => r.keyness === "Positive")} fill="#3b82f6" />
+              <Scatter name="Negative Keyness" data={results.filter(r => r.keyness === "Negative")} fill="#ef4444" />
             </ScatterChart>
           </ResponsiveContainer>
         </div>

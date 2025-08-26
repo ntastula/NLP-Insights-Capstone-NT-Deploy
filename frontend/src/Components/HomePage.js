@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Upload, FileText } from "lucide-react";
 import KeynessAnalyser from "./KeynessAnalyser"; 
+import KeynessComparison from "./KeynessComparison";
 
 const HomePage = () => {
   const [file, setFile] = useState(null);
@@ -166,7 +167,13 @@ const HomePage = () => {
           )}
 
           {/* Keyness Analysis Component */}
-          <KeynessAnalyser uploadedText={uploadedText} />
+          <KeynessAnalyser
+            uploadedText={uploadedText}
+            uploadedPreview={uploadedPreview}
+            corpusPreview={corpusPreview}
+            method="NLTK"
+          />
+
 
         </div>
       </div>
