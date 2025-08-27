@@ -171,7 +171,7 @@ const HomePage = () => {
             uploadedText={uploadedText}
             uploadedPreview={uploadedPreview}
             corpusPreview={corpusPreview}
-            method="NLTK"
+            method={"NLTK"}
           />
 
 

@@ -1,128 +1,108 @@
 // src/Components/KeynessAnalyser.js
-import React, { useState, useEffect } from "react";
-import Charts from "./Charts";
-import { BarChart3, Loader2 } from "lucide-react";
-import ResultsSummary from "./ResultsSummary";
-import KeynessResultsGrid from "./KeynessResultsGrid";
+import React, { useState } from "react";
 import ResultsTable from "./ResultsTable";
+import KeynessResultsGrid from "./KeynessResultsGrid";
+import Charts from "./Charts";
+import ResultsSummary from "./ResultsSummary";
 
-const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method = "NLTK" }) => {
+const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method }) => {
   const [comparisonResults, setComparisonResults] = useState([]);
-  const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0 });
+  const [stats, setStats] = useState({ uploaded_total: 0, sample_total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [analysisDone, setAnalysisDone] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState("nltk"); 
 
-  // Perform keyness analysis
-  const performAnalysis = async () => {
-    console.log("Perform analysis clicked. Uploaded text:", uploadedText);
-if (!uploadedText) return;
+  const performAnalysis = async (method) => {
+  if (!uploadedText) return;
+  setLoading(true);
+  setError("");
+  setAnalysisDone(false);
+  setSelectedMethod(method);
 
-    if (!uploadedText) return;
-    setLoading(true);
-    setError("");
-    setAnalysisDone(false);
-    
+  try {
+    console.log("Perform analysis clicked. Method:", method);
 
-    try {
-      console.log("Button clicked!");
-      const response = await fetch("http://localhost:8000/api/analyse-keyness/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploaded_text: uploadedText }),
-      });
+    const response = await fetch("http://localhost:8000/api/analyse-keyness/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uploaded_text: uploadedText, method: method.toLowerCase() }),
+    });
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      console.log("Received data:", data);
-      // if (data.error) throw new Error(data.error);
+    const data = await response.json();
 
-      // const results = data.nltk || [];
-      // setComparisonResults(results);
+    if (data.error) throw new Error(data.error);
 
-      // // Calculate stats
-      // setStats({
-      //   uploadedTotal: uploadedText.split(/\s+/).length,
-      //   corpusTotal: data.corpus_total || 0,
-      // });
-      // Set state using the correct data shape
-    setComparisonResults(data.results || []); 
+    console.log("Received data:", data);
+
+    // Update state with results
+    setComparisonResults(data.results.results || data.results); // support both methods
     setStats({
-  uploadedTotal: uploadedText.split(/\s+/).length,
+  uploadedTotal: data.uploaded_total || uploadedText.split(/\s+/).length,
   corpusTotal: data.corpus_total || 0
 });
 
+
+    setSelectedMethod(method); // store which method was used
     setAnalysisDone(true);
-    console.log("stats:", stats);
-console.log("comparisonResults:", comparisonResults);
 
-    
+  } catch (err) {
+    console.error("Analysis error:", err);
+    setError("Analysis failed: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
-      // setAnalysisDone(true);
-    } catch (err) {
-      console.error("Analysis error:", err);
-      setError("Analysis failed: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
-    <div>
+    <div className="mb-6">
       {/* Analyse Button */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-6 flex justify-center gap-4">
         <button
-          onClick={performAnalysis}
-          disabled={loading || !uploadedText}
-          className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-600 hover:to-emerald-700 transform hover:-translate-y-1 transition-all shadow-lg flex items-center gap-3 mx-auto"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-6 h-6 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <BarChart3 className="w-6 h-6" />
-              Analyse Keyness
-            </>
-          )}
-        </button>
+    onClick={() => performAnalysis("NLTK")}
+    disabled={loading || !uploadedText}
+    className="btn"
+  >
+    Analyse with NLTK
+  </button>
+
+  <button
+    onClick={() => performAnalysis("sklearn")}
+    disabled={loading || !uploadedText}
+    className="btn"
+  >
+    Analyse with Scikit-Learn
+  </button>
       </div>
 
-      
+      {loading && <p className="text-gray-500 italic">Analyzing text...</p>}
+      {error && <p className="text-red-500">{error}</p>}
 
-{/* Analysis Summary */}
-{analysisDone && (
+      {analysisDone && (
   <>
-{/* Summary */}
-          <ResultsSummary
-    uploadedTotal={stats.uploadedTotal}
-    corpusTotal={stats.corpusTotal}
-    sigKeywords={comparisonResults.length}
-    method={method}
-  />
+    {/* Results Summary */}
+    <ResultsSummary
+  stats={stats}
+  selectedMethod={selectedMethod}
+  comparisonResults={comparisonResults}
+/>
 
-          {/* Significant keywords grid */}
-          <KeynessResultsGrid results={comparisonResults} />
 
-          {/* Charts */}
-          <Charts results={comparisonResults} />
 
-          {/* Results Table */}
-          {analysisDone && comparisonResults.length > 0 && (
-          <ResultsTable results={comparisonResults} />
+    {/* Significant Keywords Grid */}
+    <KeynessResultsGrid results={comparisonResults.slice(0, 20)} method={selectedMethod} />
+
+    {/* Charts */}
+    <Charts results={comparisonResults} method={selectedMethod} />
+
+    {/* Full Results Table */}
+    <ResultsTable results={comparisonResults} method={selectedMethod} />
+  </>
 )}
 
 
-          </>
-)}
-
-      {/* Loading / Error messages */}
-      {loading && <p className="text-center text-gray-600">Loading analysis...</p>}
-      {error && <p className="text-center text-red-500">{error}</p>}
     </div>
-    
   );
 };
 
