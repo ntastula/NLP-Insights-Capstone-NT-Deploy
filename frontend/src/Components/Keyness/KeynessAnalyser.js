@@ -67,7 +67,7 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
 
       {/* Analyse Button */}
       <div className="text-center mb-6 flex justify-center gap-4">
-        <button
+  <button
     onClick={() => performAnalysis("NLTK")}
     disabled={loading || !uploadedText}
     className="btn"
@@ -82,7 +82,25 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
   >
     Analyse with Scikit-Learn
   </button>
-      </div>
+
+  <button
+    onClick={() => performAnalysis("gensim")}
+    disabled={loading || !uploadedText}
+    className="btn"
+  >
+    Analyse with Gensim
+  </button>
+
+  <button
+  onClick={() => performAnalysis("spaCy")}
+  disabled={loading || !uploadedText}
+  className="btn"
+>
+  Analyse with spaCy
+</button>
+
+</div>
+
 
       {loading && <p className="text-gray-500 italic">Analyzing text...</p>}
       {error && <p className="text-red-500">{error}</p>}
@@ -102,7 +120,8 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
     <KeynessResultsGrid results={comparisonResults.slice(0, 20)} method={selectedMethod} />
 
     {/* Charts */}
-    <Charts results={comparisonResults} method={selectedMethod} />
+    <Charts results={comparisonResults.results ?? comparisonResults} method={selectedMethod} />
+
 
     {/* Full Results Table */}
     <ResultsTable results={comparisonResults} method={selectedMethod} />
