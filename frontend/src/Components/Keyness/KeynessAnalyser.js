@@ -5,7 +5,7 @@ import KeynessResultsGrid from "./KeynessResultsGrid";
 import Charts from "./Charts";
 import ResultsSummary from "./ResultsSummary";
 
-const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method }) => {
+const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method, onBack }) => {
   const [comparisonResults, setComparisonResults] = useState([]);
   const [stats, setStats] = useState({ uploaded_total: 0, sample_total: 0 });
   const [loading, setLoading] = useState(false);
@@ -56,7 +56,15 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method 
 
 
   return (
+    
     <div className="mb-6">
+      <button
+  onClick={onBack}
+  className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+>
+  ← Back
+</button>
+
       {/* Analyse Button */}
       <div className="text-center mb-6 flex justify-center gap-4">
         <button
