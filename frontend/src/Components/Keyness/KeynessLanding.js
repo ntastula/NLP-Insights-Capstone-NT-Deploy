@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TextInputSection from "../TextInputSection";
 import KeynessAnalyser from "./KeynessAnalyser";
 
@@ -10,6 +10,21 @@ const KeynessLanding = ({ onBack }) => {
   const [activeInput, setActiveInput] = useState("");
   const [error, setError] = useState("");
   const [analysisStarted, setAnalysisStarted] = useState(false);
+  const [corpusPreview, setCorpusPreview] = useState("");
+
+  useEffect(() => {
+  const fetchCorpusPreview = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/corpus-preview/");
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setCorpusPreview(data.preview);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchCorpusPreview();
+}, []);
 
   const handleTextPaste = (e) => {
     const text = e.target.value;
@@ -57,15 +72,16 @@ const KeynessLanding = ({ onBack }) => {
 
       <h1 className="text-3xl font-bold mb-6">Keyness Analysis</h1>
       <TextInputSection
-        pastedText={pastedText}
-        handleTextPaste={handleTextPaste}
-        file={file}
-        handleFileUpload={handleFileUpload}
-        activeInput={activeInput}
-        uploadedPreview={uploadedPreview}
-        corpusPreview={null}
-        error={error}
-      />
+  pastedText={pastedText}
+  handleTextPaste={handleTextPaste}
+  file={file}
+  handleFileUpload={handleFileUpload}
+  activeInput={activeInput}
+  uploadedPreview={uploadedPreview}
+  corpusPreview={corpusPreview}  // ✅ here
+  error={error}
+/>
+
 
       <div className="text-center">
         <button

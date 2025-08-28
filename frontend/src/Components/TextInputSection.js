@@ -1,6 +1,7 @@
 // src/Components/TextInputSection.js
 import React from "react";
 import { Upload, FileText } from "lucide-react";
+import KeynessAnalyser from "./Keyness/KeynessAnalyser";
 
 const TextInputSection = ({
   pastedText,
