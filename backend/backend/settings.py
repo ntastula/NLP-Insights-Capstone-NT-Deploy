@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'api',
     'corsheaders',
+    'django_crontab',
 ]
 
 MIDDLEWARE = [
@@ -132,3 +133,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+# CRONJOBS = [
+#     ('0 2 * * * cd /path/to/your/project && python manage.py cleanup_sessions --days=7')
+# ]

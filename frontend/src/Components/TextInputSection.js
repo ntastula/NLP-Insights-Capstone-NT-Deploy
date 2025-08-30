@@ -5,6 +5,7 @@ import "./Keyness/KeynessLanding.css";
 const TextInputSection = ({
   pastedText,
   handleTextPaste,
+  pastedWordCount,
   uploadedPreview,
   corpusPreview,
   error,
@@ -14,108 +15,145 @@ const TextInputSection = ({
   const [hover, setHover] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadErrors, setUploadErrors] = useState([]);
   const [uploadSuccess, setUploadSuccess] = useState([]);
+  const [draggedFileName, setDraggedFileName] = useState("");
   const dropzoneRef = useRef(null);
 
-  // Upload files to Django backend
+  // Upload files to Django backend with progress
   const uploadFilesToBackend = async (files) => {
     setUploading(true);
     setUploadErrors([]);
     setUploadSuccess([]);
+    setUploadProgress(0);
 
     const formData = new FormData();
     files.forEach((file, index) => {
       formData.append(`file_${index}`, file);
     });
 
-    try {
-      const response = await fetch('http://localhost:8000/api/upload-files/', {
-        method: 'POST',
-        body: formData,
-      });
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "http://localhost:8000/api/upload-files/", true);
 
-      const result = await response.json();
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
 
-      if (result.success && result.files.length > 0) {
-        // Combine all file contents
-        const combinedText = result.files
-          .map(file => file.text_content)
-          .join('\n\n--- Next File ---\n\n');
+      xhr.onload = () => {
+        try {
+          const result = JSON.parse(xhr.responseText);
+          resolve(result);
+        } catch (e) {
+          setUploadErrors(["Invalid server response"]);
+          resolve(null);
+        }
+      };
 
-        // Update parent component with combined text
-        onFilesUploaded && onFilesUploaded(combinedText, files);
+      xhr.onerror = () => {
+        setUploadErrors(["Network error: Could not connect to server"]);
+        resolve(null);
+      };
 
-        // Show success messages
-        setUploadSuccess(result.files.map(file => 
-          `✓ ${file.filename} uploaded successfully (${file.word_count} words)`
-        ));
-
-        // Update selected files with metadata
-        setSelectedFiles(result.files.map((file, index) => ({
-          ...files[index],
-          processed: true,
-          wordCount: file.word_count,
-          charCount: file.char_count
-        })));
+      xhr.send(formData);
+    }).then((result) => {
+      if (!result) {
+        setUploading(false);
+        return;
       }
 
-      // Show any errors (even if some files succeeded)
+      if (result.success && result.files.length > 0) {
+        const combinedText = result.files
+          .map((file) => file.text_content)
+          .join("\n\n--- Next File ---\n\n");
+
+        onFilesUploaded && onFilesUploaded(combinedText, files);
+
+        setUploadSuccess(
+          result.files.map(
+            (file) =>
+              `✓ ${file.filename} uploaded successfully (${file.word_count} words)`
+          )
+        );
+
+        setSelectedFiles(
+          result.files.map((file, index) => ({
+            ...files[index],
+            processed: true,
+            wordCount: file.word_count,
+            charCount: file.char_count,
+          }))
+        );
+      }
+
       if (result.errors && result.errors.length > 0) {
         setUploadErrors(result.errors);
       }
 
-      // Handle complete failure
       if (!result.success) {
-        setUploadErrors([result.error || 'Upload failed']);
+        setUploadErrors([result.error || "Upload failed"]);
       }
 
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploadErrors(['Network error: Could not connect to server']);
-    } finally {
       setUploading(false);
-    }
+      setUploadProgress(0);
+    });
   };
 
-  // Handle files when dropped or selected
+  // Handle files
   const handleFiles = (files) => {
-    console.log('handleFiles called with:', files);
     const fileArray = Array.from(files);
 
-    // Basic client-side validation
-    if (fileArray.length > 5) {
-      setUploadErrors(['Maximum 5 files allowed']);
+    // Deduplicate by name + size
+    const existing = new Set(selectedFiles.map((f) => `${f.name}-${f.size}`));
+    const newFiles = fileArray.filter(
+      (f) => !existing.has(`${f.name}-${f.size}`)
+    );
+
+    if (newFiles.length < fileArray.length) {
+      setUploadErrors(["Some duplicate files were skipped"]);
+    }
+
+    if (newFiles.length === 0) return;
+
+    if (newFiles.length > 5) {
+      setUploadErrors(["Maximum 5 files allowed"]);
       return;
     }
 
-    const oversizedFiles = fileArray.filter(file => file.size > 5 * 1024 * 1024);
+    const oversizedFiles = newFiles.filter((file) => file.size > 5 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      setUploadErrors([`Files too large: ${oversizedFiles.map(f => f.name).join(', ')}`]);
+      setUploadErrors([
+        `Files too large: ${oversizedFiles.map((f) => f.name).join(", ")}`,
+      ]);
       return;
     }
 
-    const invalidTypes = fileArray.filter(file => 
-      !file.name.toLowerCase().match(/\.(txt|doc|docx)$/)
+    const invalidTypes = newFiles.filter(
+      (file) => !file.name.toLowerCase().match(/\.(txt|doc|docx)$/)
     );
     if (invalidTypes.length > 0) {
-      setUploadErrors([`Invalid file types: ${invalidTypes.map(f => f.name).join(', ')}`]);
+      setUploadErrors([
+        `Invalid file types: ${invalidTypes.map((f) => f.name).join(", ")}`,
+      ]);
       return;
     }
 
-    // Clear previous errors and upload to backend
     setUploadErrors([]);
     setUploadSuccess([]);
-    uploadFilesToBackend(fileArray);
+    uploadFilesToBackend(newFiles);
   };
 
   // Remove a selected file
   const removeFile = (indexToRemove) => {
     const newFiles = selectedFiles.filter((_, index) => index !== indexToRemove);
     setSelectedFiles(newFiles);
-    
+
     if (newFiles.length === 0) {
-      onFilesUploaded && onFilesUploaded('', []);
+      onFilesUploaded && onFilesUploaded("", []);
       setUploadSuccess([]);
       setUploadErrors([]);
     }
@@ -126,26 +164,28 @@ const TextInputSection = ({
     setSelectedFiles([]);
     setUploadSuccess([]);
     setUploadErrors([]);
-    onFilesUploaded && onFilesUploaded('', []);
+    onFilesUploaded && onFilesUploaded("", []);
   };
 
-  // Drag events (same as before)
+  // Drag events
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => prev + 1);
+    setDragCounter((prev) => prev + 1);
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setHover(true);
+      setDraggedFileName(e.dataTransfer.items[0].getAsFile()?.name || "");
     }
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => {
+    setDragCounter((prev) => {
       const newCounter = prev - 1;
       if (newCounter === 0) {
         setHover(false);
+        setDraggedFileName("");
       }
       return newCounter;
     });
@@ -154,7 +194,7 @@ const TextInputSection = ({
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
+    e.dataTransfer.dropEffect = "copy";
   };
 
   const handleDrop = (e) => {
@@ -162,7 +202,8 @@ const TextInputSection = ({
     e.stopPropagation();
     setHover(false);
     setDragCounter(0);
-    
+    setDraggedFileName("");
+
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       handleFiles(files);
@@ -174,16 +215,11 @@ const TextInputSection = ({
     if (files && files.length > 0) {
       handleFiles(files);
     }
-    e.target.value = '';
+    e.target.value = "";
   };
 
-  // Global drag handlers (same as before)
+  // Global drag handlers
   React.useEffect(() => {
-    const preventDefaults = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
     const handleGlobalDrop = (e) => {
       if (!dropzoneRef.current?.contains(e.target)) {
         e.preventDefault();
@@ -197,12 +233,12 @@ const TextInputSection = ({
       }
     };
 
-    document.addEventListener('dragover', handleGlobalDragOver, false);
-    document.addEventListener('drop', handleGlobalDrop, false);
+    document.addEventListener("dragover", handleGlobalDragOver, false);
+    document.addEventListener("drop", handleGlobalDrop, false);
 
     return () => {
-      document.removeEventListener('dragover', handleGlobalDragOver, false);
-      document.removeEventListener('drop', handleGlobalDrop, false);
+      document.removeEventListener("dragover", handleGlobalDragOver, false);
+      document.removeEventListener("drop", handleGlobalDrop, false);
     };
   }, []);
 
@@ -219,51 +255,91 @@ const TextInputSection = ({
           className="keyness-textarea"
           placeholder="Paste text here..."
           style={{
-            width: '100%',
-            minHeight: '120px',
-            padding: '12px',
-            border: '1px solid #ccc',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontFamily: 'monospace',
-            resize: 'vertical'
+            width: "100%",
+            minHeight: "120px",
+            padding: "12px",
+            border: "1px solid #ccc",
+            borderRadius: "6px",
+            fontSize: "14px",
+            fontFamily: "monospace",
+            resize: "vertical",
           }}
         />
+        {pastedText && (
+          <div
+            style={{ fontSize: "0.9em", color: "#666", marginTop: "6px" }}
+          >
+            Word count: {pastedWordCount}
+          </div>
+        )}
       </div>
 
       {/* Drag & Drop */}
       <div
         ref={dropzoneRef}
-        className={`keyness-dropzone ${hover ? "hover" : ""} ${uploading ? "uploading" : ""}`}
+        className={`keyness-dropzone ${hover ? "hover" : ""} ${
+          uploading ? "uploading" : ""
+        }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        onClick={() => !uploading && document.getElementById("fileInput").click()}
         style={{
-          width: '100%',
-          border: uploading ? '2px solid #007bff' : '2px dashed #ccc',
-          padding: '40px 20px',
-          textAlign: 'center',
-          cursor: uploading ? 'not-allowed' : 'pointer',
-          borderRadius: '8px',
-          backgroundColor: uploading ? '#f0f8ff' : (hover ? '#f0f8ff' : 'transparent'),
-          borderColor: uploading ? '#007bff' : (hover ? '#007bff' : '#ccc'),
-          transition: 'all 0.3s ease',
-          opacity: uploading ? 0.7 : 1
+          width: "100%",
+          border: uploading ? "2px solid #007bff" : "2px dashed #ccc",
+          padding: "40px 20px",
+          textAlign: "center",
+          borderRadius: "8px",
+          backgroundColor: uploading
+            ? "#f0f8ff"
+            : hover
+            ? "#f0f8ff"
+            : "transparent",
+          borderColor: uploading ? "#007bff" : hover ? "#007bff" : "#ccc",
+          transition: "all 0.3s ease",
+          opacity: uploading ? 0.7 : 1,
         }}
       >
-        <div style={{ pointerEvents: 'none' }}>
+        <div style={{ pointerEvents: "none" }}>
           {uploading ? (
             <div>
               <Upload className="animate-pulse mx-auto mb-2" size={24} />
-              Uploading files...
+              Uploading… {uploadProgress}%
+              <div
+                style={{
+                  width: "100%",
+                  height: "6px",
+                  background: "#eee",
+                  marginTop: "8px",
+                  borderRadius: "3px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${uploadProgress}%`,
+                    height: "100%",
+                    background: "#007bff",
+                    transition: "width 0.2s",
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <>
-              Drag & drop files here or click to select
-              {hover && <div>Release to upload files</div>}
-              <div style={{ fontSize: '0.9em', color: '#666', marginTop: '8px' }}>
+              Drag & drop files here
+              {hover && draggedFileName && (
+                <div style={{ marginTop: "8px", color: "#333" }}>
+                  Release to upload: <strong>{draggedFileName}</strong>
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: "0.9em",
+                  color: "#666",
+                  marginTop: "8px",
+                }}
+              >
                 Supported: .txt, .doc, .docx (max 5MB each)
               </div>
             </>
@@ -280,16 +356,41 @@ const TextInputSection = ({
         />
       </div>
 
+      {/* Select Files Button */}
+      <button
+        type="button"
+        onClick={() =>
+          !uploading && document.getElementById("fileInput").click()
+        }
+        style={{
+          marginTop: "10px",
+          padding: "6px 12px",
+          background: "#007bff",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor: uploading ? "not-allowed" : "pointer",
+        }}
+      >
+        Select Files
+      </button>
+
       {/* Upload Success Messages */}
       {uploadSuccess.length > 0 && (
-        <div style={{
-          backgroundColor: '#d1f2eb',
-          border: '1px solid #52c41a',
-          borderRadius: '6px',
-          padding: '12px'
-        }}>
+        <div
+          style={{
+            backgroundColor: "#d1f2eb",
+            border: "1px solid #52c41a",
+            borderRadius: "6px",
+            padding: "12px",
+            marginTop: "12px",
+          }}
+        >
           {uploadSuccess.map((message, index) => (
-            <div key={index} style={{ color: '#389e0d', marginBottom: '4px' }}>
+            <div
+              key={index}
+              style={{ color: "#389e0d", marginBottom: "4px" }}
+            >
               {message}
             </div>
           ))}
@@ -298,15 +399,24 @@ const TextInputSection = ({
 
       {/* Upload Error Messages */}
       {uploadErrors.length > 0 && (
-        <div style={{
-          backgroundColor: '#fff2f0',
-          border: '1px solid #ff4d4f',
-          borderRadius: '6px',
-          padding: '12px'
-        }}>
+        <div
+          style={{
+            backgroundColor: "#fff2f0",
+            border: "1px solid #ff4d4f",
+            borderRadius: "6px",
+            padding: "12px",
+            marginTop: "12px",
+          }}
+        >
           {uploadErrors.map((error, index) => (
-            <div key={index} style={{ color: '#cf1322', marginBottom: '4px' }}>
-              <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
+            <div
+              key={index}
+              style={{ color: "#cf1322", marginBottom: "4px" }}
+            >
+              <AlertCircle
+                size={16}
+                style={{ display: "inline", marginRight: "6px" }}
+              />
               {error}
             </div>
           ))}
@@ -315,43 +425,69 @@ const TextInputSection = ({
 
       {/* Selected files */}
       {selectedFiles.length > 0 && (
-        <div className="keyness-file-list" style={{
-          width: '100%',
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '6px',
-          border: '1px solid #e9ecef'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h4 style={{ margin: 0, color: '#495057' }}>Selected Files:</h4>
-            <button 
+        <div
+          className="keyness-file-list"
+          style={{
+            width: "100%",
+            padding: "16px",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "6px",
+            border: "1px solid #e9ecef",
+            marginTop: "12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "12px",
+            }}
+          >
+            <h4 style={{ margin: 0, color: "#495057" }}>Selected Files:</h4>
+            <button
               onClick={clearAllFiles}
               style={{
-                background: 'none',
-                border: 'none',
-                color: '#6c757d',
-                cursor: 'pointer',
-                fontSize: '0.9em'
+                background: "none",
+                border: "none",
+                color: "#6c757d",
+                cursor: "pointer",
+                fontSize: "0.9em",
               }}
             >
               Clear All
             </button>
           </div>
           {selectedFiles.map((file, index) => (
-            <div key={`${file.name}-${index}`} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 0',
-              borderBottom: index < selectedFiles.length - 1 ? '1px solid #dee2e6' : 'none'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <CheckCircle size={16} style={{ marginRight: '8px', color: 'green' }} />
+            <div
+              key={`${file.name}-${index}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 0",
+                borderBottom:
+                  index < selectedFiles.length - 1
+                    ? "1px solid #dee2e6"
+                    : "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <CheckCircle
+                  size={16}
+                  style={{ marginRight: "8px", color: "green" }}
+                />
                 <span>
                   {file.name} ({Math.round(file.size / 1024)}KB)
                   {file.processed && file.wordCount && (
-                    <span style={{ color: '#6c757d', fontSize: '0.9em' }}>
-                      {' '}• {file.wordCount} words
+                    <span
+                      style={{
+                        color: "#6c757d",
+                        fontSize: "0.9em",
+                      }}
+                    >
+                      {" "}
+                      • {file.wordCount} words
                     </span>
                   )}
                 </span>
@@ -359,11 +495,11 @@ const TextInputSection = ({
               <button
                 onClick={() => removeFile(index)}
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#dc3545',
-                  cursor: 'pointer',
-                  padding: '4px'
+                  background: "none",
+                  border: "none",
+                  color: "#dc3545",
+                  cursor: "pointer",
+                  padding: "4px",
                 }}
               >
                 <X size={16} />
@@ -373,73 +509,96 @@ const TextInputSection = ({
         </div>
       )}
 
-      {/* Rest of your existing preview components */}
+      {/* Uploaded Preview */}
       {uploadedPreview && (
-        <div className="keyness-preview" style={{
-          width: '100%',
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '6px',
-          border: '1px solid #e9ecef'
-        }}>
-          <h3 className="font-semibold mb-2" style={{ marginBottom: '12px', color: '#495057' }}>
+        <div
+          className="keyness-preview"
+          style={{
+            width: "100%",
+            padding: "16px",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "6px",
+            border: "1px solid #e9ecef",
+            marginTop: "12px",
+          }}
+        >
+          <h3
+            className="font-semibold mb-2"
+            style={{ marginBottom: "12px", color: "#495057" }}
+          >
             Uploaded Text Preview:
           </h3>
-          <pre style={{ 
-            whiteSpace: 'pre-wrap', 
-            maxHeight: '200px', 
-            overflow: 'auto',
-            backgroundColor: '#ffffff',
-            padding: '12px',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6',
-            fontSize: '13px',
-            fontFamily: 'monospace',
-            margin: 0
-          }}>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              maxHeight: "200px",
+              overflow: "auto",
+              backgroundColor: "#ffffff",
+              padding: "12px",
+              borderRadius: "4px",
+              border: "1px solid #dee2e6",
+              fontSize: "13px",
+              fontFamily: "monospace",
+              margin: 0,
+            }}
+          >
             {uploadedPreview}
           </pre>
         </div>
       )}
 
+      {/* Corpus Preview */}
       {corpusPreview && (
-        <div className="keyness-corpus-preview" style={{
-          width: '100%',
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '6px',
-          border: '1px solid #e9ecef'
-        }}>
-          <h3 className="font-semibold mb-2" style={{ marginBottom: '12px', color: '#495057' }}>
+        <div
+          className="keyness-corpus-preview"
+          style={{
+            width: "100%",
+            padding: "16px",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "6px",
+            border: "1px solid #e9ecef",
+            marginTop: "12px",
+          }}
+        >
+          <h3
+            className="font-semibold mb-2"
+            style={{ marginBottom: "12px", color: "#495057" }}
+          >
             Corpus Preview:
           </h3>
-          <pre style={{ 
-            whiteSpace: 'pre-wrap', 
-            maxHeight: '200px', 
-            overflow: 'auto',
-            backgroundColor: '#ffffff',
-            padding: '12px',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6',
-            fontSize: '13px',
-            fontFamily: 'monospace',
-            margin: 0
-          }}>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              maxHeight: "200px",
+              overflow: "auto",
+              backgroundColor: "#ffffff",
+              padding: "12px",
+              borderRadius: "4px",
+              border: "1px solid #dee2e6",
+              fontSize: "13px",
+              fontFamily: "monospace",
+              margin: 0,
+            }}
+          >
             {corpusPreview}
           </pre>
         </div>
       )}
 
-      {/* General error messages */}
+      {/* General error */}
       {error && (
-        <div className="keyness-error" style={{ 
-          width: '100%',
-          color: '#dc3545', 
-          padding: '12px',
-          backgroundColor: '#f8d7da',
-          border: '1px solid #f5c6cb',
-          borderRadius: '6px'
-        }}>
+        <div
+          className="keyness-error"
+          style={{
+            width: "100%",
+            color: "#dc3545",
+            padding: "12px",
+            backgroundColor: "#f8d7da",
+            border: "1px solid #f5c6cb",
+            borderRadius: "6px",
+            marginTop: "12px",
+          }}
+        >
           {error}
         </div>
       )}
