@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from .views import secure_file_upload
 from .views import upload_files
 
 urlpatterns = [
