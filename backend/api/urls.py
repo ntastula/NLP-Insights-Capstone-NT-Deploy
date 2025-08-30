@@ -1,25 +1,11 @@
 from django.urls import path
 from . import views
+from .views import secure_file_upload
+from .views import upload_files
 
 urlpatterns = [
     path("analyse-keyness/", views.analyse_keyness, name="keyness_view"),
     path('corpus-preview/', views.get_corpus_preview, name='corpus-preview'),
+    path('upload-files/', upload_files, name='upload-files'),
 ]
 
-
-
-
-# from django.urls import path
-# from . import views
-#
-# urlpatterns = [
-#     # Corpus preview
-#     path('corpus-preview/', views.get_corpus_preview, name='corpus-preview'),
-#
-#     # Parse uploaded document
-#     path('parse-document/', views.parse_document, name='parse-document'),
-#
-#     # Keyness analysis
-#     path('analyse-keyness/', views.analyse_keyness, name='analyse-keyness'),
-#
-# ]

@@ -17,7 +17,7 @@ const HomePage = ({ onSelect }) => {
           defaultValue=""
         >
           <option value="" disabled>
-            What type of analysis would you like to do?
+            Select an option
           </option>
           <option value="keyness">Keyness</option>
           <option value="sentiment">Sentiment</option>
