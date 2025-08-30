@@ -11,6 +11,7 @@ const KeynessLanding = ({ onBack }) => {
   const [error, setError] = useState("");
   const [analysisStarted, setAnalysisStarted] = useState(false);
   const [corpusPreview, setCorpusPreview] = useState("");
+  const [pastedWordCount, setPastedWordCount] = useState(0);
 
   useEffect(() => {
     const fetchCorpusPreview = async () => {
@@ -27,12 +28,15 @@ const KeynessLanding = ({ onBack }) => {
   }, []);
 
   const handleTextPaste = (e) => {
-    const text = e.target.value;
-    setPastedText(text);
-    setUploadedText(text);
-    setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
-    setActiveInput("text");
-  };
+  const text = e.target.value;
+  setPastedText(text);
+  setUploadedText(text);
+  setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
+  setActiveInput("text");
+
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  setPastedWordCount(words.length);
+};
 
   const handleFilesUploaded = (combinedText, files) => {
     setUploadedText(combinedText);
@@ -78,6 +82,7 @@ const KeynessLanding = ({ onBack }) => {
       <TextInputSection
         pastedText={pastedText}
         handleTextPaste={handleTextPaste}
+        pastedWordCount={pastedWordCount}
         uploadedPreview={uploadedPreview}
         corpusPreview={corpusPreview}
         error={error}
