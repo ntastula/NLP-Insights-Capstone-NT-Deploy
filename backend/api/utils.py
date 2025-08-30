@@ -2,11 +2,13 @@
 import os
 import re
 import math
-from collections import Counter
+from collections import Counter, defaultdict
 import docx
 import tempfile
 import mammoth
 from django.conf import settings
+import hashlib
+import time
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, 'api', 'corpus')
 
@@ -137,3 +139,59 @@ def extract_text_from_file(uploaded_file):
         "preview": preview,
         "word_count": len(text.split())
     }
+
+
+class SecurityUtils:
+    """Security utility functions"""
+
+    @staticmethod
+    def sanitize_filename(filename):
+        """Sanitize filename to prevent path traversal"""
+        filename = os.path.basename(filename)
+        filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', filename)
+
+        if len(filename) > 255:
+            name, ext = os.path.splitext(filename)
+            filename = name[:255 - len(ext)] + ext
+
+        if not filename or filename == '.':
+            filename = 'uploaded_file.txt'
+
+        return filename
+
+    @staticmethod
+    def calculate_file_hash(file_path):
+        """Calculate SHA-256 hash of file"""
+        hash_sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_sha256.update(chunk)
+        return hash_sha256.hexdigest()
+
+
+class RateLimiter:
+    """Rate limiting functionality"""
+
+    def __init__(self, max_requests=10, window_seconds=60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.request_counts = defaultdict(list)
+
+    def is_allowed(self, client_id):
+        """Check if client is within rate limits"""
+        now = time.time()
+        cutoff = now - self.window_seconds
+
+        # Clean old entries
+        self.request_counts[client_id] = [
+            timestamp for timestamp in self.request_counts[client_id]
+            if timestamp > cutoff
+        ]
+
+        # Check limit
+        if len(self.request_counts[client_id]) >= self.max_requests:
+            return False
+
+        # Add current request
+        self.request_counts[client_id].append(now)
+        return True
