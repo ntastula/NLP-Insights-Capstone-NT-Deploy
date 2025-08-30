@@ -21,6 +21,9 @@ from .utils import RateLimiter
 from .exceptions import FileValidationError, RateLimitExceeded, ContentProcessingError
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
+import mimetypes
+from django.core.files.uploadedfile import UploadedFile
+from docx import Document
 
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
@@ -30,6 +33,150 @@ logger = logging.getLogger(__name__)
 # Initialize rate limiter
 upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 analysis_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+# File validation constants
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_FILES = 5
+ALLOWED_EXTENSIONS = {'.txt', '.doc', '.docx'}
+ALLOWED_MIME_TYPES = {
+    'text/plain',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+}
+
+
+def validate_file(uploaded_file: UploadedFile) -> tuple[bool, str]:
+    """
+    Validate a single uploaded file.
+    Returns (is_valid, error_message)
+    """
+    # Check file size
+    if uploaded_file.size > MAX_FILE_SIZE:
+        return False, f"{uploaded_file.name} exceeds maximum file size (5MB)"
+
+    # Check if file is empty
+    if uploaded_file.size == 0:
+        return False, f"{uploaded_file.name} is empty"
+
+    # Check file extension
+    file_extension = uploaded_file.name.lower().split('.')[-1] if '.' in uploaded_file.name else ''
+    if f'.{file_extension}' not in ALLOWED_EXTENSIONS:
+        return False, f"{uploaded_file.name} has an unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+
+    # Check MIME type for additional security
+    mime_type, _ = mimetypes.guess_type(uploaded_file.name)
+    if mime_type and mime_type not in ALLOWED_MIME_TYPES:
+        return False, f"{uploaded_file.name} has an invalid MIME type"
+
+    # Check for suspicious file names
+    suspicious_chars = ['..', '/', '\\', '<', '>', ':', '"', '|', '?', '*']
+    if any(char in uploaded_file.name for char in suspicious_chars):
+        return False, f"{uploaded_file.name} contains invalid characters"
+
+    return True, ""
+
+
+def process_text_file(uploaded_file: UploadedFile) -> tuple[str, str]:
+    """
+    Process different file types and extract text content.
+    Returns (text_content, error_message)
+    """
+    try:
+        file_extension = uploaded_file.name.lower().split('.')[-1]
+
+        if file_extension == 'txt':
+            # Handle text files
+            content = uploaded_file.read()
+
+            # Try different encodings
+            for encoding in ['utf-8', 'utf-16', 'latin-1', 'cp1252']:
+                try:
+                    text_content = content.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                return "", "Unable to decode file with supported encodings"
+
+
+        elif file_extension == 'docx':
+
+            doc = Document(uploaded_file)
+
+            text_content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+
+        elif file_extension == 'doc':
+
+            return "", ".doc files not supported. Please convert to .docx or .txt"
+
+        else:
+            return "", f"Unsupported file type: {file_extension}"
+
+        # Basic content validation
+        if len(text_content.strip()) == 0:
+            return "", "File appears to be empty or contains only whitespace"
+
+        # Check for reasonable content length
+        if len(text_content) > 1000000:  # 1MB of text
+            return "", "Text content is too large"
+
+        return text_content, ""
+
+    except Exception as e:
+        return "", f"Error processing file: {str(e)}"
+
+
+@csrf_exempt
+@require_POST
+def upload_files(request):
+    if not request.FILES:
+        return JsonResponse({'error': 'No files uploaded'}, status=400)
+
+    # Check number of files
+    if len(request.FILES) > MAX_FILES:
+        return JsonResponse({
+            'error': f'Too many files. Maximum {MAX_FILES} files allowed'
+        }, status=400)
+
+    processed_files = []
+    errors = []
+
+    for field_name, uploaded_file in request.FILES.items():
+        # Validate file
+        is_valid, error_msg = validate_file(uploaded_file)
+        if not is_valid:
+            errors.append(error_msg)
+            continue
+
+        # Process file content
+        text_content, process_error = process_text_file(uploaded_file)
+        if process_error:
+            errors.append(f"{uploaded_file.name}: {process_error}")
+            continue
+
+        processed_files.append({
+            'filename': uploaded_file.name,
+            'file_size': uploaded_file.size,
+            'text_content': text_content,
+            'word_count': len(text_content.split()) if text_content else 0,
+            'char_count': len(text_content) if text_content else 0,
+        })
+
+    # Return appropriate response
+    if not processed_files and errors:
+        return JsonResponse({
+            'success': False,
+            'error': 'No files could be processed',
+            'details': errors
+        }, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'files': processed_files,
+        'errors': errors,  # Include any non-fatal errors
+        'total_files_processed': len(processed_files),
+        'total_files_failed': len(errors)
+    })
 
 def read_corpus():
     try:
@@ -215,72 +362,6 @@ def analyse_keyness(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-def get_client_ip(request):
-    """Get client IP address"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0]
-    return request.META.get('REMOTE_ADDR')
-
-@csrf_exempt
-@login_required
-@require_http_methods(["POST"])
-def secure_file_upload(request):
-    """Handle secure file upload - supports multiple files"""
-    try:
-        client_ip = get_client_ip(request)
-
-        # Rate limiting check
-        if not upload_rate_limiter.is_allowed(client_ip):
-            return JsonResponse({
-                'error': 'Rate limit exceeded. Please wait before uploading again.'
-            }, status=429)
-
-        # Check if files were uploaded
-        if not request.FILES:
-            return JsonResponse({'error': 'No files uploaded'}, status=400)
-
-        processed_files = []
-        errors = []
-
-        # Process each uploaded file
-        for field_name, uploaded_file in request.FILES.items():
-            try:
-                result = FileProcessingService.process_uploaded_file(uploaded_file)
-                processed_files.append(result)
-
-                logger.info(f"Successfully processed: {result['filename']}, "
-                            f"size: {result['file_size']}")
-
-            except (FileValidationError, ContentProcessingError) as e:
-                error_msg = f"Error processing {uploaded_file.name}: {str(e)}"
-                errors.append(error_msg)
-                logger.warning(error_msg)
-
-        # Return results
-        if not processed_files and errors:
-            return JsonResponse({
-                'error': 'No files could be processed',
-                'details': errors
-            }, status=400)
-
-        response_data = {
-            'success': True,
-            'message': f'Successfully processed {len(processed_files)} file(s)',
-            'files': processed_files
-        }
-
-        if errors:
-            response_data['warnings'] = errors
-
-        return JsonResponse(response_data)
-
-    except Exception as e:
-        logger.error(f"Unexpected error in file upload: {str(e)}")
-        return JsonResponse({
-            'error': 'An unexpected error occurred while processing your files'
-        }, status=500)
-
 
 @login_required
 @require_http_methods(["POST"])
@@ -342,37 +423,3 @@ ALLOWED_TYPES = ['text/plain',
                  'application/msword',
                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-
-
-@csrf_exempt
-@require_POST
-def upload_files(request):
-    if not request.FILES:
-        return JsonResponse({'error': 'No files uploaded'}, status=400)
-
-    processed_files = []
-    errors = []
-
-    for field_name, uploaded_file in request.FILES.items():
-        if uploaded_file.size > 5 * 1024 * 1024:  # Max 5MB
-            errors.append(f"{uploaded_file.name} exceeds maximum file size")
-            continue
-        if not uploaded_file.name.endswith(('.txt', '.doc', '.docx')):
-            errors.append(f"{uploaded_file.name} is not an accepted file type")
-            continue
-
-        try:
-            text_content = uploaded_file.read().decode('utf-8', errors='ignore')
-            processed_files.append({
-                'filename': uploaded_file.name,
-                'file_size': uploaded_file.size,
-                'text_content': text_content,
-            })
-        except Exception as e:
-            errors.append(f"Error reading {uploaded_file.name}: {str(e)}")
-
-    return JsonResponse({
-        'success': True if processed_files else False,
-        'files': processed_files,
-        'errors': errors
-    })

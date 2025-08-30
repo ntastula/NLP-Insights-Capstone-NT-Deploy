@@ -2,7 +2,7 @@
 
 /* General container - Updated to 50% width */
 .keyness-container {
-  max-width: 50%;
+  max-width: 80%;
   margin: 0 auto;
   padding: 2rem;
   display: flex;
