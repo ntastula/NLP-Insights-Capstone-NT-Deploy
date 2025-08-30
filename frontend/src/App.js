@@ -4,6 +4,7 @@ import KeynessLanding from "./Components/Keyness/KeynessLanding";
 import ClusteringLanding from "./Components/Clustering/ClusteringLanding";
 import SentimentLanding from "./Components/Sentiment/SentimentLanding";
 import SensorimotorLanding from "./Components/Sensorimotor/SensorimotorLanding";
+import { DndContext } from "@dnd-kit/core"
 
 function App() {
   const [activePage, setActivePage] = useState("home");
@@ -11,6 +12,7 @@ function App() {
   const handleBack = () => setActivePage("home");
 
   return (
+    // <DndContext>
     <div className="App p-6">
       {activePage === "home" && <HomePage onSelect={setActivePage} />}
 
@@ -21,6 +23,7 @@ function App() {
         <SensorimotorLanding onBack={handleBack} />
       )}
     </div>
+    // </DndContext>
   );
 }
 
