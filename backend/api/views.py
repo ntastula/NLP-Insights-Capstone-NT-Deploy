@@ -201,3 +201,49 @@ def analyse_keyness(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+# --- Sentiment (SentiArt lexicon) -------------------------------------------
+
+# Allow this view to accept POST requests
+@csrf_exempt
+# Only allow POST method (not GET, PUT, etc.)
+@require_http_methods(["POST"])
+def analyse_sentiment(request):
+
+    # Try to load the JSON body of the request
+    try:
+        # request.body is raw bytes -> decode to string -> load as JSON
+        data = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        # If JSON is missing or invalid, return an error with status code 400 (bad request)
+        return JsonResponse({"error": "Invalid JSON body"}, status=400)
+
+    # Pull the uploaded_text field out of the JSON, or use empty string if missing
+    text = (data.get("uploaded_text") or "").strip()
+
+    # If no text was provided, return an error
+    if not text:
+        return JsonResponse({"error": "No uploaded_text provided"}, status=400)
+
+    # Try to run the sentiment analyser
+    try:
+        # Import the function from our helper file (sentiart_analyser.py)
+        from api.sentiment.sentiment_analyser import analyse_with_sentiart
+
+        # Call the analyser, passing the text
+        result = analyse_with_sentiart(text)
+
+        # Return the result as JSON to the client
+        return JsonResponse(result)
+
+    # If the CSV lexicon file is missing, give a clear hint to the user
+    except FileNotFoundError as e:
+        return JsonResponse({
+            "error": str(e),
+            "hint": "Place CSV at backend/api/sentiment/sentiart_lexicon.csv "
+                    "with headers: word,sentiment score,joy,sadness,anger,fear,disgust"
+        }, status=500)
+
+    # Catch any other errors and return them as JSON
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
