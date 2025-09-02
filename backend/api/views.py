@@ -1,9 +1,8 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 import json
-import os
+import os, tempfile, shutil
 import re
 from django.conf import settings
 from sklearn.feature_extraction.text import CountVectorizer
@@ -17,9 +16,15 @@ from api.keyness.keyness_analyser import compute_keyness, keyness_gensim, keynes
 import spacy
 import mimetypes
 from django.core.files.uploadedfile import UploadedFile
+from backend.utils.session_utils import SessionManager
+from .models import UserUploadedFile
+import logging
+import traceback
+from django.utils import timezone
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
-SAMPLE_FILE = os.path.join(CORPUS_DIR, "sample1.txt")
+SAMPLE_FILE = os.path.join(settings.BASE_DIR, 'api', 'corpus', 'sample1.txt')
+logger = logging.getLogger(__name__)
 
 # File validation constants
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
@@ -31,6 +36,12 @@ ALLOWED_MIME_TYPES = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 }
 
+def read_corpus():
+    try:
+        with open(SAMPLE_FILE, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
 
 def validate_file(uploaded_file: UploadedFile) -> tuple[bool, str]:
     """
@@ -118,103 +129,93 @@ def process_text_file(uploaded_file: UploadedFile) -> tuple[str, str]:
 @csrf_exempt
 @require_POST
 def upload_files(request):
-    if not request.FILES:
-        return JsonResponse({'error': 'No files uploaded'}, status=400)
+    try:
+        logger.info(f"Session key: {request.session.session_key}")
+        logger.info(f"Request.FILES: {request.FILES}")  # 🔹 show uploaded files
+        logger.info(f"Request.POST: {request.POST}")
 
-    # Check number of files
-    if len(request.FILES) > MAX_FILES:
+        if not request.FILES:
+            logger.warning("No files received!")
+            return JsonResponse({'error': 'No files uploaded'}, status=400)
+
+        MAX_FILES = 5
+        if len(request.FILES) > MAX_FILES:
+            return JsonResponse({
+                'error': f'Too many files. Maximum {MAX_FILES} files allowed'
+            }, status=400)
+
+        processed_files = []
+        errors = []
+
+        # Ensure session folder exists
+        session_id = request.session.session_key
+        if not session_id:
+            request.session.create()
+            session_id = request.session.session_key
+
+        session_dir = os.path.join(tempfile.gettempdir(), f"uploads_{session_id}")
+        os.makedirs(session_dir, exist_ok=True)
+
+        uploaded_files = request.FILES.getlist("file")  # get all files under the same key
+        if not uploaded_files:
+            return JsonResponse({'error': 'No files uploaded'}, status=400)
+
+        for uploaded_file in uploaded_files:
+            try:
+                # existing validation & processing
+                is_valid, error_msg = validate_file(uploaded_file)
+                if not is_valid:
+                    errors.append(error_msg)
+                    continue
+
+                text_content, process_error = process_text_file(uploaded_file)
+                if process_error:
+                    errors.append(f"{uploaded_file.name}: {process_error}")
+                    continue
+
+                user_file = SessionManager.save_user_file(
+                    request=request,
+                    filename=f"upload_{timezone.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}",
+                    original_filename=uploaded_file.name,
+                    file_size=uploaded_file.size,
+                    file_type=uploaded_file.name.split('.')[-1].lower(),
+                    text_content=text_content
+                )
+
+                processed_files.append({
+                    'id': str(user_file.id),
+                    'filename': uploaded_file.name,
+                    'backend_filename': user_file.filename,
+                    'file_size': user_file.file_size,
+                    'text_content': user_file.text_content,
+                    'word_count': user_file.word_count,
+                    'char_count': user_file.char_count,
+                })
+
+            except Exception as e:
+                errors.append(f"Error processing {uploaded_file.name}: {str(e)}")
+
+        if not processed_files and errors:
+            return JsonResponse({
+                'success': False,
+                'error': 'No files could be processed',
+                'details': errors
+            }, status=400)
+
         return JsonResponse({
-            'error': f'Too many files. Maximum {MAX_FILES} files allowed'
-        }, status=400)
-
-    processed_files = []
-    errors = []
-
-    for field_name, uploaded_file in request.FILES.items():
-        # Validate file
-        is_valid, error_msg = validate_file(uploaded_file)
-        if not is_valid:
-            errors.append(error_msg)
-            continue
-
-        # Process file content
-        text_content, process_error = process_text_file(uploaded_file)
-        if process_error:
-            errors.append(f"{uploaded_file.name}: {process_error}")
-            continue
-
-        processed_files.append({
-            'filename': uploaded_file.name,
-            'file_size': uploaded_file.size,
-            'text_content': text_content,
-            'word_count': len(text_content.split()) if text_content else 0,
-            'char_count': len(text_content) if text_content else 0,
+            'success': True,
+            'files': processed_files,
+            'errors': errors,
+            'total_files_processed': len(processed_files),
+            'total_files_failed': len(errors)
         })
 
-    # Return appropriate response
-    if not processed_files and errors:
+    except Exception as e:
         return JsonResponse({
             'success': False,
-            'error': 'No files could be processed',
-            'details': errors
-        }, status=400)
+            'error': f'Server error: {str(e)}'
+        }, status=500)
 
-    return JsonResponse({
-        'success': True,
-        'files': processed_files,
-        'errors': errors,  # Include any non-fatal errors
-        'total_files_processed': len(processed_files),
-        'total_files_failed': len(errors)
-    })
-
-def read_corpus():
-    try:
-        with open(SAMPLE_FILE, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return ""
-
-def keyness_sklearn(uploaded_text, corpus_text, top_n=20):
-    vectorizer = CountVectorizer()
-    X = vectorizer.fit_transform([uploaded_text, corpus_text])
-    terms = vectorizer.get_feature_names_out()
-    freqs = X.toarray()
-
-    uploaded_counts = freqs[0]
-    corpus_counts = freqs[1]
-
-    results = []
-    for word, u_count, c_count in zip(terms, uploaded_counts, corpus_counts):
-        if u_count == 0:
-            continue  # skip words not in uploaded text
-
-        contingency = np.array([
-            [u_count, sum(uploaded_counts) - u_count],
-            [c_count, sum(corpus_counts) - c_count]
-        ])
-
-        try:
-            chi2, p, _, _ = chi2_contingency(contingency, correction=False)
-        except ValueError:
-            chi2, p = 0, 1
-
-        results.append({
-            "word": word,
-            "uploaded_count": int(u_count),
-            "sample_count": int(c_count),
-            "chi2": float(chi2),
-            "p_value": float(p),
-        })
-
-    # Sort and limit top N
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
-    results_top = results_sorted[:top_n]
-
-    return {
-        "results": results_top,
-        "uploaded_total": int(sum(uploaded_counts)),
-        "corpus_total": int(sum(corpus_counts)),
-    }
 
 def keyness_gensim(uploaded_text, corpus_text, top_n=20):
     """
@@ -281,20 +282,75 @@ def keyness_gensim(uploaded_text, corpus_text, top_n=20):
         "corpus_total": int(sum(corpus_counts.values())),
     }
 
+def keyness_sklearn(uploaded_text, corpus_text, top_n=20):
+    vectorizer = CountVectorizer()
+    X = vectorizer.fit_transform([uploaded_text, corpus_text])
+    terms = vectorizer.get_feature_names_out()
+    freqs = X.toarray()
+
+    uploaded_counts = freqs[0]
+    corpus_counts = freqs[1]
+
+    results = []
+    for word, u_count, c_count in zip(terms, uploaded_counts, corpus_counts):
+        if u_count == 0:
+            continue  # skip words not in uploaded text
+
+        contingency = np.array([
+            [u_count, sum(uploaded_counts) - u_count],
+            [c_count, sum(corpus_counts) - c_count]
+        ])
+
+        try:
+            chi2, p, _, _ = chi2_contingency(contingency, correction=False)
+        except ValueError:
+            chi2, p = 0, 1
+
+        results.append({
+            "word": word,
+            "uploaded_count": int(u_count),
+            "sample_count": int(c_count),
+            "chi2": float(chi2),
+            "p_value": float(p),
+        })
+
+    # Sort and limit top N
+    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    results_top = results_sorted[:top_n]
+
+    return {
+        "results": results_top,
+        "uploaded_total": int(sum(uploaded_counts)),
+        "corpus_total": int(sum(corpus_counts)),
+    }
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_corpus_preview(request):
-        try:
-            corpus_text = read_corpus()
-            if not corpus_text:
-                return JsonResponse({"error": "No corpus files found."}, status=404)
+    """Get static corpus preview from corpus folder"""
+    try:
+        corpus_text = read_corpus()
+        if not corpus_text:
+            return JsonResponse({
+                'success': True,
+                'preview': 'Corpus file not found',
+                'source': 'static_corpus'
+            })
 
-            lines = [line.strip() for line in corpus_text.split("\n") if line.strip()][:4]
-            preview = "\n".join(lines)
-            return JsonResponse({"preview": preview})
+        lines = [line.strip() for line in corpus_text.split("\n") if line.strip()][:4]
+        preview = "\n".join(lines)
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({
+            'success': True,
+            'preview': preview,
+            'source': 'static_corpus'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error getting corpus preview: {str(e)}'
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -350,3 +406,111 @@ def analyse_keyness(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_user_files(request):
+    """Get all files for the current user's session"""
+    try:
+        user_files = SessionManager.get_user_files(request)
+
+        files_data = []
+        for file_obj in user_files:
+            files_data.append({
+                'id': str(file_obj.id),
+                'filename': file_obj.original_filename,
+                'file_size': file_obj.file_size,
+                'file_type': file_obj.file_type,
+                'word_count': file_obj.word_count,
+                'char_count': file_obj.char_count,
+                'uploaded_at': file_obj.uploaded_at.isoformat(),
+                'text_preview': file_obj.text_content[:200] + '...' if len(
+                    file_obj.text_content) > 200 else file_obj.text_content
+            })
+
+        return JsonResponse({
+            'success': True,
+            'files': files_data,
+            'total_files': len(files_data)
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error retrieving files: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@require_POST
+def delete_user_file(request):
+    """Delete a specific file for the current user"""
+    try:
+        data = json.loads(request.body)
+        file_id = data.get('file_id')
+
+        if not file_id:
+            return JsonResponse({'error': 'File ID required'}, status=400)
+
+        success = SessionManager.delete_user_file(request, file_id)
+
+        if success:
+            return JsonResponse({'success': True, 'message': 'File deleted successfully'})
+        else:
+            return JsonResponse({'error': 'File not found'}, status=404)
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error deleting file: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@require_POST
+def clear_user_data(request):
+    """Clear all data for the current user's session"""
+    try:
+        SessionManager.clear_user_data(request)
+        return JsonResponse({'success': True, 'message': 'All data cleared successfully'})
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error clearing data: {str(e)}'
+        }, status=500)
+
+
+
+@csrf_exempt
+@require_POST
+def save_analysis(request):
+    """Save analysis results with session isolation"""
+    try:
+        data = json.loads(request.body)
+        analysis_type = data.get('analysis_type')
+        input_text = data.get('input_text', '')
+        results = data.get('results', {})
+
+        if not analysis_type or not results:
+            return JsonResponse({'error': 'Analysis type and results required'}, status=400)
+
+        analysis = SessionManager.save_analysis_result(
+            request=request,
+            analysis_type=analysis_type,
+            input_text_preview=input_text,
+            results=results
+        )
+
+        return JsonResponse({
+            'success': True,
+            'analysis_id': str(analysis.id),
+            'message': 'Analysis saved successfully'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error saving analysis: {str(e)}'
+        }, status=500)

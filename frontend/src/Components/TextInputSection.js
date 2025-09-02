@@ -22,89 +22,87 @@ const TextInputSection = ({
   const dropzoneRef = useRef(null);
 
   // Upload files to Django backend with progress
-  const uploadFilesToBackend = async (files) => {
-    setUploading(true);
-    setUploadErrors([]);
-    setUploadSuccess([]);
-    setUploadProgress(0);
+const uploadFilesToBackend = async (files) => {
+  setUploading(true);
+  setUploadErrors([]);
+  setUploadSuccess([]);
+  setUploadProgress(0);
 
-    const formData = new FormData();
-    files.forEach((file, index) => {
-      formData.append(`file_${index}`, file);
-    });
+  console.log("Files to upload:", files);
 
-    return new Promise((resolve) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "http://localhost:8000/api/upload-files/", true);
+  const formData = new FormData();
+  files.forEach((file) => formData.append("file", file)); // all under same key
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percent);
-        }
-      };
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "http://localhost:8000/api/upload-files/", true);
+    xhr.withCredentials = true;
 
-      xhr.onload = () => {
-        try {
-          const result = JSON.parse(xhr.responseText);
-          resolve(result);
-        } catch (e) {
-          setUploadErrors(["Invalid server response"]);
-          resolve(null);
-        }
-      };
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
 
-      xhr.onerror = () => {
-        setUploadErrors(["Network error: Could not connect to server"]);
+    xhr.onload = () => {
+      try {
+        resolve(JSON.parse(xhr.responseText));
+      } catch (e) {
+        setUploadErrors(["Invalid server response"]);
         resolve(null);
-      };
-
-      xhr.send(formData);
-    }).then((result) => {
-      if (!result) {
-        setUploading(false);
-        return;
       }
+    };
 
-      if (result.success && result.files.length > 0) {
-        const combinedText = result.files
-          .map((file) => file.text_content)
-          .join("\n\n--- Next File ---\n\n");
+    xhr.onerror = () => {
+      setUploadErrors(["Network error"]);
+      resolve(null);
+    };
 
-        onFilesUploaded && onFilesUploaded(combinedText, files);
+    xhr.send(formData);
+  }).then((result) => {
+    setUploading(false);
 
-        setUploadSuccess(
-          result.files.map(
-            (file) =>
-              `✓ ${file.filename} uploaded successfully (${file.word_count} words)`
-          )
-        );
+    if (!result) return;
 
-        setSelectedFiles(
-          result.files.map((file, index) => ({
-            ...files[index],
-            processed: true,
-            wordCount: file.word_count,
-            charCount: file.char_count,
-          }))
-        );
-      }
+    if (result.success && result.files.length > 0) {
+  const combinedText = result.files
+    .map((file) => file.text_content)
+    .join("\n\n--- Next File ---\n\n");
 
-      if (result.errors && result.errors.length > 0) {
-        setUploadErrors(result.errors);
-      }
+  onFilesUploaded && onFilesUploaded(combinedText, result.files); 
 
-      if (!result.success) {
-        setUploadErrors([result.error || "Upload failed"]);
-      }
+  setUploadSuccess(
+    result.files.map((file) => {
+      return `✓ ${file.filename} uploaded successfully (${file.word_count} words)`;
+    })
+  );
 
-      setUploading(false);
-      setUploadProgress(0);
-    });
-  };
+  setSelectedFiles(
+    result.files.map((file) => ({
+      name: file.filename,          
+      processed: true,
+      wordCount: file.word_count,
+      charCount: file.char_count,
+      textContent: file.text_content 
+    }))
+  );
+}
+
+
+    if (result.errors?.length > 0) setUploadErrors(result.errors);
+    if (!result.success) setUploadErrors([result.error || "Upload failed"]);
+    setUploadProgress(0);
+  });
+};
+
+
+
 
   // Handle files
   const handleFiles = (files) => {
+    console.log("handleFiles called with:", files);
+Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
+
     const fileArray = Array.from(files);
 
     // Deduplicate by name + size

@@ -13,19 +13,21 @@ const KeynessLanding = ({ onBack }) => {
   const [corpusPreview, setCorpusPreview] = useState("");
   const [pastedWordCount, setPastedWordCount] = useState(0);
 
-  useEffect(() => {
-    const fetchCorpusPreview = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/corpus-preview/");
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        setCorpusPreview(data.preview.split("\n").slice(0, 4).join("\n"));
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchCorpusPreview();
-  }, []);
+ useEffect(() => {
+  const fetchCorpusPreview = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/corpus-preview/", {
+        credentials: 'include'  // Add this line
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      setCorpusPreview(data.preview.split("\n").slice(0, 4).join("\n"));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  fetchCorpusPreview();
+}, []);
 
   const handleTextPaste = (e) => {
   const text = e.target.value;
