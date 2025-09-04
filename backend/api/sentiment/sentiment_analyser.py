@@ -66,6 +66,19 @@ WORD_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’-]*")
 # tends to carry clear sentiment and is common in casual text.
 EMOTICON_PATTERN = re.compile(r"(:\)|:\(|:D|:P|;\)|:\/|:-\)|:-\(|:'\(|<3)")
 
+# Common function words and contraction fragments to exclude from OOV display
+STOPWORDS = {
+    "a","an","and","the","of","to","in","on","for","with","at","by","from","as",
+    "that","this","it","is","are","was","were","be","been","being","do","does","did",
+    "but","or","if","then","so","than","very","can","could","should","would","will",
+    "just","not","no","nor","you","your","yours","i","me","my","we","our","they","their",
+    "he","she","his","her","them","who","whom","which","what","when","where","why","how",
+    "also","into","over","under","again","more","most","such","only","own","same",
+    # common contraction shards
+    "s","t","d","ll","m","o","re","ve","y"
+}
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # LEXICON CACHE (module-level singletons)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -236,6 +249,16 @@ def load_lexicon() -> Dict[str, Dict[str, float]]:
 # ──────────────────────────────────────────────────────────────────────────────
 # STEP 3: ANALYSIS
 # ──────────────────────────────────────────────────────────────────────────────
+def _is_good_oov(token: str) -> bool:
+    """
+    Filter for display-worthy OOV tokens:
+    - alphabetic only (drops numbers/punctuation fragments)
+    - length >= 3 (drops very short noise)
+    - not in STOPWORDS
+    """
+    w = token.lower()
+    return w.isalpha() and len(w) >= 3 and w not in STOPWORDS
+
 def analyze_text(text: str) -> dict:
     """
     Main entry point for callers.
@@ -416,7 +439,8 @@ def analyze_text(text: str) -> dict:
 
     # OOV (out-of-vocabulary) examples: top 10 unknown words by frequency.
     # Useful for: expanding the lexicon, debugging domain-specific terms, etc.
-    oov_examples = sorted(unmatched_tokens, key=lambda x: x[1], reverse=True)[:10]
+    oov_filtered = [(w, c) for (w, c) in unmatched_tokens if _is_good_oov(w)]
+    oov_examples = sorted(oov_filtered, key=lambda x: x[1], reverse=True)[:10]
 
     # "Polarity" collapses direction to {-1, 0, +1} based on the mean sentiment.
     # This is often handy for quick UI indicators (thumbs up/down/neutral).

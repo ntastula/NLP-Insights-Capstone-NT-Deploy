@@ -542,10 +542,10 @@ def analyse_sentiment(request):
     # Try to run the sentiment analyser
     try:
         # Import the function from our helper file (sentiart_analyser.py)
-        from api.sentiment.sentiment_analyser import analyse_with_sentiart
+        from api.sentiment.sentiment_analyser import analyze_text
 
         # Call the analyser, passing the text
-        result = analyse_with_sentiart(text)
+        result = analyze_text(text)
 
         # Return the result as JSON to the client
         return JsonResponse(result)
