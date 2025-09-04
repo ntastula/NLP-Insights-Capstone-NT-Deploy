@@ -1,18 +1,79 @@
-import React from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import SentimentResults from "./SentimentResults";
 
-const SentimentAnalyser = () => {
+const API_URL = "http://localhost:8000/api/analyse-sentiment/";
+
+export default function SentimentAnalyser({ uploadedText, uploadedPreview, corpusPreview, onBack }) {
+  const [data, setData] = useState(null);
+  const [state, setState] = useState({ loading: true, error: "" });
+
+  const previews = useMemo(() => {
+    const out = [];
+    if (uploadedPreview) out.push({ label: "Your text (preview)", body: uploadedPreview });
+    if (corpusPreview) out.push({ label: "Corpus preview", body: corpusPreview });
+    return out;
+  }, [uploadedPreview, corpusPreview]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setState({ loading: true, error: "" });
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploaded_text: uploadedText || "" }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+        if (!cancelled) setData(json);
+      } catch (e) {
+        if (!cancelled) setState({ loading: false, error: e.message || "Request failed" });
+        return;
+      }
+      if (!cancelled) setState({ loading: false, error: "" });
+    })();
+    return () => { cancelled = true; };
+  }, [uploadedText]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
-      <div className="bg-white rounded-2xl shadow-lg p-10 max-w-2xl w-full text-center">
-        <h1 className="text-3xl font-bold text-blue-600 mb-4">
-          Sentiment Analysis
-        </h1>
-        <p className="text-gray-600">
-          Analyse the emotional tone and polarity of your text.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Sentiment</h1>
+          <button onClick={onBack} className="px-3 py-2 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-800">
+            ← Back
+          </button>
+        </div>
+
+        {state.loading && (
+          <div className="bg-white border rounded-2xl p-8 shadow-sm text-center">
+            <div className="animate-pulse text-gray-500">Analysing your text…</div>
+          </div>
+        )}
+
+        {state.error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
+            Error: {state.error}. Is the API available at <code className="font-mono">{API_URL}</code>?
+          </div>
+        )}
+
+        {!state.loading && !state.error && (
+          <>
+            {previews.length > 0 && (
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                {previews.map((b, i) => (
+                  <div key={i} className="bg-white border rounded-xl p-4 shadow-sm">
+                    <div className="text-xs font-semibold text-gray-600 mb-2">{b.label}</div>
+                    <pre className="text-sm text-gray-800 whitespace-pre-wrap leading-snug max-h-48 overflow-auto">{b.body}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+            <SentimentResults data={data} />
+          </>
+        )}
       </div>
     </div>
   );
-};
-
-export default SentimentAnalyser;
+}
