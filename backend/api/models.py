@@ -52,3 +52,14 @@ class UserAnalysisHistory(models.Model):
     class Meta:
         db_table = 'user_analysis_history'
         ordering = ['-created_at']
+
+class KeynessResult(models.Model):
+    uploaded_text = models.TextField()
+    method = models.CharField(max_length=50)
+    results = models.JSONField()
+    uploaded_total = models.IntegerField()
+    corpus_total = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"KeynessResult {self.id} ({self.method})"
