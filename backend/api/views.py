@@ -134,7 +134,7 @@ def upload_files(request):
     processed_files = []
     errors = []
 
-    for field_name, uploaded_file in request.FILES.items():
+    for uploaded_file in request.FILES.getlist("files"):
         is_valid, error_msg = validate_file(uploaded_file)
         if not is_valid:
             logger.warning(f"File validation failed: {uploaded_file.name} - {error_msg}")
@@ -147,13 +147,16 @@ def upload_files(request):
             errors.append(f"{uploaded_file.name}: {process_error}")
             continue
 
-        logger.info(f"File uploaded: {uploaded_file.name} ({uploaded_file.size} bytes, {len(text_content.split())} words)")
+        logger.info(
+            f"File uploaded: {uploaded_file.name} "
+            f"({uploaded_file.size} bytes, {len(text_content.split())} words)"
+        )
         processed_files.append({
-            'filename': uploaded_file.name,
-            'file_size': uploaded_file.size,
-            'text_content': text_content,
-            'word_count': len(text_content.split()) if text_content else 0,
-            'char_count': len(text_content) if text_content else 0,
+            "filename": uploaded_file.name,
+            "file_size": uploaded_file.size,
+            "text_content": text_content,
+            "word_count": len(text_content.split()) if text_content else 0,
+            "char_count": len(text_content) if text_content else 0,
         })
 
     logger.info(f"Upload complete. {len(processed_files)} files processed, {len(errors)} failed.")
