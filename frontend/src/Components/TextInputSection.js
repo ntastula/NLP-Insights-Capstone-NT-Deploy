@@ -31,7 +31,7 @@ const uploadFilesToBackend = async (files) => {
   console.log("Files to upload:", files);
 
   const formData = new FormData();
-  files.forEach((file) => formData.append("file", file)); // all under same key
+  files.forEach((file) => formData.append("files", file));
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
@@ -507,43 +507,60 @@ Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
         </div>
       )}
 
-      {/* Uploaded Preview */}
-      {uploadedPreview && (
-        <div
-          className="keyness-preview"
-          style={{
-            width: "100%",
-            padding: "16px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "6px",
-            border: "1px solid #e9ecef",
-            marginTop: "12px",
-          }}
-        >
-          <h3
-            className="font-semibold mb-2"
-            style={{ marginBottom: "12px", color: "#495057" }}
-          >
-            Uploaded Text Preview:
-          </h3>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              maxHeight: "200px",
-              overflow: "auto",
-              backgroundColor: "#ffffff",
-              padding: "12px",
-              borderRadius: "4px",
-              border: "1px solid #dee2e6",
-              fontSize: "13px",
-              fontFamily: "monospace",
-              margin: 0,
-            }}
-          >
-            {uploadedPreview}
-          </pre>
-        </div>
-      )}
+{/* Uploaded Preview */}
+{selectedFiles.length > 0 && (
+  <div
+    className="keyness-preview"
+    style={{
+      width: "100%",
+      padding: "16px",
+      backgroundColor: "#f8f9fa",
+      borderRadius: "6px",
+      border: "1px solid #e9ecef",
+      marginTop: "12px",
+    }}
+  >
+    <h3
+      className="font-semibold mb-2"
+      style={{ marginBottom: "12px", color: "#495057" }}
+    >
+      Uploaded Text Preview:
+    </h3>
+    <pre
+      style={{
+        whiteSpace: "pre-wrap",
+        maxHeight: "200px",   // keeps box scrollable
+        overflowY: "auto",
+        backgroundColor: "#ffffff",
+        padding: "12px",
+        borderRadius: "4px",
+        border: "1px solid #dee2e6",
+        fontSize: "13px",
+        fontFamily: "monospace",
+        margin: 0,
+      }}
+    >
+      {selectedFiles.map((file, index) => {
+        const previewText = file.textContent
+          ? file.textContent.split("\n").slice(0, 4).join("\n") // first 4 lines
+          : "";
+
+        return (
+          <div key={index} style={{ marginBottom: "1em" }}>
+            <strong>{file.name}</strong>
+            {"\n"}
+            {previewText}
+            {"\n---\n"}
+          </div>
+        );
+      })}
+    </pre>
+  </div>
+)}
+
+
+
+
 
       {/* Corpus Preview */}
       {corpusPreview && (
