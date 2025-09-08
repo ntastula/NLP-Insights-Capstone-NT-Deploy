@@ -10,10 +10,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency
-from api.keyness.keyness_analyser import compute_keyness
 from gensim import corpora, models
 from collections import defaultdict
-from api.keyness.keyness_analyser import compute_keyness, keyness_gensim, keyness_spacy
+from api.keyness.keyness_analyser import compute_keyness, keyness_gensim, keyness_spacy, keyness_sklearn, filter_content_words
 import spacy
 import mimetypes
 from django.core.files.uploadedfile import UploadedFile
@@ -175,112 +174,7 @@ def read_corpus():
     except FileNotFoundError:
         return ""
 
-def keyness_sklearn(uploaded_text, corpus_text, top_n=20):
-    vectorizer = CountVectorizer()
-    X = vectorizer.fit_transform([uploaded_text, corpus_text])
-    terms = vectorizer.get_feature_names_out()
-    freqs = X.toarray()
 
-    uploaded_counts = freqs[0]
-    corpus_counts = freqs[1]
-
-    results = []
-    for word, u_count, c_count in zip(terms, uploaded_counts, corpus_counts):
-        if u_count == 0:
-            continue  # skip words not in uploaded text
-
-        contingency = np.array([
-            [u_count, sum(uploaded_counts) - u_count],
-            [c_count, sum(corpus_counts) - c_count]
-        ])
-
-        try:
-            chi2, p, _, _ = chi2_contingency(contingency, correction=False)
-        except ValueError:
-            chi2, p = 0, 1
-
-        results.append({
-            "word": word,
-            "uploaded_count": int(u_count),
-            "sample_count": int(c_count),
-            "chi2": float(chi2),
-            "p_value": float(p),
-        })
-
-    # Sort and limit top N
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
-    results_top = results_sorted[:top_n]
-
-    return {
-        "results": results_top,
-        "uploaded_total": int(sum(uploaded_counts)),
-        "corpus_total": int(sum(corpus_counts)),
-    }
-
-def keyness_gensim(uploaded_text, corpus_text, top_n=20):
-    """
-    Compute keyness using Gensim TF-IDF scores and chi-squared contingency for counts.
-    """
-    # 1. Tokenize texts
-    uploaded_tokens = uploaded_text.lower().split()
-    corpus_tokens = corpus_text.lower().split()
-
-    # 2. Build dictionary and corpus for gensim
-    dictionary = corpora.Dictionary([uploaded_tokens, corpus_tokens])
-    corpus_gensim = [dictionary.doc2bow(uploaded_tokens), dictionary.doc2bow(corpus_tokens)]
-
-    # 3. TF-IDF model
-    tfidf = models.TfidfModel(corpus_gensim, smartirs='ntc')
-    tfidf_scores = [tfidf[doc] for doc in corpus_gensim]  # list of (term_id, score)
-
-    # 4. Convert to dict for easy access
-    uploaded_tfidf = {dictionary[id]: score for id, score in tfidf_scores[0]}
-    corpus_tfidf = {dictionary[id]: score for id, score in tfidf_scores[1]}
-
-    # 5. Count occurrences
-    uploaded_counts = defaultdict(int)
-    corpus_counts = defaultdict(int)
-    for word in uploaded_tokens:
-        uploaded_counts[word] += 1
-    for word in corpus_tokens:
-        corpus_counts[word] += 1
-
-    # 6. Compute chi-squared contingency and combine with TF-IDF
-    results = []
-    all_words = set(uploaded_tokens)
-    for word in all_words:
-        u_count = uploaded_counts.get(word, 0)
-        c_count = corpus_counts.get(word, 0)
-        if u_count == 0:
-            continue
-
-        contingency = np.array([
-            [u_count, sum(uploaded_counts.values()) - u_count],
-            [c_count, sum(corpus_counts.values()) - c_count]
-        ])
-        try:
-            chi2, p, _, _ = chi2_contingency(contingency, correction=False)
-        except ValueError:
-            chi2, p = 0, 1
-
-        results.append({
-            "word": word,
-            "uploaded_count": u_count,
-            "sample_count": c_count,
-            "chi2": float(chi2),
-            "p_value": float(p),
-            "tfidf_score": float(uploaded_tfidf.get(word, 0))
-        })
-
-    # Sort by chi2 or by TF-IDF (here by chi2 for compatibility)
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
-    results_top = results_sorted[:top_n]
-
-    return {
-        "results": results_top,
-        "uploaded_total": int(sum(uploaded_counts.values())),
-        "corpus_total": int(sum(corpus_counts.values())),
-    }
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -305,8 +199,6 @@ def analyse_keyness(request):
         uploaded_text = data.get("uploaded_text", "")
         method = data.get("method", "nltk").lower()
 
-        logger.info(f"Keyness analysis requested: method={method}, uploaded_text_words={len(uploaded_text.split())}")
-
         if not uploaded_text:
             logger.warning("Analysis request with empty uploaded_text")
             return JsonResponse({"error": "No uploaded text provided"}, status=400)
@@ -316,40 +208,50 @@ def analyse_keyness(request):
             logger.error("Reference corpus is empty")
             return JsonResponse({"error": "Reference corpus is empty."}, status=500)
 
-        # Compute results based on method
+        # ✅ Compute filtered tokens once for consistency
+        filtered_uploaded = filter_content_words(uploaded_text)
+        filtered_corpus = filter_content_words(sample_corpus)
+
+        logger.info(
+            f"Keyness analysis requested: method={method}, "
+            f"uploaded_text_words={len(filtered_uploaded)}, corpus_words={len(filtered_corpus)}"
+        )
+
+        # Compute results
         if method == "nltk":
             results_list = compute_keyness(uploaded_text, sample_corpus, top_n=20)
-            uploaded_total = len(uploaded_text.split())
-            corpus_total = len(sample_corpus.split())
         elif method == "sklearn":
             results_dict = keyness_sklearn(uploaded_text, sample_corpus)
             results_list = results_dict["results"]
-            uploaded_total = results_dict["uploaded_total"]
-            corpus_total = results_dict["corpus_total"]
         elif method == "gensim":
             results_dict = keyness_gensim(uploaded_text, sample_corpus)
             results_list = results_dict["results"]
-            uploaded_total = results_dict["uploaded_total"]
-            corpus_total = results_dict["corpus_total"]
         elif method == "spacy":
             results_dict = keyness_spacy(uploaded_text, sample_corpus)
             results_list = results_dict["results"]
-            uploaded_total = results_dict.get("uploaded_total", len(uploaded_text.split()))
-            corpus_total = results_dict.get("corpus_total", len(sample_corpus.split()))
         else:
             logger.warning(f"Unknown keyness method requested: {method}")
             return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
+
+        # ✅ Use filtered totals consistently
+        uploaded_total = len(filtered_uploaded)
+        corpus_total = len(filtered_corpus)
 
         # Save result to DB
         keyness_obj = KeynessResult.objects.create(
             method=method,
             uploaded_text=uploaded_text,
-            results={"results": results_list},  # <-- match model field name
+            results={"results": results_list},
             uploaded_total=uploaded_total,
-            corpus_total=corpus_total
+            corpus_total=corpus_total,
         )
 
-        logger.info(f"Keyness analysis completed: method={method}, results_count={len(results_list)}, id={keyness_obj.id}")
+        logger.info(
+            f"Keyness analysis completed: method={method}, "
+            f"results_count={len(results_list)}, "
+            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, "
+            f"id={keyness_obj.id}"
+        )
 
         response = {
             "id": keyness_obj.id,
@@ -364,6 +266,7 @@ def analyse_keyness(request):
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @require_http_methods(["GET"])
 def get_keyness_results(request, result_id):
