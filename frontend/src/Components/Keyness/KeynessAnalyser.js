@@ -102,7 +102,7 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
 </div>
 
 
-      {loading && <p className="text-gray-500 italic">Analyzing text...</p>}
+      {loading && <p className="text-gray-500 italic">Analysing text...</p>}
       {error && <p className="text-red-500">{error}</p>}
 
       {analysisDone && (
