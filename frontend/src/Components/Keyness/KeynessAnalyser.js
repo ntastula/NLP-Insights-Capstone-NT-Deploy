@@ -1,9 +1,38 @@
-// src/Components/KeynessAnalyser.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ResultsTable from "./ResultsTable";
 import KeynessResultsGrid from "./KeynessResultsGrid";
 import Charts from "./Charts";
 import ResultsSummary from "./ResultsSummary";
+import "./ProgressBar.css";
+
+const ProgressBar = ({ loading }) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      setProgress(0);
+      timer = setInterval(() => {
+        setProgress((old) => (old < 90 ? old + Math.random() * 3 : old));
+      }, 200);
+    } else {
+      setProgress(100);
+      const reset = setTimeout(() => setProgress(0), 500);
+      return () => clearTimeout(reset);
+    }
+    return () => clearInterval(timer);
+  }, [loading]);
+
+  return (
+    <div className="progress-container">
+      <div
+        className="progress-fill"
+        style={{ width: `${progress}%` }}
+      ></div>
+      <div className="progress-text">{Math.floor(progress)}%</div>
+    </div>
+  );
+};
 
 const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method, onBack }) => {
   const [comparisonResults, setComparisonResults] = useState([]);
@@ -12,6 +41,7 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
   const [error, setError] = useState("");
   const [analysisDone, setAnalysisDone] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState("nltk"); 
+  const [filterMode, setFilterMode] = useState("content"); // "content" = default (nouns, verbs, adjectives, adverbs)
 
   const performAnalysis = async (method) => {
   if (!uploadedText) return;
@@ -26,26 +56,22 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
     const response = await fetch("http://localhost:8000/api/analyse-keyness/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uploaded_text: uploadedText, method: method.toLowerCase() }),
+      body: JSON.stringify({ uploaded_text: uploadedText, method: method.toLowerCase(), filter_mode: filterMode, }),
     });
 
     const data = await response.json();
-
-    if (data.error) throw new Error(data.error);
-
     console.log("Received data:", data);
-
-    // Update state with results
-    setComparisonResults(data.results.results || data.results); // support both methods
-    setStats({
-  uploadedTotal: data.uploaded_total || uploadedText.split(/\s+/).length,
-  corpusTotal: data.corpus_total || 0
-});
-
-
-    setSelectedMethod(method); // store which method was used
-    setAnalysisDone(true);
-
+    if (response.ok) {
+      setComparisonResults(data.results.results || data.results);
+      setStats({
+        uploadedTotal: data.uploaded_total || uploadedText.split(/\s+/).length,
+        corpusTotal: data.corpus_total || 0
+      });
+      setAnalysisDone(true);
+      setSelectedMethod(method);
+    } else {
+      setError(data.error || "Analysis failed");
+    }
   } catch (err) {
     console.error("Analysis error:", err);
     setError("Analysis failed: " + err.message);
@@ -53,7 +79,6 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
     setLoading(false);
   }
 };
-
 
   return (
     
@@ -64,6 +89,35 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
 >
   ← Back
 </button>
+
+{/* Word Filtering Options */}
+    <div className="mb-6 text-center">
+      <p className="mb-2 font-medium">Select an option for what words in your text you would like analysed:</p>
+      <div className="flex justify-center gap-6">
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="filterMode"
+            value="content"
+            checked={filterMode === "content"}
+            onChange={(e) => setFilterMode(e.target.value)}
+            className="mr-1"
+          />
+          <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="filterMode"
+            value="all"
+            checked={filterMode === "all"}
+            onChange={(e) => setFilterMode(e.target.value)}
+            className="mr-1"
+          />
+          <span>All words</span>
+        </label>
+      </div>
+    </div>
 
       {/* Analyse Button */}
       <div className="text-center mb-6 flex justify-center gap-4">
@@ -101,8 +155,12 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
 
 </div>
 
+     {loading && (
+  <div className="w-full max-w-xl mx-auto mt-4">
+  <ProgressBar loading={loading} />
+</div>
+)}
 
-      {loading && <p className="text-gray-500 italic">Analysing text...</p>}
       {error && <p className="text-red-500">{error}</p>}
 
       {analysisDone && (
@@ -113,8 +171,6 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
   selectedMethod={selectedMethod}
   comparisonResults={comparisonResults}
 />
-
-
 
     {/* Significant Keywords Grid */}
     <KeynessResultsGrid results={comparisonResults.slice(0, 20)} method={selectedMethod} />
@@ -127,8 +183,6 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
     <ResultsTable results={comparisonResults} method={selectedMethod} />
   </>
 )}
-
-
     </div>
   );
 };

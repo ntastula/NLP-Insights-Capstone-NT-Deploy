@@ -10,7 +10,7 @@ const Charts = ({ results, method = "nltk" }) => {
     return <p className="text-gray-500 italic">No chart data available.</p>;
   }
 
-  const topResults = results.slice(0, 15);
+  const topResults = results.slice(0, 20);
 
   // Determine axis labels and data keys dynamically
 let xKey = "log_likelihood";
@@ -78,7 +78,7 @@ if (method.toLowerCase() === "nltk") {
 { xKey && yKey && (
   <div className="mb-8" style={{ width: "100%", height: 400 }}>
     <ResponsiveContainer width="100%" height="100%">
-      <ScatterChart data={results} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+      <ScatterChart data={topResults} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
           dataKey={xKey}
