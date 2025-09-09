@@ -12,7 +12,14 @@ import pandas as pd
 from scipy.stats import chi2_contingency
 from gensim import corpora, models
 from collections import defaultdict
-from api.keyness.keyness_analyser import compute_keyness, keyness_gensim, keyness_spacy, keyness_sklearn, filter_content_words
+from api.keyness.keyness_analyser import (
+    compute_keyness,
+    keyness_gensim,
+    keyness_spacy,
+    keyness_sklearn,
+    filter_content_words,
+    filter_all_words,
+)
 import spacy
 import mimetypes
 from django.core.files.uploadedfile import UploadedFile
@@ -116,7 +123,6 @@ def process_text_file(uploaded_file: UploadedFile) -> tuple[str, str]:
     except Exception as e:
         return "", f"Error processing file: {str(e)}"
 
-
 @csrf_exempt
 @require_POST
 def upload_files(request):
@@ -176,6 +182,8 @@ def read_corpus():
 
 
 
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_corpus_preview(request):
@@ -198,6 +206,12 @@ def analyse_keyness(request):
         data = json.loads(request.body)
         uploaded_text = data.get("uploaded_text", "")
         method = data.get("method", "nltk").lower()
+        filter_mode = data.get("filter_mode", "content")
+
+        if filter_mode == "all":
+            filter_fn = filter_all_words
+        else:
+            filter_fn = filter_content_words
 
         if not uploaded_text:
             logger.warning("Analysis request with empty uploaded_text")
@@ -208,26 +222,31 @@ def analyse_keyness(request):
             logger.error("Reference corpus is empty")
             return JsonResponse({"error": "Reference corpus is empty."}, status=500)
 
-        # ✅ Compute filtered tokens once for consistency
-        filtered_uploaded = filter_content_words(uploaded_text)
-        filtered_corpus = filter_content_words(sample_corpus)
+        # Choose filter function
+        filter_func = filter_all_words if filter_mode == "all" else filter_content_words
+
+        # Apply filter consistently
+        filtered_uploaded = filter_func(uploaded_text)
+        filtered_corpus = filter_func(sample_corpus)
 
         logger.info(
             f"Keyness analysis requested: method={method}, "
-            f"uploaded_text_words={len(filtered_uploaded)}, corpus_words={len(filtered_corpus)}"
+            f"filter_mode={filter_mode}, "
+            f"uploaded_text_words={len(filtered_uploaded)}, "
+            f"corpus_words={len(filtered_corpus)}"
         )
 
         # Compute results
         if method == "nltk":
-            results_list = compute_keyness(uploaded_text, sample_corpus, top_n=20)
+            results_list = compute_keyness(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
         elif method == "sklearn":
-            results_dict = keyness_sklearn(uploaded_text, sample_corpus)
+            results_dict = keyness_sklearn(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
             results_list = results_dict["results"]
         elif method == "gensim":
-            results_dict = keyness_gensim(uploaded_text, sample_corpus)
+            results_dict = keyness_gensim(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
             results_list = results_dict["results"]
         elif method == "spacy":
-            results_dict = keyness_spacy(uploaded_text, sample_corpus)
+            results_dict = keyness_spacy(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
             results_list = results_dict["results"]
         else:
             logger.warning(f"Unknown keyness method requested: {method}")
@@ -248,14 +267,17 @@ def analyse_keyness(request):
 
         logger.info(
             f"Keyness analysis completed: method={method}, "
+            f"filter_mode={filter_mode}, "
             f"results_count={len(results_list)}, "
-            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, "
+            f"uploaded_total={uploaded_total}, "
+            f"corpus_total={corpus_total}, "
             f"id={keyness_obj.id}"
         )
 
         response = {
             "id": keyness_obj.id,
             "method": method,
+            "filter_mode": filter_mode,
             "results": results_list,
             "uploaded_total": uploaded_total,
             "corpus_total": corpus_total,

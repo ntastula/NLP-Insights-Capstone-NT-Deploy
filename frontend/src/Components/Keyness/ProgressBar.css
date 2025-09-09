@@ -1,0 +1,27 @@
+.progress-container {
+  width: 400px;
+  height: 24px;
+  background-color: #d1d5db; /* Tailwind gray-300 */
+  border-radius: 9999px;
+  overflow: hidden;
+  margin: 1rem auto;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #3b82f6; /* Tailwind blue-500 */
+  width: 0%;
+  transition: width 0.2s ease-in-out;
+}
+
+.progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+  pointer-events: none;
+}
