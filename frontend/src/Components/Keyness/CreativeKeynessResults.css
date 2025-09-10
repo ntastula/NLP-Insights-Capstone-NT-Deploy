@@ -1,0 +1,125 @@
+/* CreativeKeynessResults.css */
+
+/* Container for each POS group */
+.pos-group {
+  margin-bottom: 1.5rem;
+}
+
+/* POS heading */
+.pos-group h4 {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  color: #333;
+}
+
+.pos-section {
+  margin-bottom: 1.5rem;
+}
+
+/* POS heading */
+.pos-section h3 {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  color: #333;
+}
+
+/* Container for the words */
+.word-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem; /* space between words */
+}
+
+.word-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem; /* space between words */
+}
+
+/* Individual keyword blocks */
+.keyword {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s, box-shadow 0.1s;
+  white-space: nowrap; /* prevent breaking inside word */
+}
+
+/* Hover effect */
+.keyword:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* POS colours */
+.keyword-pill.noun {
+  background-color: #10b981; /* green */
+  color: #1f2937;
+}
+
+.keyword-pill.verb {
+  background-color: #3b82f6; /* blue */
+  color: #1f2937;
+}
+
+.keyword-pill.adj {
+  background-color: #f59e0b; /* orange */
+  color: #1f2937;
+}
+
+.keyword-pill.adv {
+  background-color: #8b5cf6; /* purple */
+  color: #1f2937;
+}
+
+.keyword-pill.other {
+  background-color: #6b7280; /* gray */
+  color: #1f2937;
+}
+
+.keyword-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.keyword-pill {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+  color: white;
+}
+
+.keyword-pill:hover {
+  transform: scale(1.1);
+}
+
+/* Colours by POS */
+.keyword-pill.verb {
+  background: #3b82f6; /* blue */
+}
+
+.keyword-pill.noun {
+  background: #10b981; /* green */
+}
+
+.keyword-pill.adj {
+  background: #f59e0b; /* orange */
+}
+
+.keyword-pill.adv {
+  background: #8b5cf6; /* purple */
+}
+
+.keyword-pill.other {
+  background: #6b7280; /* gray */
+}

@@ -19,6 +19,8 @@ from api.keyness.keyness_analyser import (
     keyness_sklearn,
     filter_content_words,
     filter_all_words,
+    extract_sentences,
+    keyness_nltk,
 )
 import spacy
 import mimetypes
@@ -222,12 +224,10 @@ def analyse_keyness(request):
             logger.error("Reference corpus is empty")
             return JsonResponse({"error": "Reference corpus is empty."}, status=500)
 
-        # Choose filter function
-        filter_func = filter_all_words if filter_mode == "all" else filter_content_words
-
-        # Apply filter consistently
-        filtered_uploaded = filter_func(uploaded_text)
-        filtered_corpus = filter_func(sample_corpus)
+        filtered_uploaded = filter_fn(uploaded_text)
+        filtered_corpus = filter_fn(sample_corpus)
+        uploaded_total = len(filtered_uploaded)
+        corpus_total = len(filtered_corpus)
 
         logger.info(
             f"Keyness analysis requested: method={method}, "
@@ -237,30 +237,32 @@ def analyse_keyness(request):
         )
 
         # Compute results
+        results_list = []
         if method == "nltk":
-            results_list = compute_keyness(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
+            nltk_data = keyness_nltk(uploaded_text, sample_corpus, top_n=20, filter_func=filter_fn)
+            results_list = nltk_data
+
+
         elif method == "sklearn":
-            results_dict = keyness_sklearn(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
-            results_list = results_dict["results"]
+            res = keyness_sklearn(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
+            results_list = res.get("results", [])
+
         elif method == "gensim":
-            results_dict = keyness_gensim(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
-            results_list = results_dict["results"]
+            res = keyness_gensim(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
+            results_list = res.get("results", [])
+
         elif method == "spacy":
-            results_dict = keyness_spacy(uploaded_text, sample_corpus, top_n=20, filter_func=filter_func)
-            results_list = results_dict["results"]
+            res = keyness_spacy(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
+            results_list = res.get("results", [])
         else:
             logger.warning(f"Unknown keyness method requested: {method}")
             return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
-
-        # ✅ Use filtered totals consistently
-        uploaded_total = len(filtered_uploaded)
-        corpus_total = len(filtered_corpus)
 
         # Save result to DB
         keyness_obj = KeynessResult.objects.create(
             method=method,
             uploaded_text=uploaded_text,
-            results={"results": results_list},
+            results=results_list,
             uploaded_total=uploaded_total,
             corpus_total=corpus_total,
         )
@@ -274,16 +276,14 @@ def analyse_keyness(request):
             f"id={keyness_obj.id}"
         )
 
-        response = {
+        return JsonResponse({
             "id": keyness_obj.id,
             "method": method,
             "filter_mode": filter_mode,
-            "results": results_list,
+            "results": results_list,  # flat list for frontend
             "uploaded_total": uploaded_total,
-            "corpus_total": corpus_total,
-        }
-
-        return JsonResponse(response)
+            "corpus_total": corpus_total
+        })
 
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
@@ -305,6 +305,28 @@ def get_keyness_results(request, result_id):
             return JsonResponse(response)
     except KeynessResult.DoesNotExist:
             return JsonResponse({"error": "Result not found"}, status=404)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def get_sentences(request):
+
+    try:
+        data = json.loads(request.body)
+        uploaded_text = data.get("uploaded_text", "")
+        word = data.get("word", "")
+
+        if not uploaded_text or not word:
+            return JsonResponse({"error": "Missing text or word"}, status=400)
+
+        sentences = extract_sentences(uploaded_text, word)
+        return JsonResponse({"sentences": sentences})
+
+    except Exception as e:
+        logger.exception(f"Error extracting sentences: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+
 
 
 # --- Sentiment (SentiArt lexicon) -------------------------------------------
