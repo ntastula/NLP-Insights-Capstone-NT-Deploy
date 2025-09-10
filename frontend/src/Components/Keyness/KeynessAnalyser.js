@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
-import ResultsTable from "./ResultsTable";
-import KeynessResultsGrid from "./KeynessResultsGrid";
-import Charts from "./Charts";
+import React, { useState } from "react";
 import ResultsSummary from "./ResultsSummary";
+import Charts from "./Charts";
+import ResultsTable from "./ResultsTable";
+import CreativeKeynessResults from "./CreativeKeynessResults";
 import "./ProgressBar.css";
 
 const ProgressBar = ({ loading }) => {
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let timer;
     if (loading) {
       setProgress(0);
@@ -25,10 +25,7 @@ const ProgressBar = ({ loading }) => {
 
   return (
     <div className="progress-container">
-      <div
-        className="progress-fill"
-        style={{ width: `${progress}%` }}
-      ></div>
+      <div className="progress-fill" style={{ width: `${progress}%` }}></div>
       <div className="progress-text">{Math.floor(progress)}%</div>
     </div>
   );
@@ -40,8 +37,8 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [analysisDone, setAnalysisDone] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState("nltk"); 
-  const [filterMode, setFilterMode] = useState("content"); // "content" = default (nouns, verbs, adjectives, adverbs)
+  const [selectedMethod, setSelectedMethod] = useState("nltk");
+  const [filterMode, setFilterMode] = useState("content");
 
   const performAnalysis = async (method) => {
   if (!uploadedText) return;
@@ -51,24 +48,30 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
   setSelectedMethod(method);
 
   try {
-    console.log("Perform analysis clicked. Method:", method);
-
     const response = await fetch("http://localhost:8000/api/analyse-keyness/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uploaded_text: uploadedText, method: method.toLowerCase(), filter_mode: filterMode, }),
+      body: JSON.stringify({
+        uploaded_text: uploadedText,
+        method: method.toLowerCase(),
+        filter_mode: filterMode,
+      }),
     });
 
     const data = await response.json();
-    console.log("Received data:", data);
+
     if (response.ok) {
-      setComparisonResults(data.results.results || data.results);
+      // data.results is always a flat array
+      const resultsArray = Array.isArray(data.results) ? data.results : [];
+
+      setComparisonResults(resultsArray);
+
       setStats({
-        uploadedTotal: data.uploaded_total || uploadedText.split(/\s+/).length,
-        corpusTotal: data.corpus_total || 0
+        uploadedTotal: data.uploaded_total ?? uploadedText.split(/\s+/).length,
+        corpusTotal: data.corpus_total ?? 0,
       });
+
       setAnalysisDone(true);
-      setSelectedMethod(method);
     } else {
       setError(data.error || "Analysis failed");
     }
@@ -79,6 +82,9 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
     setLoading(false);
   }
 };
+
+
+
 
   return (
     
@@ -164,25 +170,14 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
       {error && <p className="text-red-500">{error}</p>}
 
       {analysisDone && (
-  <>
-    {/* Results Summary */}
-    <ResultsSummary
-  stats={stats}
-  selectedMethod={selectedMethod}
-  comparisonResults={comparisonResults}
-/>
-
-    {/* Significant Keywords Grid */}
-    <KeynessResultsGrid results={comparisonResults.slice(0, 20)} method={selectedMethod} />
-
-    {/* Charts */}
-    <Charts results={comparisonResults.results ?? comparisonResults} method={selectedMethod} />
-
-
-    {/* Full Results Table */}
-    <ResultsTable results={comparisonResults} method={selectedMethod} />
-  </>
+  <CreativeKeynessResults
+    results={comparisonResults}
+    uploadedText={uploadedText}
+    method={selectedMethod}
+    stats={stats}
+  />
 )}
+
     </div>
   );
 };
