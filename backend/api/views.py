@@ -239,21 +239,24 @@ def analyse_keyness(request):
         # Compute results
         results_list = []
         if method == "nltk":
-            nltk_data = keyness_nltk(uploaded_text, sample_corpus, top_n=20, filter_func=filter_fn)
-            results_list = nltk_data
-
+            nltk_data = keyness_nltk(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
+            results_list = nltk_data["results"]
+            total_significant = nltk_data["total_significant"]
 
         elif method == "sklearn":
             res = keyness_sklearn(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
             results_list = res.get("results", [])
+            total_significant = res.get("total_significant", len(results_list))
 
         elif method == "gensim":
             res = keyness_gensim(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
             results_list = res.get("results", [])
+            total_significant = res.get("total_significant", len(results_list))
 
         elif method == "spacy":
             res = keyness_spacy(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
             results_list = res.get("results", [])
+            total_significant = res.get("total_significant", len(results_list))
         else:
             logger.warning(f"Unknown keyness method requested: {method}")
             return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
@@ -282,7 +285,8 @@ def analyse_keyness(request):
             "filter_mode": filter_mode,
             "results": results_list,  # flat list for frontend
             "uploaded_total": uploaded_total,
-            "corpus_total": corpus_total
+            "corpus_total": corpus_total,
+            "total_significant": total_significant
         })
 
     except Exception as e:

@@ -114,26 +114,42 @@ const posGroups = useMemo(() => {
       </div>
 
       {/* Keywords View */}
-      {activeView === "keywords" && (
-        <div className="creative-results">
-          {Object.entries(posGroups).map(([pos, words]) => (
-            <div key={pos} className="pos-section">
-              <h3>{pos}</h3>
-              <div className="word-list" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {words.map((w, idx) => (
-                  <span
-                    key={idx}
-                    className={`keyword keyword-pill ${posColors[pos] || posColors.OTHER} cursor-pointer`}
-                    onClick={() => handleKeywordClick(w.word)}
-                  >
-                    {w.word}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+{activeView === "keywords" && (
+  <div className="creative-results">
+    {Object.entries(posGroups).map(([pos, words]) => {
+      // Map POS codes to full names
+      const posFullNames = {
+        ADV: "Adverb",
+        NOUN: "Noun",
+        VERB: "Verb",
+        ADJ: "Adjective",
+        OTHER: "Other",
+      };
+      const posLabel = posFullNames[pos] || pos;
+
+      return (
+        <div key={pos} className="pos-section">
+          <h3>{posLabel}</h3>
+          <div
+            className="word-list"
+            style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}
+          >
+            {words.map((w, idx) => (
+              <span
+                key={idx}
+                className={`keyword keyword-pill ${posColors[pos] || posColors.OTHER} cursor-pointer`}
+                onClick={() => handleKeywordClick(w.word)}
+              >
+                {w.word}
+              </span>
+            ))}
+          </div>
         </div>
-      )}
+      );
+    })}
+  </div>
+)}
+
 
       {/* Charts View */}
       {activeView === "charts" && <Charts results={safeResults} method={method} />}
