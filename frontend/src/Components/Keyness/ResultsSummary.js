@@ -23,9 +23,8 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults }) => {
     </div>
     <div>
       <div className="text-2xl font-bold text-purple-600">
-  {comparisonResults.slice(0, 20).length} 
+  {stats.totalSignificant || 0}
 </div>
-
       <div className="text-sm text-gray-600">Significant keywords</div>
     </div>
   </div>

@@ -69,6 +69,7 @@ const KeynessAnalyser = ({ uploadedText, uploadedPreview, corpusPreview, method,
       setStats({
         uploadedTotal: data.uploaded_total ?? uploadedText.split(/\s+/).length,
         corpusTotal: data.corpus_total ?? 0,
+        totalSignificant: data.total_significant ?? 0,
       });
 
       setAnalysisDone(true);
