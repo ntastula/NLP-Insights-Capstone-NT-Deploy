@@ -11,6 +11,8 @@ from gensim.corpora import Dictionary
 import spacy
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk.stem import WordNetLemmatizer
+from nltk import word_tokenize, pos_tag, FreqDist
+from math import log
 
 nltk.download("punkt", quiet=True)
 
@@ -158,13 +160,9 @@ def compute_keyness(uploaded_text, corpus_text=None, top_n=50, filter_func=None)
 
     return pos_groups
 
-import nltk
-from nltk import word_tokenize, pos_tag, FreqDist
-from math import log
-
 ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
-def keyness_nltk(uploaded_text, corpus_text, top_n=20, filter_func=None):
+def keyness_nltk(uploaded_text, corpus_text, top_n=50, filter_func=None):
     """
     Compute keyness using NLTK-style log-likelihood.
     Returns a list of dicts with word, pos, counts, effect_size, log_likelihood, keyness.
@@ -241,14 +239,23 @@ def keyness_nltk(uploaded_text, corpus_text, top_n=20, filter_func=None):
             "keyness": round(ll, 2)
         })
 
+    # Sort all results
+    sorted_results = sorted(results, key=lambda x: x["keyness"], reverse=True)
+
+    # True total significant words (before top_n cutoff)
+    total_significant = len(sorted_results)
+
     # Sort by log-likelihood descending
-    results_list = sorted(results, key=lambda x: x["keyness"], reverse=True)[:top_n]
+    results_list = sorted_results[:top_n]
 
-    return results_list
+    return {
+        "results": results_list,
+        "total_significant": total_significant
+    }
 
 
 
-def keyness_gensim(uploaded_text, corpus_text, top_n=20, filter_func=filter_content_words):
+def keyness_gensim(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
     tokens_uploaded = filter_func(uploaded_text)
     tokens_corpus = filter_func(corpus_text)
 
@@ -298,15 +305,21 @@ def keyness_gensim(uploaded_text, corpus_text, top_n=20, filter_func=filter_cont
         })
 
     results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+
+    total_significant = len(results_sorted)
+
+    top_results = results_sorted[:top_n]
+
     return {
-        "results": results_sorted[:top_n],
+        "results": top_results,
+        "total_significant": total_significant,
         "uploaded_total": int(sum(uploaded_counts.values())),
         "corpus_total": int(sum(corpus_counts.values())),
     }
 
 
 
-def keyness_spacy(uploaded_text, corpus_text, top_n=20, filter_func=filter_content_words):
+def keyness_spacy(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
     tokens_uploaded = filter_func(uploaded_text)
     tokens_corpus = filter_func(corpus_text)
 
@@ -356,13 +369,19 @@ def keyness_spacy(uploaded_text, corpus_text, top_n=20, filter_func=filter_conte
         })
 
     results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+
+    total_significant = len(results_sorted)
+
+    top_results = results_sorted[:top_n]
+
     return {
-        "results": results_sorted[:top_n],
+        "results": top_results,
+        "total_significant": total_significant,
         "uploaded_total": total_uploaded,
         "corpus_total": total_corpus,
     }
 
-def keyness_sklearn(uploaded_text, corpus_text, top_n=20, filter_func=filter_content_words):
+def keyness_sklearn(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
     tokens_uploaded = filter_func(uploaded_text)
     tokens_corpus = filter_func(corpus_text)
 
@@ -409,8 +428,13 @@ def keyness_sklearn(uploaded_text, corpus_text, top_n=20, filter_func=filter_con
         })
 
     results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+
+    total_significant = len(results_sorted)
+
     return {
         "results": results_sorted[:top_n],
-        "uploaded_total": int(sum(uploaded_counts)),
-        "corpus_total": int(sum(corpus_counts)),
+        "total_significant": total_significant,
+        "uploaded_total": int(uploaded_counts.sum()),
+        "corpus_total": int(corpus_counts.sum()),
+
     }
