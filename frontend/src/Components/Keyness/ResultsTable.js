@@ -1,13 +1,14 @@
 import React from "react";
+import { formatNumber } from "../../Utils";
 
-const ResultsTable = ({ results, method }) => {
-  if (!results || results.length === 0) return null;
+const ResultsTable = ({ results = [], method = "nltk" }) => {
+  if (!Array.isArray(results) || results.length === 0) return null;
 
-  const methodLower = method?.toLowerCase();
-  const isSklearn = methodLower === "sklearn";
-  const isGensim = methodLower === "gensim";
-  const isSpacy = methodLower === "spacy";
-  const isNltk = methodLower === "nltk";
+  const methodUpper = method.toUpperCase();
+  const isSklearn = methodUpper === "SKLEARN";
+  const isGensim = methodUpper === "GENSIM";
+  const isSpacy = methodUpper === "SPACY";
+  const isNltk = methodUpper === "NLTK";
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mt-6 overflow-x-auto">
@@ -19,15 +20,18 @@ const ResultsTable = ({ results, method }) => {
             <th className="px-4 py-2 border-b">Your Text Freq</th>
             <th className="px-4 py-2 border-b">Sample Freq</th>
 
-            {isSklearn && (
+            {/* Sklearn and Spacy show Chi² and p-value */}
+            {(isSklearn || isSpacy) && (
               <>
                 <th className="px-4 py-2 border-b">Chi²</th>
                 <th className="px-4 py-2 border-b">p-value</th>
               </>
             )}
 
+            {/* Gensim */}
             {isGensim && <th className="px-4 py-2 border-b">TF-IDF Score</th>}
 
+            {/* Nltk and Spacy show Effect Size / Log-Likelihood / Keyness */}
             {(isNltk || isSpacy) && (
               <>
                 <th className="px-4 py-2 border-b">Effect Size</th>
@@ -37,32 +41,40 @@ const ResultsTable = ({ results, method }) => {
             )}
           </tr>
         </thead>
-
         <tbody>
-          {results.map((row, index) => (
-            <tr key={index} className="hover:bg-gray-50">
-              <td className="px-4 py-2 border-b">{row.word}</td>
-              <td className="px-4 py-2 border-b">{row.uploaded_count ?? row.count_a ?? row.uploaded_freq ?? 0}</td>
-              <td className="px-4 py-2 border-b">{row.sample_count ?? row.count_b ?? row.sample_freq ?? 0}</td>
+          {results.map((row, index) => {
+            const word = row.word ?? "-";
+            const uploaded = row.uploaded_count ?? row.uploaded_freq ?? 0;
+            const sample = row.sample_count ?? row.sample_freq ?? 0;
 
-              {isSklearn && (
-                <>
-                  <td>{row.chi2?.toFixed(3)}</td>
-                  <td>{row.p_value?.toExponential(2)}</td>
-                </>
-              )}
+            return (
+              <tr key={index} className="hover:bg-gray-50">
+                <td className="px-4 py-2 border-b">{word}</td>
+                <td className="px-4 py-2 border-b">{uploaded}</td>
+                <td className="px-4 py-2 border-b">{sample}</td>
 
-              {isGensim && <td>{row.tfidf_score?.toFixed(3)}</td>}
+                {(isSklearn || isSpacy) && (
+                  <>
+                    <td className="px-4 py-2 border-b">{formatNumber(row.chi2)}</td>
+                    <td className="px-4 py-2 border-b">{formatNumber(row.p_value, 2)}</td>
+                  </>
+                )}
 
-              {(isNltk || isSpacy) && (
-                <>
-                  <td>{row.effect_size}</td>
-                  <td>{row.log_likelihood}</td>
-                  <td>{row.keyness}</td>
-                </>
-              )}
-            </tr>
-          ))}
+                {isGensim && (
+                  <td className="px-4 py-2 border-b">{formatNumber(row.tfidf_score)}</td>
+                )}
+
+                {(isNltk || isSpacy) && (
+  <>
+    <td className="px-4 py-2 border-b">{formatNumber(row.effect_size)}</td>
+    <td className="px-4 py-2 border-b">{formatNumber(row.log_likelihood)}</td>
+    <td className="px-4 py-2 border-b">{row.keyness ?? "-"}</td>
+  </>
+)}
+
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
