@@ -1,5 +1,3 @@
-// src/Components/ResultsSummary.js
-// src/Components/ResultsSummary.js
 import React from "react";
 import { BarChart3 } from "lucide-react";
 
