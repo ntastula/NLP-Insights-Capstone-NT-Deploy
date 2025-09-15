@@ -5,7 +5,7 @@ const HomePage = ({ onSelect }) => {
     <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-gradient-to-br from-blue-500 via-purple-600 to-purple-800 p-6">
       <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl p-8 text-center max-w-lg w-full">
         <h1 className="text-4xl font-bold text-gray-800 mb-6">
-          Welcome to TCC Writing Analysis
+          Welcome to TTC Writing Analysis
         </h1>
         <p className="text-gray-600 mb-6">
           Select the type of analysis you would like to perform:
