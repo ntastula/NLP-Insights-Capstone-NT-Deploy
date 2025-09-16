@@ -5,6 +5,10 @@ import ResultsSummary from "./ResultsSummary";
 import SentenceModal from "./SentenceModal";
 import KeynessResultsGrid from "./KeynessResultsGrid"
 import "./CreativeKeynessResults.css";
+import { exportAnalysisToCSV } from "./ExportCsv";
+import { exportKeynessToXlsx } from "./ExportXlsx";
+import { generateChartData } from "./GenerateChartData";
+
 
 const posColors = {
   NOUN: "noun",
@@ -19,9 +23,13 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
   const [selectedWord, setSelectedWord] = useState(null);
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(false);
+  
 
   // Ensure results is always an array
   const safeResults = Array.isArray(results) ? results : [];
+  console.log("API results:", results);
+console.log("Safe results:", safeResults);
+
 
   // Group by POS
   const uploadedWordsSet = useMemo(() => {
@@ -90,28 +98,55 @@ const posGroups = useMemo(() => {
     return <p>No significant keywords found.</p>;
   }
 
+  const chartData = results?.slice(0, 20).map((r) => ({
+  label: r.word,
+  value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+}));
+
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
       <ResultsSummary stats={stats} selectedMethod={method} comparisonResults={safeResults} />
 
       {/* View Toggle Buttons */}
-      <div className="flex gap-4 mb-6 justify-center">
-        {["keywords", "charts", "table", "wordData"].map((view) => (
-          <button
-            key={view}
-            className={`btn ${activeView === view ? "bg-blue-500 text-white" : ""}`}
-            onClick={() => setActiveView(view)}
-          >
-            {view === "keywords"
-              ? "Top Keywords"
-              : view === "charts"
-              ? "Charts"
-              : view === "table"
-              ? "Table"
-              : "Word Data"}
-          </button>
-        ))}
-      </div>
+<div className="flex gap-4 mb-6 justify-center">
+  {["keywords", "charts", "table", "wordData"].map((view) => (
+    <button
+      key={view}
+      className={`btn ${activeView === view ? "bg-blue-500 text-white" : ""}`}
+      onClick={() => setActiveView(view)}
+    >
+      {view === "keywords"
+        ? "Top Keywords"
+        : view === "charts"
+        ? "Charts"
+        : view === "table"
+        ? "Table"
+        : "Word Data"}
+    </button>
+  ))}
+
+  {/* Download button */}
+  <button
+  className="btn bg-green-500 text-white"
+  onClick={() =>
+    exportKeynessToXlsx(
+      safeResults,
+      method,
+      stats,
+      posGroups,
+      [],
+      chartData      
+    )
+  }
+>
+  Download XLSX
+</button>
+
+
+
+</div>
+
 
       {/* Keywords View */}
 {activeView === "keywords" && (
