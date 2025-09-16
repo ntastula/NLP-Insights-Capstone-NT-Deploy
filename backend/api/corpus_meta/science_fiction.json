@@ -1,0 +1,34 @@
+{
+  "genre": "science_fiction",
+  "version": "2025-09-16",
+  "preview": [
+    "Panels flicker while the station turns,",
+    "telemetry whispering across the dark,",
+    "a minor drift pinned by patient math,",
+    "and the planet rolling like a quiet eye."
+  ],
+  "tokenizer": "sentiart_v1",
+  "filter": "content_words_v1",
+  "doc_count": 5,
+  "total_tokens": 150000,
+  "freq": {
+    "ship": 640,
+    "station": 430,
+    "orbit": 380,
+    "signal": 355,
+    "module": 290,
+    "engineer": 260,
+    "protocol": 240,
+    "data": 610,
+    "vacuum": 120
+  },
+  "sentiment_baseline": {
+    "coverage": 0.45,
+    "sentiment_score_mean": 0.02,
+    "magnitude_mean": 0.20,
+    "positive_ratio": 0.32,
+    "neutral_ratio": 0.52,
+    "negative_ratio": 0.16,
+    "emotions_mean": { "joy": 0.08, "sadness": 0.05, "anger": 0.06, "fear": 0.07, "disgust": 0.02 }
+  }
+}

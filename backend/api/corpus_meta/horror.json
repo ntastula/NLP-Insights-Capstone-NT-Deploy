@@ -1,0 +1,34 @@
+{
+  "genre": "horror",
+  "version": "2025-09-16",
+  "preview": [
+    "Wallpaper breathing in the bulb’s dim buzz,",
+    "a latch settling like a careful thought,",
+    "iron in the air and steps too soft,",
+    "the house remembering your name."
+  ],
+  "tokenizer": "sentiart_v1",
+  "filter": "content_words_v1",
+  "doc_count": 4,
+  "total_tokens": 140000,
+  "freq": {
+    "blood": 770,
+    "shadow": 680,
+    "scream": 330,
+    "night": 900,
+    "door": 620,
+    "basement": 240,
+    "whisper": 410,
+    "teeth": 210,
+    "breath": 360
+  },
+  "sentiment_baseline": {
+    "coverage": 0.48,
+    "sentiment_score_mean": -0.10,
+    "magnitude_mean": 0.35,
+    "positive_ratio": 0.18,
+    "neutral_ratio": 0.36,
+    "negative_ratio": 0.46,
+    "emotions_mean": { "joy": 0.04, "sadness": 0.08, "anger": 0.07, "fear": 0.22, "disgust": 0.10 }
+  }
+}

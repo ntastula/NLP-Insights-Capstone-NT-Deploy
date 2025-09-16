@@ -7,25 +7,37 @@ import SensorimotorLanding from "./Components/Sensorimotor/SensorimotorLanding";
 import useUnloadCleanup from "./Hooks/useUnloadCleanup";
 
 function App() {
-  const [activePage, setActivePage] = useState("home");
+    const [activePage, setActivePage] = useState("home");
+    const [selectedGenre, setSelectedGenre] = useState("");
 
-  const handleBack = () => setActivePage("home");
+    const handleBack = () => setActivePage("home");
 
-  useUnloadCleanup();
+    useUnloadCleanup();
 
-  return (
-    <div className="App p-6">
-      {activePage === "home" && <HomePage onSelect={setActivePage} />}
+    return (
+        <div className="App p-6">
+            {activePage === "home" && (
+                <HomePage
+                    onSelect={setActivePage}
+                    selectedGenre={selectedGenre}        
+                    onSelectGenre={setSelectedGenre}    
+                />
+            )}
 
-      {activePage === "keyness" && <KeynessLanding onBack={handleBack} />}
-      {activePage === "clustering" && <ClusteringLanding onBack={handleBack} />}
-      {activePage === "sentiment" && <SentimentLanding onBack={handleBack} />}
-      {activePage === "sensorimotor" && (
-        <SensorimotorLanding onBack={handleBack} />
+            {activePage === "keyness" && (
+                <KeynessLanding onBack={handleBack} genre={selectedGenre} />   
       )}
-    </div>
-  );
+            {activePage === "clustering" && (
+                <ClusteringLanding onBack={handleBack} genre={selectedGenre} />
+      )}
+            {activePage === "sentiment" && (
+                <SentimentLanding onBack={handleBack} genre={selectedGenre} /> 
+      )}
+            {activePage === "sensorimotor" && (
+                <SensorimotorLanding onBack={handleBack} genre={selectedGenre} />
+      )}
+        </div>
+    );
 }
 
 export default App;
-
