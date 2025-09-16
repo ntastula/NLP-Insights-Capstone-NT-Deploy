@@ -1,0 +1,39 @@
+{
+  "genre": "romance",
+  "version": "2025-09-14",
+  "preview": [
+    "A breathless confession beneath lamplight,",
+    "hands trembling as hearts begin to speak,",
+    "letters folded and refolded, ink worn thin,",
+    "a promise whispered where the street grows quiet."
+  ],
+
+  "tokenizer": "sentiart_v1",
+  "filter": "content_words_v1",
+
+  "doc_count": 3,
+  "total_tokens": 123456,
+
+  "freq": {
+    "love": 842,
+    "heart": 233,
+    "eyes": 201,
+    "kiss": 175,
+    "longing": 92
+  },
+
+  "sentiment_baseline": {
+    "coverage": 0.47,
+    "sentiment_score_mean": 0.12,
+    "magnitude_mean": 0.28,
+    "positive_ratio": 0.51,
+    "neutral_ratio": 0.35,
+    "negative_ratio": 0.14,
+    "emotions_mean": { "joy": 0.21, "sadness": 0.08, "anger": 0.05, "fear": 0.07, "disgust": 0.03 }
+  }
+
+  /* Optional later:
+   "idf": { "rareword": 4.77, "commonword": 0.12 },
+   "sensorimotor_baseline": { "visual": 0.61, "auditory": 0.22, "haptic": 0.18, "olfactory": 0.04, "gustatory": 0.03 }
+  */
+}
