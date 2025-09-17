@@ -24,3 +24,5 @@ numberbatch-en-19.08.txt.gz
 node_modules/
 dist/
 build/
+# Ignore local database
+backend/db.sqlite3

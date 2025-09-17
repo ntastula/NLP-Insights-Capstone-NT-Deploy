@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import TextInputSection from "../TextInputSection";
 import ClusteringAnalyser from "./ClusteringAnalyser";
 // import "./ClusteringLanding.css";
@@ -10,22 +10,7 @@ const ClusteringLanding = ({ onBack }) => {
   const [activeInput, setActiveInput] = useState("");
   const [error, setError] = useState("");
   const [analysisStarted, setAnalysisStarted] = useState(false);
-  const [corpusPreview, setCorpusPreview] = useState("");
   const [pastedWordCount, setPastedWordCount] = useState(0);
-
-  useEffect(() => {
-    const fetchCorpusPreview = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/corpus-preview/");
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        setCorpusPreview(data.preview.split("\n").slice(0, 4).join("\n"));
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchCorpusPreview();
-  }, []);
 
   const handleTextPaste = (e) => {
     const text = e.target.value;
@@ -58,7 +43,6 @@ const ClusteringLanding = ({ onBack }) => {
       <ClusteringAnalyser
         uploadedText={uploadedText}
         uploadedPreview={uploadedPreview}
-        corpusPreview={corpusPreview}
         onBack={() => setAnalysisStarted(false)}
       />
     );
@@ -81,22 +65,23 @@ const ClusteringLanding = ({ onBack }) => {
           handleTextPaste={handleTextPaste}
           pastedWordCount={pastedWordCount}
           uploadedPreview={uploadedPreview}
-          corpusPreview={corpusPreview}
           error={error}
           onFilesUploaded={handleFilesUploaded}
         />
 
-        <div className="text-center">
-          <button
-            onClick={handleContinue}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
-          >
-            Continue to Analysis →
-          </button>
-        </div>
+        <div className="text-center mb-12">
+  <button
+    onClick={handleContinue}
+    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
+  >
+    Continue to Analysis →
+  </button>
+</div>
       </div>
     </div>
   );
 };
 
 export default ClusteringLanding;
+
+
