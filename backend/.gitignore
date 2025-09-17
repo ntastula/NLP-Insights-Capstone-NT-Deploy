@@ -1,3 +1,6 @@
+# Ignore embeddings/data folder
+backend/backend/data/*
+
 # Ignore ConceptNet embeddings
 backend/models/numberbatch-en.txt
 numberbatch-en-19.08.txt.gz

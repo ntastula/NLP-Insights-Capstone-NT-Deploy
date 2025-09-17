@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 const ClusteringAnalyser = ({ uploadedText, onBack }) => {
   const [clusters, setClusters] = useState([]);
@@ -8,27 +8,30 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
   const [numDocs, setNumDocs] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [selectedCluster, setSelectedCluster] = useState("all"); // <-- dropdown state
+  const [selectedCluster, setSelectedCluster] = useState("all");
+  const [embedding, setEmbedding] = useState("conceptnet");
 
   const runAnalysis = async () => {
+    if (!uploadedText) return;
+
     try {
       setLoading(true);
       setError("");
       const response = await fetch("http://localhost:8000/api/clustering-analysis/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: uploadedText }),
+        body: JSON.stringify({ text: uploadedText, embedding }),
       });
 
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const data = await response.json();
 
-      // Save results into state (match backend field names)
       setClusters(data.clusters || []);
       setTopTerms(data.top_terms || {});
       setThemes(data.suggested_themes || {});
       setNumClusters(data.num_clusters || null);
       setNumDocs(data.num_docs || null);
+      setSelectedCluster("all"); // reset filter
 
     } catch (err) {
       setError(err.message);
@@ -37,11 +40,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
     }
   };
 
-  useEffect(() => {
-    if (uploadedText) runAnalysis();
-  }, [uploadedText]);
-
-  // Compute cluster options and filtered clusters
   const clusterOptions = Array.from(new Set(clusters.map(c => c.label))).sort((a, b) => a - b);
   const displayedClusters =
     selectedCluster === "all"
@@ -62,9 +60,32 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
           Clustering Analysis
         </h1>
 
-        {/* Loading & errors */}
-        {loading && <p className="text-gray-600">Analysing text…</p>}
-        {error && <p className="text-red-500">Error: {error}</p>}
+        {/* Embedding selection */}
+        <div className="mb-4">
+          <label className="mr-2 font-medium">Embeddings:</label>
+          <select
+            value={embedding}
+            onChange={(e) => setEmbedding(e.target.value)}
+            className="border rounded p-1"
+          >
+            <option value="conceptnet">ConceptNet</option>
+            <option value="spacy">spaCy</option>
+          </select>
+        </div>
+
+        {/* Run Analysis button */}
+        <div className="mb-6">
+          <button
+            onClick={runAnalysis}
+            disabled={loading || !uploadedText}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+          >
+            {loading ? "Analysing..." : "Run Analysis"}
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && <p className="text-red-500 mb-4">Error: {error}</p>}
 
         {/* Metadata */}
         {!loading && !error && numClusters && numDocs && (
@@ -94,8 +115,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
 
             {/* Clustered documents with dropdown filter */}
             <h2 className="text-xl font-semibold mb-4">Clustered Documents</h2>
-
-            {/* Dropdown */}
             <div className="mb-4">
               <label className="mr-2 font-medium">Select Cluster:</label>
               <select
@@ -112,7 +131,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
               </select>
             </div>
 
-            {/* Filtered documents */}
             <ul className="space-y-2 text-left">
               {displayedClusters.map((item, idx) => (
                 <li key={idx} className="bg-gray-50 p-3 rounded shadow">
@@ -129,4 +147,3 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
 };
 
 export default ClusteringAnalyser;
-
