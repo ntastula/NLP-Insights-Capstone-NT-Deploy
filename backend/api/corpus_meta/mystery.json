@@ -1,0 +1,34 @@
+{
+  "genre": "mystery",
+  "version": "2025-09-16",
+  "preview": [
+    "A streetlight ticks above wet stone,",
+    "footsteps paused where questions live,",
+    "an alibi frayed at the edges,",
+    "and the city holding back its breath."
+  ],
+  "tokenizer": "sentiart_v1",
+  "filter": "content_words_v1",
+  "doc_count": 7,
+  "total_tokens": 165000,
+  "freq": {
+    "detective": 540,
+    "clue": 420,
+    "evidence": 600,
+    "alibi": 260,
+    "motive": 310,
+    "suspect": 590,
+    "case": 720,
+    "police": 680,
+    "crime": 650
+  },
+  "sentiment_baseline": {
+    "coverage": 0.46,
+    "sentiment_score_mean": -0.02,
+    "magnitude_mean": 0.22,
+    "positive_ratio": 0.28,
+    "neutral_ratio": 0.54,
+    "negative_ratio": 0.18,
+    "emotions_mean": { "joy": 0.07, "sadness": 0.06, "anger": 0.07, "fear": 0.09, "disgust": 0.03 }
+  }
+}

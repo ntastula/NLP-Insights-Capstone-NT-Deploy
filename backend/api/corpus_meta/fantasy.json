@@ -1,0 +1,34 @@
+{
+  "genre": "fantasy",
+  "version": "2025-09-16",
+  "preview": [
+    "Banners breathe along the castle wall,",
+    "iron ringing where oaths are kept,",
+    "spelllight braiding through the pines,",
+    "and an old name waking in the dark."
+  ],
+  "tokenizer": "sentiart_v1",
+  "filter": "content_words_v1",
+  "doc_count": 6,
+  "total_tokens": 180000,
+  "freq": {
+    "king": 710,
+    "queen": 410,
+    "sword": 830,
+    "magic": 620,
+    "spell": 370,
+    "forest": 450,
+    "dragon": 290,
+    "castle": 520,
+    "prophecy": 180
+  },
+  "sentiment_baseline": {
+    "coverage": 0.50,
+    "sentiment_score_mean": 0.07,
+    "magnitude_mean": 0.26,
+    "positive_ratio": 0.44,
+    "neutral_ratio": 0.38,
+    "negative_ratio": 0.18,
+    "emotions_mean": { "joy": 0.16, "sadness": 0.07, "anger": 0.06, "fear": 0.09, "disgust": 0.03 }
+  }
+}

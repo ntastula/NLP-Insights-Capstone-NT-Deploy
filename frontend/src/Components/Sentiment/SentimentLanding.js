@@ -3,101 +3,105 @@ import TextInputSection from "../TextInputSection";
 import SentimentAnalyser from "./SentimentAnalyser";
 // import "./SentimentLanding.css";
 
-const SentimentLanding = ({ onBack }) => {
-  // same state as ClusteringLanding...
-  const [pastedText, setPastedText] = useState("");
-  const [uploadedText, setUploadedText] = useState("");
-  const [uploadedPreview, setUploadedPreview] = useState("");
-  const [activeInput, setActiveInput] = useState("");
-  const [error, setError] = useState("");
-  const [analysisStarted, setAnalysisStarted] = useState(false);
-  const [corpusPreview, setCorpusPreview] = useState("");
-  const [pastedWordCount, setPastedWordCount] = useState(0);
+const SentimentLanding = ({ onBack, genre }) => {
+    // same state as ClusteringLanding...
+    const [pastedText, setPastedText] = useState("");
+    const [uploadedText, setUploadedText] = useState("");
+    const [uploadedPreview, setUploadedPreview] = useState("");
+    const [activeInput, setActiveInput] = useState("");
+    const [error, setError] = useState("");
+    const [analysisStarted, setAnalysisStarted] = useState(false);
+    const [corpusPreview, setCorpusPreview] = useState("");
+    const [pastedWordCount, setPastedWordCount] = useState(0);
 
-  useEffect(() => {
-    const fetchCorpusPreview = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/corpus-preview/");
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        setCorpusPreview(data.preview.split("\n").slice(0, 4).join("\n"));
-      } catch (err) {
-        console.error(err);
-      }
+    useEffect(() => {
+        const fetchCorpusPreview = async () => {
+            try {
+                const url = genre
+                    ? `http://localhost:8000/api/corpus-preview/?name=${encodeURIComponent(genre)}`
+                    : "http://localhost:8000/api/corpus-preview/";
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                setCorpusPreview((data.preview || "").split("\n").slice(0, 4).join("\n"));
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchCorpusPreview();
+    }, [genre]);
+
+    const handleTextPaste = (e) => {
+        const text = e.target.value;
+        setPastedText(text);
+        setUploadedText(text);
+        setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
+        setActiveInput("text");
+
+        const words = text.trim().split(/\s+/).filter(Boolean);
+        setPastedWordCount(words.length);
     };
-    fetchCorpusPreview();
-  }, []);
 
-  const handleTextPaste = (e) => {
-    const text = e.target.value;
-    setPastedText(text);
-    setUploadedText(text);
-    setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
-    setActiveInput("text");
+    const handleFilesUploaded = (combinedText, files) => {
+        setUploadedText(combinedText);
+        setUploadedPreview(combinedText.split("\n").slice(0, 4).join("\n"));
+        setActiveInput("file");
+        setError("");
+    };
 
-    const words = text.trim().split(/\s+/).filter(Boolean);
-    setPastedWordCount(words.length);
-  };
+    const handleContinue = () => {
+        if (!uploadedText.trim()) {
+            setError("Please enter or upload some text before continuing.");
+            return;
+        }
+        setAnalysisStarted(true);
+    };
 
-  const handleFilesUploaded = (combinedText, files) => {
-    setUploadedText(combinedText);
-    setUploadedPreview(combinedText.split("\n").slice(0, 4).join("\n"));
-    setActiveInput("file");
-    setError("");
-  };
-
-  const handleContinue = () => {
-    if (!uploadedText.trim()) {
-      setError("Please enter or upload some text before continuing.");
-      return;
+    if (analysisStarted) {
+        return (
+            <SentimentAnalyser
+                uploadedText={uploadedText}
+                uploadedPreview={uploadedPreview}
+                corpusPreview={corpusPreview}
+                onBack={() => setAnalysisStarted(false)}
+                genre={genre}
+            />
+        );
     }
-    setAnalysisStarted(true);
-  };
 
-  if (analysisStarted) {
     return (
-      <SentimentAnalyser
-        uploadedText={uploadedText}
-        uploadedPreview={uploadedPreview}
-        corpusPreview={corpusPreview}
-        onBack={() => setAnalysisStarted(false)}
-      />
-    );
-  }
+        <div>
+            <button
+                onClick={onBack}
+                className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+            >
+                ← Back
+            </button>
 
-  return (
-    <div>
-      <button
-        onClick={onBack}
-        className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
-      >
-        ← Back
-      </button>
+            <h1 className="text-3xl font-bold mb-6">Sentiment Analysis</h1>
 
-      <h1 className="text-3xl font-bold mb-6">Sentiment Analysis</h1>
+            <div className="sentiment-container">
+                <TextInputSection
+                    pastedText={pastedText}
+                    handleTextPaste={handleTextPaste}
+                    pastedWordCount={pastedWordCount}
+                    uploadedPreview={uploadedPreview}
+                    corpusPreview={corpusPreview}
+                    error={error}
+                    onFilesUploaded={handleFilesUploaded}
+                />
 
-      <div className="sentiment-container">
-        <TextInputSection
-          pastedText={pastedText}
-          handleTextPaste={handleTextPaste}
-          pastedWordCount={pastedWordCount}
-          uploadedPreview={uploadedPreview}
-          corpusPreview={corpusPreview}
-          error={error}
-          onFilesUploaded={handleFilesUploaded}
-        />
-
-        <div className="text-center">
-          <button
-            onClick={handleContinue}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
-          >
-            Continue to Analysis →
-          </button>
+                <div className="text-center">
+                    <button
+                        onClick={handleContinue}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
+                    >
+                        Continue to Analysis →
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default SentimentLanding;
