@@ -12,6 +12,12 @@ function App() {
 
     const handleBack = () => setActivePage("home");
 
+    // --- NEW: handleProceed ---
+    const handleProceed = ({ analysisType, genre }) => {
+        setSelectedGenre(genre || ""); // set the selected genre (empty for clustering)
+        setActivePage(analysisType);   // set the active page to the analysis type
+    };
+
     useUnloadCleanup();
 
     return (
@@ -20,24 +26,26 @@ function App() {
                 <HomePage
                     onSelect={setActivePage}
                     selectedGenre={selectedGenre}        
-                    onSelectGenre={setSelectedGenre}    
+                    onSelectGenre={setSelectedGenre}  
+                    onProceed={handleProceed}       // pass it here
                 />
             )}
 
             {activePage === "keyness" && (
                 <KeynessLanding onBack={handleBack} genre={selectedGenre} />   
-      )}
+            )}
             {activePage === "clustering" && (
                 <ClusteringLanding onBack={handleBack} genre={selectedGenre} />
-      )}
+            )}
             {activePage === "sentiment" && (
                 <SentimentLanding onBack={handleBack} genre={selectedGenre} /> 
-      )}
+            )}
             {activePage === "sensorimotor" && (
                 <SensorimotorLanding onBack={handleBack} genre={selectedGenre} />
-      )}
+            )}
         </div>
     );
 }
+
 
 export default App;

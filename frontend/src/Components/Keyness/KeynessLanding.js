@@ -15,33 +15,32 @@ const KeynessLanding = ({ onBack, genre }) => {
     const [pastedWordCount, setPastedWordCount] = useState(0);
 
     useEffect(() => {
-        let cancelled = false;
+    let cancelled = false;
 
-        async function fetchCorpusPreview() {
-            try {
-                const url = genre
-                    ? `http://localhost:8000/api/corpus-preview/?name=${encodeURIComponent(genre)}`
-                    : "http://localhost:8000/api/corpus-preview/";
-                const response = await fetch(url, { credentials: "include" });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                if (!cancelled) {
-                    const preview = (data.preview || "").split("\n").slice(0, 4).join("\n");
-                    setCorpusPreview(preview);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    console.error("Preview fetch failed:", err);
-                    setCorpusPreview("");
-                }
+    async function fetchCorpusPreview() {
+        try {
+            if (!genre) return;
+            
+            const url = genre
+    ? `http://localhost:8000/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`
+    : "http://localhost:8000/api/corpus-preview-keyness/";
+
+
+            const response = await fetch(url, { credentials: "include" });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (!cancelled) {
+                setCorpusPreview(data.preview || "");
             }
+        } catch (err) {
+            if (!cancelled) setCorpusPreview("");
         }
+    }
 
-        fetchCorpusPreview();
-        return () => {
-            cancelled = true;
-        };
-    }, [genre]);
+    fetchCorpusPreview();
+    return () => { cancelled = true; };
+}, [genre]);
+
 
     const handleTextPaste = (e) => {
         const text = e.target.value || "";

@@ -122,7 +122,7 @@ def extract_sentences(text, word):
 # Keyness Functions
 # ---------------------------
 
-def compute_keyness(uploaded_text, corpus_text=None, top_n=50, filter_func=None):
+def compute_keyness(uploaded_text, corpus_text=None, top_n=50, filter_func=filter_content_words):
     """
     TEMP: Return top words with POS from uploaded_text only.
     Ignore corpus and keyness scoring.
@@ -162,117 +162,82 @@ def compute_keyness(uploaded_text, corpus_text=None, top_n=50, filter_func=None)
 
 ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
-def keyness_nltk(uploaded_text, corpus_text, top_n=50, filter_func=None):
-    """
-    Compute keyness using NLTK-style log-likelihood.
-    Returns a list of dicts with word, pos, counts, effect_size, log_likelihood, keyness.
-    """
+def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
+    """NLTK-style log-likelihood using counts-based corpus."""
+    if filter_func is None:
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
 
-    # Optional filter function
-    if filter_func:
-        uploaded_tokens = filter_func(uploaded_text)
-        corpus_tokens = filter_func(corpus_text)
-        uploaded_words = [t["word"] for t in uploaded_tokens]
-        corpus_words = [t["word"] for t in corpus_tokens]
-        pos_map_input = {t["word"]: t["pos"] for t in uploaded_tokens + corpus_tokens}
-    else:
-        uploaded_words = word_tokenize(uploaded_text.lower())
-        corpus_words = word_tokenize(corpus_text.lower())
-        pos_map_input = {}
+    uploaded_tokens = filter_func(uploaded_text)
+    uploaded_counts = Counter([t["word"] for t in uploaded_tokens])
 
-    # Frequency distributions
-    freq_uploaded = FreqDist(uploaded_words)
-    freq_corpus = FreqDist(corpus_words)
-
-    total_uploaded = sum(freq_uploaded.values())
-    total_corpus = sum(freq_corpus.values())
+    uploaded_total = sum(uploaded_counts.values())
+    corpus_total = sum(corpus_counts_map.values())
 
     results = []
-
-    # Merge keys
-    all_words = set(freq_uploaded.keys()).union(freq_corpus.keys())
+    all_words = set(uploaded_counts.keys()).union(corpus_counts_map.keys())
 
     for word in all_words:
-        count_a = freq_uploaded.get(word, 0)
-        count_b = freq_corpus.get(word, 0)
-
-        # Skip words not in uploaded_text (if you want only uploaded words in interactive list)
+        count_a = uploaded_counts.get(word, 0)
+        count_b = corpus_counts_map.get(word, 0)
         if count_a == 0:
             continue
 
-        # Compute log-likelihood
-        E1 = total_uploaded * (count_a + count_b) / (total_uploaded + total_corpus)
-        E2 = total_corpus * (count_a + count_b) / (total_uploaded + total_corpus)
-        ll = 2 * (
-            (count_a * log(count_a / E1) if count_a > 0 else 0) +
-            (count_b * log(count_b / E2) if count_b > 0 else 0)
-        )
+        # Log-likelihood
+        E1 = uploaded_total * (count_a + count_b) / (uploaded_total + corpus_total)
+        E2 = corpus_total * (count_a + count_b) / (uploaded_total + corpus_total)
+        ll = 2 * ((count_a * log(count_a / E1) if count_a > 0 else 0) +
+                  (count_b * log(count_b / E2) if count_b > 0 else 0))
 
-        # Effect size (simple)
-        effect_size = (count_a / total_uploaded) - (count_b / total_corpus)
-
-        # Determine POS
-        pos = pos_map_input.get(word)
-        if not pos:
-            # fallback: use NLTK pos_tag
-            pos_tagged = pos_tag([word])
-            pos_nltk = pos_tagged[0][1]
-            pos_map = {
-                'NN': 'NOUN', 'NNS': 'NOUN',
-                'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-                'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-                'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-                'NNP': None, 'NNPS': None  # ignore proper nouns
-            }
-            pos = pos_map.get(pos_nltk, "OTHER")
-
+        pos = next((t["pos"] for t in uploaded_tokens if t["word"] == word), "OTHER")
         if pos not in ALLOWED_POS:
             pos = "OTHER"
 
         results.append({
             "word": word,
-            "pos": pos,
             "uploaded_count": count_a,
             "sample_count": count_b,
-            "effect_size": round(effect_size, 4),
             "log_likelihood": round(ll, 2),
-            "keyness": round(ll, 2)
+            "effect_size": round((count_a / uploaded_total - count_b / max(1, corpus_total)), 4),
+            "keyness": round(ll, 2),
+            "pos": pos
         })
 
-    # Sort all results
     sorted_results = sorted(results, key=lambda x: x["keyness"], reverse=True)
-
-    # True total significant words (before top_n cutoff)
-    total_significant = len(sorted_results)
-
-    # Sort by log-likelihood descending
-    results_list = sorted_results[:top_n]
-
-    return {
-        "results": results_list,
-        "total_significant": total_significant
-    }
+    return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
+def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
+    """
+    Gensim-style TF-IDF + chi2 keyness using counts-based corpus from _keyness.json
+    uploaded_text: raw text from user
+    corpus_counts_map: Counter from _keyness.json
+    """
+    if filter_func is None:
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
 
-def keyness_gensim(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
+    # Tokens
     tokens_uploaded = filter_func(uploaded_text)
-    tokens_corpus = filter_func(corpus_text)
+    words_uploaded = [t["word"] for t in tokens_uploaded]
 
-    words_uploaded = [t['word'] if isinstance(t, dict) else t for t in tokens_uploaded]
-    words_corpus = [t['word'] if isinstance(t, dict) else t for t in tokens_corpus]
+    # Reconstruct "corpus text" from counts map
+    words_corpus = []
+    for word, count in corpus_counts_map.items():
+        words_corpus.extend([word] * count)
 
+    # Gensim dictionary & TF-IDF
     dictionary = corpora.Dictionary([words_uploaded, words_corpus])
     corpus_gensim = [dictionary.doc2bow(words_uploaded), dictionary.doc2bow(words_corpus)]
-
-    tfidf = models.TfidfModel(corpus_gensim, smartirs='ntc')
+    tfidf = models.TfidfModel(corpus_gensim, smartirs="ntc")
     tfidf_scores = [tfidf[doc] for doc in corpus_gensim]
 
     uploaded_tfidf = {dictionary[id]: score for id, score in tfidf_scores[0]}
-    corpus_tfidf = {dictionary[id]: score for id, score in tfidf_scores[1]}
+    # corpus_tfidf = {dictionary[id]: score for id, score in tfidf_scores[1]}  # optional
 
     uploaded_counts = Counter(words_uploaded)
     corpus_counts = Counter(words_corpus)
+
+    uploaded_total = sum(uploaded_counts.values())
+    corpus_total = sum(corpus_counts.values())
 
     results = []
     for word in uploaded_counts.keys():
@@ -280,81 +245,65 @@ def keyness_gensim(uploaded_text, corpus_text, top_n=50, filter_func=filter_cont
         c_count = corpus_counts.get(word, 0)
 
         contingency = np.array([
-            [u_count, sum(uploaded_counts.values()) - u_count],
-            [c_count, sum(corpus_counts.values()) - c_count]
+            [u_count, uploaded_total - u_count],
+            [c_count, corpus_total - c_count]
         ])
         try:
-            chi2, p, _, _ = chi2_contingency(contingency, correction=False)
+            chi2_val, p, _, _ = chi2_contingency(contingency, correction=False)
         except ValueError:
-            chi2, p = 0, 1
+            chi2_val, p = 0, 1
 
-        pos = None
-        for t in tokens_uploaded:
-            if isinstance(t, dict) and t['word'] == word:
-                pos = t.get('pos')
-                break
+        pos = next((t["pos"] for t in tokens_uploaded if t["word"] == word), "OTHER")
+        if pos not in ALLOWED_POS:
+            pos = "OTHER"
 
         results.append({
             "word": word,
             "uploaded_count": u_count,
             "sample_count": c_count,
-            "chi2": float(chi2),
+            "chi2": float(chi2_val),
             "p_value": float(p),
             "tfidf_score": float(uploaded_tfidf.get(word, 0)),
+            "keyness": float(chi2_val),
             "pos": pos
         })
 
     results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
-
-    total_significant = len(results_sorted)
-
-    top_results = results_sorted[:top_n]
-
     return {
-        "results": top_results,
-        "total_significant": total_significant,
-        "uploaded_total": int(sum(uploaded_counts.values())),
-        "corpus_total": int(sum(corpus_counts.values())),
+        "results": results_sorted[:top_n],
+        "total_significant": len(results_sorted),
+        "uploaded_total": uploaded_total,
+        "corpus_total": corpus_total
     }
 
 
+def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
+    if filter_func is None:
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
 
-def keyness_spacy(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
     tokens_uploaded = filter_func(uploaded_text)
-    tokens_corpus = filter_func(corpus_text)
+    uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
+    corpus_counts = corpus_counts_map.copy()
 
-    words_uploaded = [t['word'] if isinstance(t, dict) else t for t in tokens_uploaded]
-    words_corpus = [t['word'] if isinstance(t, dict) else t for t in tokens_corpus]
-
-    total_uploaded = len(words_uploaded)
-    total_corpus = len(words_corpus)
-
-    freq_uploaded = Counter(words_uploaded)
-    freq_corpus = Counter(words_corpus)
+    uploaded_total = sum(uploaded_counts.values())
+    corpus_total = sum(corpus_counts.values())
 
     results = []
-    for word in set(freq_uploaded.keys()).union(freq_corpus.keys()):
-        a = freq_uploaded.get(word, 0)
-        b = freq_corpus.get(word, 0)
-        if a + b < 2:
-            continue
-
+    for word, a in uploaded_counts.items():
+        b = corpus_counts.get(word, 0)
         contingency = np.array([
-            [a, total_uploaded - a],
-            [b, total_corpus - b]
+            [a, uploaded_total - a],
+            [b, corpus_total - b]
         ])
         try:
             chi2, p, _, _ = chi2_contingency(contingency, correction=False)
         except ValueError:
             chi2, p = 0, 1
 
-        effect_size = (a - b) / max(1, total_uploaded + total_corpus)
-
-        pos = None
-        for t in tokens_uploaded:
-            if isinstance(t, dict) and t['word'] == word:
-                pos = t.get('pos')
-                break
+        effect_size = (a - b) / max(1, uploaded_total + corpus_total)
+        pos = next((t["pos"] for t in tokens_uploaded if t["word"] == word), "OTHER")
+        if pos not in ALLOWED_POS:
+            pos = "OTHER"
 
         results.append({
             "word": word,
@@ -368,73 +317,46 @@ def keyness_spacy(uploaded_text, corpus_text, top_n=50, filter_func=filter_conte
             "pos": pos
         })
 
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
-    total_significant = len(results_sorted)
 
-    top_results = results_sorted[:top_n]
+def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None):
+    if filter_func is None:
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
 
-    return {
-        "results": top_results,
-        "total_significant": total_significant,
-        "uploaded_total": total_uploaded,
-        "corpus_total": total_corpus,
-    }
-
-def keyness_sklearn(uploaded_text, corpus_text, top_n=50, filter_func=filter_content_words):
     tokens_uploaded = filter_func(uploaded_text)
-    tokens_corpus = filter_func(corpus_text)
+    uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
+    corpus_counts = corpus_counts_map.copy()
 
-    # Extract words
-    words_uploaded = [t['word'] if isinstance(t, dict) else t for t in tokens_uploaded]
-    words_corpus = [t['word'] if isinstance(t, dict) else t for t in tokens_corpus]
-
-    vectorizer = CountVectorizer(vocabulary=list(set(words_uploaded + words_corpus)))
-    X = vectorizer.fit_transform([" ".join(words_uploaded), " ".join(words_corpus)])
-    terms = vectorizer.get_feature_names_out()
-    freqs = X.toarray()
-
-    uploaded_counts = freqs[0]
-    corpus_counts = freqs[1]
+    uploaded_total = sum(uploaded_counts.values())
+    corpus_total = sum(corpus_counts.values())
 
     results = []
-    for word, u_count, c_count in zip(terms, uploaded_counts, corpus_counts):
-        if u_count == 0:
-            continue
-
+    for word, u_count in uploaded_counts.items():
+        c_count = corpus_counts.get(word, 0)
         contingency = np.array([
-            [u_count, sum(uploaded_counts) - u_count],
-            [c_count, sum(corpus_counts) - c_count]
+            [u_count, uploaded_total - u_count],
+            [c_count, corpus_total - c_count]
         ])
         try:
             chi2, p, _, _ = chi2_contingency(contingency, correction=False)
         except ValueError:
             chi2, p = 0, 1
 
-        # Include POS if available
-        pos = None
-        for t in tokens_uploaded:
-            if isinstance(t, dict) and t['word'] == word:
-                pos = t.get('pos')
-                break
+        pos = next((t["pos"] for t in tokens_uploaded if t["word"] == word), "OTHER")
+        if pos not in ALLOWED_POS:
+            pos = "OTHER"
 
         results.append({
             "word": word,
-            "uploaded_count": int(u_count),
-            "sample_count": int(c_count),
+            "uploaded_count": u_count,
+            "sample_count": c_count,
             "chi2": float(chi2),
             "p_value": float(p),
+            "keyness": float(chi2),
             "pos": pos
         })
 
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
-
-    total_significant = len(results_sorted)
-
-    return {
-        "results": results_sorted[:top_n],
-        "total_significant": total_significant,
-        "uploaded_total": int(uploaded_counts.sum()),
-        "corpus_total": int(corpus_counts.sum()),
-
-    }
+    sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}

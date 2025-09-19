@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.http import require_POST
@@ -31,22 +31,42 @@ import logging
 from pathlib import Path  # <-- ADDED (minimal import required)
 import math               # <-- used by compute_keyness_from_counts
 
+
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
 SAMPLE_FILE = os.path.join(CORPUS_DIR, "sample1.txt")
+logger = logging.getLogger(__name__)
 
 # --- Genre Corpus Meta (helpers only; no other behavior changed) -----------
 # Looks for metadata-only corpora in backend/api/corpus_meta/*.json
-META_DIR = os.path.join(settings.BASE_DIR, "api", "corpus_meta")
+META_DIR = Path("api/corpus_meta")
+KEYNESS_DIR = Path("api/corpus_meta_keyness")
 
-def list_corpus_files():
-    """
-    List available genre corpus names (filenames in corpus_meta without .json).
-    Returns a sorted list, e.g. ["romance", "sf", "fantasy"].
-    """
-    base = Path(META_DIR)
-    if not base.exists():
+def list_corpus_files(analysis_type=None):
+    if analysis_type == "keyness":
+        folder = KEYNESS_DIR
+    else:
+        folder = META_DIR
+
+    print(f"DEBUG list_corpus_files: analysis_type={analysis_type}, folder={folder}")
+
+    if not folder.exists():
+        print("DEBUG list_corpus_files: folder does not exist")
         return []
-    return sorted([p.stem for p in base.glob("*.json")])
+
+    files = [f.stem for f in folder.glob("*.json")]  # <- use stem (no .json)
+    print(f"DEBUG list_corpus_files: raw files={files}")
+
+    if analysis_type == "keyness":
+        # strip _keyness suffix
+        files = [f.replace("_keyness", "") for f in files]
+        files.sort(key=lambda x: (0 if x == "general_english" else 1, x))
+    else:
+        files.sort()
+
+    print(f"DEBUG list_corpus_files: sorted files={files}")
+    return files
+
+
 
 def load_corpus_meta(corpus_name: str) -> dict:
     """
@@ -76,8 +96,22 @@ def corpus_counts(meta: dict) -> tuple[dict, int]:
 @require_GET
 def list_corpora(request):
     try:
-        return JsonResponse({"corpora": list_corpus_files()})
+        analysis_type = request.GET.get("analysis")
+        files = list_corpus_files(analysis_type)
+
+        # Log what was found
+        logger.info("list_corpora -> analysis_type=%s, files=%s", analysis_type, files)
+
+        # If keyness, add the suffix back for the frontend
+        if analysis_type == "keyness":
+            files = [f"{f}_keyness" if f != "general_english" else f"{f}_keyness" for f in files]
+
+            # Log what was found
+            logger.info("list_corpora -> analysis_type=%s, files=%s", analysis_type, files)
+
+        return JsonResponse({"corpora": files})
     except Exception as e:
+        logger.exception("Error in list_corpora")
         return JsonResponse({"error": str(e)}, status=500)
 # ---------------------------------------------------------------------------
 
@@ -343,15 +377,29 @@ def compute_keyness_from_counts(
 def analyse_keyness(request):
     try:
         data = json.loads(request.body)
-        corpus_name = data.get("corpus_name")
+        corpus_name = data.get("corpus_name").strip()
+        if not corpus_name:
+            return JsonResponse({"error": "No corpus_name provided"}, status=400)
+
+        # Remove .json if already included
+        corpus_name = re.sub(r'\.json$', '', corpus_name)
+
+        # Append _keyness.json only if not already present
+        if not corpus_name.endswith("_keyness"):
+            filename = f"{corpus_name}_keyness.json"
+        else:
+            filename = f"{corpus_name}.json"
+
+        corpus_path = KEYNESS_DIR / filename
+        if not corpus_path.exists():
+            return JsonResponse({"error": f"Unknown corpus_name: {filename}"}, status=400)
+
         uploaded_text = data.get("uploaded_text", "")
         method = data.get("method", "nltk").lower()
         filter_mode = data.get("filter_mode", "content")
 
-        if filter_mode == "all":
-            filter_fn = filter_all_words
-        else:
-            filter_fn = filter_content_words
+        # Choose filtering function
+        filter_fn = filter_all_words if filter_mode == "all" else filter_content_words
 
         if not uploaded_text:
             logger.warning("Analysis request with empty uploaded_text")
@@ -361,94 +409,64 @@ def analyse_keyness(request):
         filtered_uploaded = filter_fn(uploaded_text)
         uploaded_total = len(filtered_uploaded)
 
-        # Branch: counts-based against selected genre, OR legacy sample text
         results_list = []
         total_significant = 0
+        corpus_total = 0
 
-        if corpus_name:
-            # --- counts-based path using corpus_meta/<name>.json
-            try:
-                meta = load_corpus_meta(corpus_name)
-            except FileNotFoundError:
-                return JsonResponse({"error": f"Unknown corpus_name: {corpus_name}"}, status=400)
+        # --- Load corpus counts from JSON ---
+        corpus_path = KEYNESS_DIR / filename
+        if not corpus_path.exists():
+            return JsonResponse({"error": f"Unknown corpus_name: {filename}"}, status=400)
 
-            corpus_counts_map, corpus_total = corpus_counts(meta)
+        with open(corpus_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+            logger.info(f"Loaded corpus meta: {filename}")
 
-            # Build uploaded word counts from filtered tokens
-            uploaded_counts = Counter()
-            for t in filtered_uploaded:
-                if isinstance(t, dict) and "word" in t:
-                    w = str(t["word"]).lower()
-                elif isinstance(t, str):
-                    w = t.lower()
-                else:
-                    continue
-                if w:
-                    uploaded_counts[w] += 1
+        # Corpus counts map from JSON
+        corpus_counts_map = Counter(meta.get("counts", {}))
+        corpus_total = sum(corpus_counts_map.values())
 
-            out = compute_keyness_from_counts(
-                uploaded_counts=uploaded_counts,
-                uploaded_total=uploaded_total,
+        # --- Compute keyness using chosen method ---
+        if method == "nltk":
+            data_out = keyness_nltk(
+                uploaded_text,
                 corpus_counts_map=corpus_counts_map,
-                corpus_total=corpus_total,
-                top_n=50
+                top_n=50,
+                filter_func=filter_fn
             )
-            results_list = out.get("results", [])
-            total_significant = out.get("total_significant", len(results_list))
-
-        else:
-            # --- legacy path using SAMPLE_FILE text
-            sample_corpus = read_corpus()
-            if not sample_corpus:
-                logger.error("Reference corpus is empty")
-                return JsonResponse({"error": "Reference corpus is empty."}, status=500)
-
-            filtered_corpus = filter_fn(sample_corpus)
-            corpus_total = len(filtered_corpus)
-
-            logger.info(
-                f"Keyness analysis requested: method={method}, "
-                f"filter_mode={filter_mode}, "
-                f"uploaded_text_words={len(filtered_uploaded)}, "
-                f"corpus_words={len(filtered_corpus)}"
+        elif method == "sklearn":
+            data_out = keyness_sklearn(
+                uploaded_text,
+                corpus_counts_map=corpus_counts_map,
+                top_n=50,
+                filter_func=filter_fn
             )
-
-            if method == "nltk":
-                nltk_data = keyness_nltk(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
-                results_list = nltk_data["results"]
-                total_significant = nltk_data["total_significant"]
-
-            elif method == "sklearn":
-                res = keyness_sklearn(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
-                results_list = res.get("results", [])
-                total_significant = res.get("total_significant", len(results_list))
-
-            elif method == "gensim":
-                res = keyness_gensim(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
-                results_list = res.get("results", [])
-                total_significant = res.get("total_significant", len(results_list))
-
-            elif method == "spacy":
-                res = keyness_spacy(uploaded_text, sample_corpus, top_n=50, filter_func=filter_fn)
-                results_list = res.get("results", [])
-                total_significant = res.get("total_significant", len(results_list))
-            else:
-                logger.warning(f"Unknown keyness method requested: {method}")
-                return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
-
-        # Compute corpus_total for response
-        if corpus_name:
-            # counts-based branch
-            _, corpus_total = corpus_counts(load_corpus_meta(corpus_name))
+        elif method == "gensim":
+            data_out = keyness_gensim(
+                uploaded_text,
+                corpus_counts_map=corpus_counts_map,
+                top_n=50,
+                filter_func=filter_fn
+            )
+        elif method == "spacy":
+            data_out = keyness_spacy(
+                uploaded_text,
+                corpus_counts_map=corpus_counts_map,
+                top_n=50,
+                filter_func=filter_fn
+            )
         else:
-            # legacy branch
-            # filtered_corpus defined in legacy path
-            try:
-                corpus_total = len(filtered_corpus)
-            except NameError:
-                corpus_total = 0
+            logger.warning(f"Unknown keyness method requested: {method}")
+            return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
 
-        # Save result to DB
+        results_list = data_out.get("results", [])
+        total_significant = data_out.get("total_significant", len(results_list))
+
+        # Ensure every item has a POS tag for frontend
+        for item in results_list:
+            item["pos"] = item.get("pos", item.get("pos_tag", "OTHER")).upper()
+
+        # Save to DB
         keyness_obj = KeynessResult.objects.create(
             method=method,
             uploaded_text=uploaded_text,
@@ -459,18 +477,15 @@ def analyse_keyness(request):
 
         logger.info(
             f"Keyness analysis completed: method={method}, "
-            f"filter_mode={filter_mode}, "
-            f"results_count={len(results_list)}, "
-            f"uploaded_total={uploaded_total}, "
-            f"corpus_total={corpus_total}, "
-            f"id={keyness_obj.id}"
+            f"filter_mode={filter_mode}, results_count={len(results_list)}, "
+            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
         )
 
         return JsonResponse({
             "id": keyness_obj.id,
             "method": method,
             "filter_mode": filter_mode,
-            "results": results_list,  # flat list for frontend
+            "results": results_list,
             "uploaded_total": uploaded_total,
             "corpus_total": corpus_total,
             "total_significant": total_significant
@@ -479,6 +494,8 @@ def analyse_keyness(request):
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
         return JsonResponse({"error": str(e)}, status=500)
+
+
 
 
 @require_http_methods(["GET"])
@@ -565,3 +582,44 @@ def analyse_sentiment(request):
     # Catch any other errors and return them as JSON
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def corpus_preview_keyness(request):
+    # Get the genre from the query string
+    genre = request.GET.get("name", "").strip()
+    if not genre:
+        return JsonResponse({"preview": ""})
+
+    # Remove any trailing '.json' first
+    genre = re.sub(r'\.json$', '', genre)
+
+    # Ensure filename ends with '_keyness.json'
+    if not genre.endswith("_keyness"):
+        filename = f"{genre}_keyness.json"
+    else:
+        filename = f"{genre}.json"
+
+    file_path = KEYNESS_DIR / filename
+
+    if not file_path.exists():
+        logger.warning(f"Corpus file not found: {file_path}")
+        return JsonResponse({"error": "Corpus file not found"}, status=404)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        snippets = [item.get("snippet", "") for item in data.get("previews", [])[:5]]
+        preview_text = "\n\n".join(snippets)
+
+        logger.info(f"Generated preview text (first 200 chars): {preview_text[:200]}")
+        return JsonResponse({"preview": preview_text})
+
+    except Exception as e:
+        logger.exception(f"Error generating keyness corpus preview: {e}")
+        return JsonResponse({"preview": ""}, status=500)
+
+
+
+

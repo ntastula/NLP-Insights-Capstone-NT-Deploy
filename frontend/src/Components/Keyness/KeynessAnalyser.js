@@ -107,30 +107,6 @@ const KeynessAnalyser = ({
                 ← Back
             </button>
 
-            {/* Optional previews (unchanged) */}
-            {(uploadedPreview || corpusPreview) && (
-                <div className="grid md:grid-cols-2 gap-4 mb-6">
-                    {uploadedPreview && (
-                        <div className="bg-white border rounded-xl p-4 shadow-sm">
-                            <div className="text-xs font-semibold text-gray-600 mb-2">Your text (preview)</div>
-                            <pre className="text-sm text-gray-800 whitespace-pre-wrap leading-snug max-h-48 overflow-auto">
-                                {uploadedPreview}
-                            </pre>
-                        </div>
-                    )}
-                    {corpusPreview && (
-                        <div className="bg-white border rounded-xl p-4 shadow-sm">
-                            <div className="text-xs font-semibold text-gray-600 mb-2">
-                                {genre ? `Corpus preview (${genre})` : "Corpus preview"}
-                            </div>
-                            <pre className="text-sm text-gray-800 whitespace-pre-wrap leading-snug max-h-48 overflow-auto">
-                                {corpusPreview}
-                            </pre>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Word Filtering Options (PRESERVED) */}
             <div className="mb-6 text-center">
                 <p className="mb-2 font-medium">

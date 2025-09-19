@@ -11,6 +11,7 @@ urlpatterns = [
     path("analyse-sentiment/", views.analyse_sentiment, name="analyse-sentiment"),
     path("get-sentences/", views.get_sentences, name="get_sentences"),
     path('clustering-analysis/', clustering_analysis, name='clustering-analysis'),
+    path("corpus-preview-keyness/", views.corpus_preview_keyness, name="corpus_preview_keyness"),
 
 ]
 

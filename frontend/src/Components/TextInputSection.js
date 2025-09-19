@@ -563,42 +563,44 @@ Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
 
 
       {/* Corpus Preview */}
-      {corpusPreview && (
-        <div
-          className="keyness-corpus-preview"
-          style={{
-            width: "100%",
-            padding: "16px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "6px",
-            border: "1px solid #e9ecef",
-            marginTop: "12px",
-          }}
-        >
-          <h3
-            className="font-semibold mb-2"
-            style={{ marginBottom: "12px", color: "#495057" }}
-          >
-            Corpus Preview:
-          </h3>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              maxHeight: "200px",
-              overflow: "auto",
-              backgroundColor: "#ffffff",
-              padding: "12px",
-              borderRadius: "4px",
-              border: "1px solid #dee2e6",
-              fontSize: "13px",
-              fontFamily: "monospace",
-              margin: 0,
-            }}
-          >
-            {corpusPreview}
-          </pre>
-        </div>
-      )}
+{corpusPreview && (
+  <div
+    className="keyness-preview"
+    style={{
+      width: "100%",
+      padding: "16px",
+      backgroundColor: "#f8f9fa",
+      borderRadius: "6px",
+      border: "1px solid #e9ecef",
+      marginTop: "12px",
+    }}
+  >
+    <h3
+      className="font-semibold mb-2"
+      style={{ marginBottom: "12px", color: "#495057" }}
+    >
+      Corpus Preview:
+    </h3>
+    <pre
+      style={{
+        whiteSpace: "pre-wrap",
+        maxHeight: "200px",
+        overflowY: "auto",
+        backgroundColor: "#ffffff",
+        padding: "12px",
+        borderRadius: "4px",
+        border: "1px solid #dee2e6",
+        fontSize: "13px",
+        fontFamily: "monospace",
+        margin: 0,
+      }}
+    >
+      {corpusPreview}
+    </pre>
+  </div>
+)}
+
+
 
       {/* General error */}
       {error && (

@@ -21,7 +21,7 @@ nltk.download("punkt", quiet=True)
 nltk.download("stopwords", quiet=True)
 from nltk.corpus import stopwords
 
-CUSTOM_STOPWORDS = {"he","she","was","for","on","as","with","at","by","an"}
+CUSTOM_STOPWORDS = {"he","she","was","for","on","as","with","at","by","an", "chapter"}
 NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 NLTK_STOPWORDS = set(stopwords.words("english"))
 ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS).union(NUMBER_WORDS)
