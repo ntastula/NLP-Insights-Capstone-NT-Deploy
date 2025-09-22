@@ -105,6 +105,7 @@ def cluster_text(text, top_words_per_cluster=10):
     """
     Cluster text into groups using either ConceptNet or spaCy embeddings.
     Chooses backend automatically based on EMBEDDING_BACKEND global variable.
+    Each cluster point now includes a 'words' array for display in scatterplots.
     """
     global EMBEDDING_BACKEND, model, nlp
 
@@ -112,7 +113,7 @@ def cluster_text(text, top_words_per_cluster=10):
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
     # ------------------ Tokenize and get vectors ------------------ #
-    vectors, valid_chunks = [], []
+    vectors, valid_chunks, chunk_words = [], [], []
     chunks = [c.strip() for c in re.split(r'[.!?]\s+', text) if len(c.strip()) > 5]
 
     for chunk in chunks:
@@ -134,6 +135,7 @@ def cluster_text(text, top_words_per_cluster=10):
         if vecs:
             vectors.append(np.mean(vecs, axis=0))
             valid_chunks.append(chunk)
+            chunk_words.append(cleaned)  # keep words for each chunk
 
     if not vectors:
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
@@ -153,15 +155,22 @@ def cluster_text(text, top_words_per_cluster=10):
 
     # ------------------ KMeans clustering ------------------ #
     labels = KMeans(n_clusters=num_clusters, random_state=42, n_init=10).fit_predict(reduced)
-    clusters = [{"label": int(lbl), "doc": doc} for doc, lbl in zip(valid_chunks, labels)]
+    clusters = [
+        {
+            "label": int(lbl),
+            "doc": doc,
+            "words": words[:top_words_per_cluster],  # keep only top N words per chunk
+            "x": float(r[0]),  # include PCA coords for plotting
+            "y": float(r[1]),
+        }
+        for doc, words, lbl, r in zip(valid_chunks, chunk_words, labels, reduced)
+    ]
 
     # ------------------ Top terms per cluster ------------------ #
     top_terms = {}
     for i in range(num_clusters):
-        cluster_docs = [valid_chunks[j] for j, lbl in enumerate(labels) if lbl == i]
-        tokens = []
-        for doc in cluster_docs:
-            tokens.extend([t.lower() for t in nltk.word_tokenize(doc) if t.isalpha() and t.lower() not in ALL_STOPWORDS])
+        cluster_docs = [chunk_words[j] for j, lbl in enumerate(labels) if lbl == i]
+        tokens = [t for doc in cluster_docs for t in doc]
         counts = Counter(tokens)
         top_terms[i] = [w for w, _ in counts.most_common(top_words_per_cluster)]
 
@@ -176,6 +185,9 @@ def cluster_text(text, top_words_per_cluster=10):
         "num_clusters": num_clusters,
         "num_docs": n_docs,
     }
+
+
+
 
 # ------------------ Django Endpoint ------------------ #
 @csrf_exempt

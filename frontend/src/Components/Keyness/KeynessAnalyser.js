@@ -4,7 +4,7 @@ import ResultsSummary from "./ResultsSummary";
 import Charts from "./Charts";
 import ResultsTable from "./ResultsTable";
 import CreativeKeynessResults from "./CreativeKeynessResults";
-import "./ProgressBar.css";
+import '../ProgressBar.css';
 
 /**
  * Lightweight progress bar (unchanged visual).

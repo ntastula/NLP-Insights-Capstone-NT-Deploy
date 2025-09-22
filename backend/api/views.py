@@ -47,14 +47,10 @@ def list_corpus_files(analysis_type=None):
     else:
         folder = META_DIR
 
-    print(f"DEBUG list_corpus_files: analysis_type={analysis_type}, folder={folder}")
-
     if not folder.exists():
-        print("DEBUG list_corpus_files: folder does not exist")
         return []
 
     files = [f.stem for f in folder.glob("*.json")]  # <- use stem (no .json)
-    print(f"DEBUG list_corpus_files: raw files={files}")
 
     if analysis_type == "keyness":
         # strip _keyness suffix
@@ -63,7 +59,6 @@ def list_corpus_files(analysis_type=None):
     else:
         files.sort()
 
-    print(f"DEBUG list_corpus_files: sorted files={files}")
     return files
 
 
