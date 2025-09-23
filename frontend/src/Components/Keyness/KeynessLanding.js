@@ -90,7 +90,7 @@ const KeynessLanding = ({ onBack, genre }) => {
             <div className="keyness-header">
                 <h1 className="keyness-title">Keyness Analysis</h1>
                 <p className="keyness-subtitle">
-                    Discover the distinctive words and phrases that make your writing unique by comparing it against a corpus of similar texts.
+                    Find the words that stand out most in your writing, showing what makes your voice and style different from other texts.
                 </p>
             </div>
 

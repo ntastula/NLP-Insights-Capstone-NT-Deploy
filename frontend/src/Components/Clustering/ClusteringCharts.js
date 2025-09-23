@@ -117,7 +117,7 @@ const traceData = useMemo(() => {
           yaxis: { title: "PCA 2" },
           showlegend: true,
         }}
-        style={{ width: "100vw", height: "80vh" }}
+        style={{ width: "80vw", height: "80vh" }}
         useResizeHandler={true}
       />
     </div>

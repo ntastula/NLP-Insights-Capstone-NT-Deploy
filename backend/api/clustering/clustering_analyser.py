@@ -21,10 +21,15 @@ nltk.download("punkt", quiet=True)
 nltk.download("stopwords", quiet=True)
 from nltk.corpus import stopwords
 
+def generate_roman_numerals(limit=1000):
+    from roman import toRoman
+    return {toRoman(i).lower() for i in range(1, limit + 1)}
+
+ROMAN_STOPWORDS = generate_roman_numerals(1000)
 CUSTOM_STOPWORDS = {"he","she","was","for","on","as","with","at","by","an", "chapter"}
 NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 NLTK_STOPWORDS = set(stopwords.words("english"))
-ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS).union(NUMBER_WORDS)
+ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPWORDS)
 
 # ------------------ Embeddings Setup ------------------ #
 EMBEDDING_BACKEND_CHOICES = ["conceptnet", "spacy"]

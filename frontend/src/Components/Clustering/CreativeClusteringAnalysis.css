@@ -1,0 +1,395 @@
+/* CreativeClusteringAnalysis.css */
+
+/* Main results container */
+.clustering-results-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+/* View controls section */
+.clustering-view-controls {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.clustering-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.clustering-btn:hover {
+    border-color: #cbd5e1;
+    background-color: #f8fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Specific button colors */
+.clustering-btn.btn-chart {
+    background: linear-gradient(135deg, #eab308, #ca8a04);
+    border-color: #ca8a04;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(234, 179, 8, 0.3);
+}
+
+.clustering-btn.btn-chart:hover {
+    background: linear-gradient(135deg, #ca8a04, #a16207);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(234, 179, 8, 0.4);
+}
+
+.clustering-btn.btn-terms {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    border-color: #7c3aed;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+}
+
+.clustering-btn.btn-terms:hover {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+}
+
+.clustering-btn.btn-documents {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #059669;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.clustering-btn.btn-documents:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+}
+
+.clustering-btn.btn-download {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.clustering-btn.btn-download:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Filter section */
+.cluster-filter-section {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.cluster-filter-label {
+    font-weight: 500;
+    color: #374151;
+    margin-right: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.cluster-filter-select {
+    padding: 0.5rem 0.75rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: #ffffff;
+    color: #374151;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    min-width: 120px;
+}
+
+.cluster-filter-select:focus {
+    outline: none;
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+/* Chart section */
+.chart-section {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Top terms grid */
+.top-terms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cluster-term-card {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease;
+}
+
+.cluster-term-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cluster-term-title {
+    font-weight: 700;
+    color: #7c3aed;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cluster-term-title::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #7c3aed;
+    flex-shrink: 0;
+}
+
+.cluster-terms-list {
+    color: #374151;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+}
+
+.cluster-theme {
+    font-size: 0.8125rem;
+    color: #059669;
+    font-weight: 500;
+    font-style: italic;
+}
+
+/* Documents section */
+.documents-section {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.documents-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.documents-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.document-item {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    transition: border-color 0.2s ease;
+}
+
+.document-item:hover {
+    border-color: #cbd5e1;
+}
+
+.document-cluster-label {
+    font-weight: 600;
+    color: #2563eb;
+    margin-right: 0.5rem;
+}
+
+.document-text {
+    color: #374151;
+    line-height: 1.6;
+    font-size: 0.875rem;
+}
+
+/* Collapsed state for embedding cards */
+.collapsed-embedding-selection {
+    margin-bottom: 1.5rem;
+}
+
+.current-embedding-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    margin: 0 auto;
+    max-width: 32rem;
+}
+
+.current-embedding-text {
+    color: #374151;
+    font-size: 1rem;
+}
+
+.change-embedding-button {
+    padding: 0.5rem 1rem;
+    background-color: #6b7280;
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.change-embedding-button:hover:not(:disabled) {
+    background-color: #4b5563;
+}
+
+.change-embedding-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Empty states */
+.no-data-message {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #64748b;
+    font-size: 1.125rem;
+}
+
+.no-data-message::before {
+    content: "📊";
+    display: block;
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+    .top-terms-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+    
+    .clustering-view-controls {
+        gap: 0.5rem;
+    }
+    
+    .clustering-btn {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.8125rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .clustering-view-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .clustering-btn {
+        text-align: center;
+        width: 100%;
+    }
+    
+    .top-terms-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .cluster-filter-section {
+        text-align: center;
+    }
+    
+    .cluster-filter-select {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+    
+    .current-embedding-info {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+}
+
+@media (max-width: 640px) {
+    .chart-section,
+    .documents-section {
+        padding: 1rem;
+    }
+    
+    .cluster-term-card {
+        padding: 1rem;
+    }
+    
+    .document-item {
+        padding: 0.75rem;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    .clustering-btn,
+    .cluster-term-card,
+    .document-item {
+        transition: none;
+    }
+    
+    .clustering-btn:hover {
+        transform: none;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .cluster-term-card,
+    .document-item,
+    .chart-section,
+    .documents-section {
+        border-width: 2px;
+        border-color: #000000;
+    }
+    
+    .clustering-btn {
+        border-width: 2px;
+        border-color: #000000;
+    }
+}
+
+/* Focus states for keyboard navigation */
+.clustering-btn:focus,
+.cluster-filter-select:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}

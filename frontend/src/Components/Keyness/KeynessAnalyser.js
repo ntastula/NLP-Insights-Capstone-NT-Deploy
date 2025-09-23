@@ -52,6 +52,11 @@ const KeynessAnalyser = ({
     const [filterMode, setFilterMode] = useState("content"); // "content" | "all"
     const [showLibraryOptions, setShowLibraryOptions] = useState(true);
 
+    useEffect(() => {
+  window.scrollTo(0, 0);
+}, []);
+
+
     // Library descriptions and configurations
     const libraries = [
         {
