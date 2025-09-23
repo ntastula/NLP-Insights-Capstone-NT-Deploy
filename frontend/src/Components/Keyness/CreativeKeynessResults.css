@@ -74,6 +74,22 @@
     overflow: hidden;
 }
 
+/* Summary Tab */
+.keyness-summary {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f7f7ff;
+  border-radius: 8px;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.07);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #26235d;
+}
+
+.keyness-summary p {
+  margin-bottom: 1em;
+}
+
 /* Base keyword pill styles */
 .keyword-pill {
     background: linear-gradient(135deg, var(--bg-start), var(--bg-end));

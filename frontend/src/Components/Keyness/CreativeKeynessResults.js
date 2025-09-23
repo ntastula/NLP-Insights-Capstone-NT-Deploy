@@ -22,6 +22,8 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
   const [selectedWord, setSelectedWord] = useState(null);
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   // Ensure results is always an array
   const safeResults = Array.isArray(results) ? results : [];
@@ -71,6 +73,29 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
     }
   };
 
+  const fetchSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/get-keyness-summary/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyness_results: results })
+      });
+      const data = await response.json();
+      setSummary(data.summary || "No summary available");
+    } catch (err) {
+      setSummary("Error retrieving summary");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeView === "summary" && !summary && !summaryLoading) {
+      fetchSummary();
+    }
+  }, [activeView]);
+
   const handleKeywordClick = async (word) => {
     setSelectedWord(word);
     setLoading(true);
@@ -111,7 +136,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
 
       {/* View Toggle Buttons */}
       <div className="view-controls">
-        {["keywords", "charts", "table", "wordData"].map((view) => (
+        {["keywords", "charts", "table", "wordData", "summary"].map((view) => (
           <button
             key={view}
             className={`btn ${activeView === view ? "bg-blue-500 text-white" : ""}`}
@@ -123,7 +148,9 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
               ? "Charts"
               : view === "table"
               ? "Table"
-              : "Word Data"}
+              : view === "wordData"
+              ? "Word Data"
+              : "Summary"}
           </button>
         ))}
 
@@ -144,6 +171,21 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
           Download XLSX
         </button>
       </div>
+
+      {/* Summary View */}
+      {activeView === "summary" && (
+        <div className="keyness-summary">
+          {summaryLoading ? (
+            "Loading summary..."
+          ) : (
+            summary
+              .split(/\n{2,}|(?<=\.)\s+/) // Split on double newlines or after periods
+              .map((p, i) => (
+                <p key={i}>{p.trim()}</p>
+              ))
+          )}
+        </div>
+      )}
 
       {/* Keywords View */}
       {activeView === "keywords" && (

@@ -3,9 +3,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.http import require_POST
 from django.views.decorators.http import require_GET
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 import json
 import os
 import re
+import requests
 from django.conf import settings
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
@@ -615,6 +618,33 @@ def corpus_preview_keyness(request):
         logger.exception(f"Error generating keyness corpus preview: {e}")
         return JsonResponse({"preview": ""}, status=500)
 
-
+@api_view(['POST'])
+def get_keyness_summary(request):
+    keyness_results = request.data.get('keyness_results', [])
+    top_words = keyness_results[:50]  # adjust sorting/filtering as needed
+    prompt = (
+        "You are an expert NLP analyst. Here are the top 50 key words in a text, along with their keyness scores and part-of-speech tags:\n"
+        f"{top_words}\n"
+        "Write a summary (2-3 paragraphs) about what these results reveal about the word choices in the text. "
+        "Do not explain statistical columns; instead, interpret the meaning and possible implications of these words in the context of the document."
+    )
+    ollama_url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": "llama3",
+        "prompt": prompt
+    }
+    ollama_response = requests.post(ollama_url, json=payload, stream=True)
+    summary_parts = []
+    for line in ollama_response.iter_lines():
+        if line:
+            try:
+                data = line.decode("utf-8")
+                json_obj = json.loads(data)  # <-- fixed!
+                if "response" in json_obj:
+                    summary_parts.append(json_obj["response"])
+            except Exception as e:
+                continue
+    summary_text = "".join(summary_parts)
+    return Response({"summary": summary_text})
 
 
