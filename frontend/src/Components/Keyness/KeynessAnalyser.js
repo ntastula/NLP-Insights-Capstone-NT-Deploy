@@ -135,7 +135,7 @@ const KeynessAnalyser = ({
             {/* Word Filtering Options */}
             <div className="filter-section">
                 <p className="filter-title">
-                    Select an option for what words in your text you would like analysed:
+                    What words in your text would you like analysed:
                 </p>
                 <div className="filter-options">
                     <label className="filter-option">

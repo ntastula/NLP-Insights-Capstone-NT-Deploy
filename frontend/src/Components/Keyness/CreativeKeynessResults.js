@@ -9,7 +9,6 @@ import { exportAnalysisToCSV } from "./ExportCsv";
 import { exportKeynessToXlsx } from "./ExportXlsx";
 import { generateChartData } from "./GenerateChartData";
 
-
 const posColors = {
   NOUN: "noun",
   VERB: "verb",
@@ -23,71 +22,68 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
   const [selectedWord, setSelectedWord] = useState(null);
   const [sentences, setSentences] = useState([]);
   const [loading, setLoading] = useState(false);
-  
 
   // Ensure results is always an array
   const safeResults = Array.isArray(results) ? results : [];
   console.log("API results:", results);
-console.log("Safe results:", safeResults);
-
+  console.log("Safe results:", safeResults);
 
   // Group by POS
   const uploadedWordsSet = useMemo(() => {
-  if (!uploadedText) return new Set();
-  return new Set(
-    uploadedText
-      .toLowerCase()
-      .match(/\b\w+\b/g)  
-  );
-}, [uploadedText]);
+    if (!uploadedText) return new Set();
+    return new Set(
+      uploadedText
+        .toLowerCase()
+        .match(/\b\w+\b/g)  
+    );
+  }, [uploadedText]);
 
-const posGroups = useMemo(() => {
-  const groups = {};
-  safeResults.forEach((item) => {
-    if (!uploadedWordsSet.has(item.word.toLowerCase())) return; 
-    if (item.pos === "PROPN") return; 
+  const posGroups = useMemo(() => {
+    const groups = {};
+    safeResults.forEach((item) => {
+      if (!uploadedWordsSet.has(item.word.toLowerCase())) return; 
+      if (item.pos === "PROPN") return; 
 
-    const pos = (item.pos || item.pos_tag || "OTHER").toUpperCase();
-    if (!groups[pos]) groups[pos] = [];
-    groups[pos].push(item);
-  });
-  return groups;
-}, [safeResults, uploadedWordsSet]);
-
+      const pos = (item.pos || item.pos_tag || "OTHER").toUpperCase();
+      if (!groups[pos]) groups[pos] = [];
+      groups[pos].push(item);
+    });
+    return groups;
+  }, [safeResults, uploadedWordsSet]);
 
   // Fetch sentences from backend
   const getSentencesContaining = async (word) => {
-  if (!uploadedText) return [];
-  try {
-    const response = await fetch("http://localhost:8000/api/get-sentences/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uploaded_text: uploadedText,  
-        word: word                     
-      })
-    });
-    const data = await response.json();
-    return data.sentences || [];
-  } catch (err) {
-    console.error("Error fetching sentences:", err);
-    return [];
-  }
-};
+    if (!uploadedText) return [];
+    try {
+      const response = await fetch("http://localhost:8000/api/get-sentences/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploaded_text: uploadedText,  
+          word: word                     
+        })
+      });
+      const data = await response.json();
+      return data.sentences || [];
+    } catch (err) {
+      console.error("Error fetching sentences:", err);
+      return [];
+    }
+  };
 
   const handleKeywordClick = async (word) => {
-  setSelectedWord(word);
-  setLoading(true);
-  try {
-    const fetchedSentences = await getSentencesContaining(word);
-    setSentences(fetchedSentences);
-  } catch (err) {
-    console.error("Error fetching sentences:", err);
-    setSentences([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    setSelectedWord(word);
+    setLoading(true);
+    try {
+      const fetchedSentences = await getSentencesContaining(word);
+      setSentences(fetchedSentences);
+    } catch (err) {
+      console.error("Error fetching sentences:", err);
+      setSentences([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const closeModal = () => {
     setSelectedWord(null);
@@ -95,96 +91,103 @@ const posGroups = useMemo(() => {
   };
 
   if (!results || Object.keys(results).length === 0) {
-    return <p>No significant keywords found.</p>;
+    return (
+      <div className="results-container">
+        <div className="no-results">
+          No significant keywords found.
+        </div>
+      </div>
+    );
   }
 
   const chartData = results?.slice(0, 20).map((r) => ({
-  label: r.word,
-  value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
-}));
-
+    label: r.word,
+    value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+  }));
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
+    <div className="results-container">
       <ResultsSummary stats={stats} selectedMethod={method} comparisonResults={safeResults} />
 
       {/* View Toggle Buttons */}
-<div className="flex gap-4 mb-6 justify-center">
-  {["keywords", "charts", "table", "wordData"].map((view) => (
-    <button
-      key={view}
-      className={`btn ${activeView === view ? "bg-blue-500 text-white" : ""}`}
-      onClick={() => setActiveView(view)}
-    >
-      {view === "keywords"
-        ? "Top Keywords"
-        : view === "charts"
-        ? "Charts"
-        : view === "table"
-        ? "Table"
-        : "Word Data"}
-    </button>
-  ))}
+      <div className="view-controls">
+        {["keywords", "charts", "table", "wordData"].map((view) => (
+          <button
+            key={view}
+            className={`btn ${activeView === view ? "bg-blue-500 text-white" : ""}`}
+            onClick={() => setActiveView(view)}
+          >
+            {view === "keywords"
+              ? "Top Keywords"
+              : view === "charts"
+              ? "Charts"
+              : view === "table"
+              ? "Table"
+              : "Word Data"}
+          </button>
+        ))}
 
-  {/* Download button */}
-  <button
-  className="btn bg-green-500 text-white"
-  onClick={() =>
-    exportKeynessToXlsx(
-      safeResults,
-      method,
-      stats,
-      posGroups,
-      [],
-      chartData      
-    )
-  }
->
-  Download XLSX
-</button>
-
-
-
-</div>
-
+        {/* Download button */}
+        <button
+          className="btn bg-green-500 text-white"
+          onClick={() =>
+            exportKeynessToXlsx(
+              safeResults,
+              method,
+              stats,
+              posGroups,
+              [],
+              chartData      
+            )
+          }
+        >
+          Download XLSX
+        </button>
+      </div>
 
       {/* Keywords View */}
-{activeView === "keywords" && (
-  <div className="creative-results">
-    {Object.entries(posGroups).map(([pos, words]) => {
-      // Map POS codes to full names
-      const posFullNames = {
-        ADV: "Adverb",
-        NOUN: "Noun",
-        VERB: "Verb",
-        ADJ: "Adjective",
-        OTHER: "Other",
-      };
-      const posLabel = posFullNames[pos] || pos;
+      {activeView === "keywords" && (
+        <div className="creative-results">
+          {Object.entries(posGroups).map(([pos, words]) => {
+            // Map POS codes to full names
+            const posFullNames = {
+              ADV: "Adverbs",
+              NOUN: "Nouns",
+              VERB: "Verbs",
+              ADJ: "Adjectives",
+              OTHER: "Other Words",
+            };
+            const posLabel = posFullNames[pos] || pos;
+            const posKey = pos.toLowerCase();
 
-      return (
-        <div key={pos} className="pos-section">
-          <h3>{posLabel}</h3>
-          <div
-            className="word-list"
-            style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}
-          >
-            {words.map((w, idx) => (
-              <span
-                key={idx}
-                className={`keyword keyword-pill ${posColors[pos] || posColors.OTHER} cursor-pointer`}
-                onClick={() => handleKeywordClick(w.word)}
-              >
-                {w.word}
-              </span>
-            ))}
-          </div>
+            return (
+              <div key={pos} className="pos-section">
+                <h3 data-pos={posKey}>{posLabel}</h3>
+                <div className="word-list">
+                  {words.map((w, idx) => (
+                    <span
+                      key={`${w.word}-${idx}`}
+                      className={`keyword keyword-pill ${posColors[pos] || posColors.OTHER}`}
+                      onClick={() => handleKeywordClick(w.word)}
+                      tabIndex={0}
+                      role="button"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleKeywordClick(w.word);
+                        }
+                      }}
+                      title={`Click to see sentences containing "${w.word}"`}
+                    >
+                      {w.word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      );
-    })}
-  </div>
-)}
-
+      )}
 
       {/* Charts View */}
       {activeView === "charts" && <Charts results={safeResults} method={method} />}
@@ -195,10 +198,14 @@ const posGroups = useMemo(() => {
       {/* Word Data View */}
       {activeView === "wordData" && <KeynessResultsGrid results={safeResults} method={method} />}
 
-
       {/* Modal for Sentences */}
       {selectedWord && (
-        <SentenceModal word={selectedWord} sentences={sentences} onClose={closeModal} />
+        <SentenceModal 
+          word={selectedWord} 
+          sentences={sentences} 
+          onClose={closeModal}
+          loading={loading}
+        />
       )}
     </div>
   );
