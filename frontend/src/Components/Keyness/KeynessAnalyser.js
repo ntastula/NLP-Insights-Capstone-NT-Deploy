@@ -1,13 +1,13 @@
-// frontend/src/Components/Keyness/KeynessAnalyser.js
 import React, { useState, useEffect } from "react";
 import ResultsSummary from "./ResultsSummary";
 import Charts from "./Charts";
 import ResultsTable from "./ResultsTable";
 import CreativeKeynessResults from "./CreativeKeynessResults";
 import '../ProgressBar.css';
+import './KeynessAnalyser.css';
 
 /**
- * Lightweight progress bar (unchanged visual).
+ * Progress Bar
  */
 const ProgressBar = ({ loading }) => {
     const [progress, setProgress] = useState(0);
@@ -35,18 +35,13 @@ const ProgressBar = ({ loading }) => {
     );
 };
 
-/**
- * KeynessAnalyser:
- * - PRESERVES your structure and UI.
- * - ONLY adds passing `genre` as `corpus_name` in the POST body.
- */
 const KeynessAnalyser = ({
     uploadedText,
     uploadedPreview,
     corpusPreview,
-    method,      // optional external method default
+    method,      
     onBack,
-    genre        // <-- NEW: forwarded to backend as corpus_name
+    genre        
 }) => {
     const [comparisonResults, setComparisonResults] = useState([]);
     const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0, totalSignificant: 0 });
@@ -55,6 +50,35 @@ const KeynessAnalyser = ({
     const [analysisDone, setAnalysisDone] = useState(false);
     const [selectedMethod, setSelectedMethod] = useState(method || "nltk");
     const [filterMode, setFilterMode] = useState("content"); // "content" | "all"
+    const [showLibraryOptions, setShowLibraryOptions] = useState(true);
+
+    // Library descriptions and configurations
+    const libraries = [
+        {
+            id: "nltk",
+            name: "NLTK",
+            title: "Get the complete statistical picture of your word choices",
+            description: "Choose NLTK when you want a comprehensive analysis that shows not just which words make your writing distinctive, but how strongly they stand out and how significant that difference really is. This gives you the most thorough understanding of your unique voice by combining multiple statistical measures to paint a complete picture of your writing style."
+        },
+        {
+            id: "sklearn",
+            name: "Scikit-Learn",
+            title: "Find your most statistically significant word patterns", 
+            description: "Choose Scikit-learn when you want to discover which words in your writing are genuinely meaningful patterns versus just random occurrences. This analysis focuses on statistical confidence, helping you identify the word choices that truly define your writing style rather than words that might just appear unusual by chance."
+        },
+        {
+            id: "gensim",
+            name: "Gensim",
+            title: "Discover your most important and distinctive terms",
+            description: "Choose Gensim when you want to find the words that carry the most weight and meaning in your writing. This analysis identifies terms that are both frequent in your work AND rare elsewhere, revealing the vocabulary that makes your writing uniquely valuable and memorable to readers."
+        },
+        {
+            id: "spacy",
+            name: "spaCy",
+            title: "Get the most complete analysis with positive and negative patterns",
+            description: "Choose spaCy when you want the fullest possible analysis that not only shows your distinctive words but also reveals what you avoid using compared to other writers. This comprehensive approach combines statistical significance with effect sizes and can highlight both your signature word choices and notable gaps in your vocabulary."
+        }
+    ];
 
     const performAnalysis = async (methodName) => {
         if (!uploadedText) return;
@@ -62,6 +86,7 @@ const KeynessAnalyser = ({
         setError("");
         setAnalysisDone(false);
         setSelectedMethod(methodName);
+        setShowLibraryOptions(false); // Hide library options when analysis starts
 
         try {
             const res = await fetch("http://localhost:8000/api/analyse-keyness/", {
@@ -69,9 +94,9 @@ const KeynessAnalyser = ({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     uploaded_text: uploadedText,
-                    method: methodName.toLowerCase(), // "nltk" | "sklearn" | "gensim" | "spacy"
-                    filter_mode: filterMode,          // "content" | "all"
-                    corpus_name: genre || ""          // <-- genre wiring (ONLY addition)
+                    method: methodName.toLowerCase(), 
+                    filter_mode: filterMode,          
+                    corpus_name: genre || ""          
                 })
             });
 
@@ -102,66 +127,98 @@ const KeynessAnalyser = ({
         <div className="mb-6">
             <button
                 onClick={onBack}
-                className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+                className="keyness-back-button"
             >
                 ← Back
             </button>
 
-            {/* Word Filtering Options (PRESERVED) */}
-            <div className="mb-6 text-center">
-                <p className="mb-2 font-medium">
+            {/* Word Filtering Options */}
+            <div className="filter-section">
+                <p className="filter-title">
                     Select an option for what words in your text you would like analysed:
                 </p>
-                <div className="flex justify-center gap-6">
-                    <label className="flex items-center gap-2">
+                <div className="filter-options">
+                    <label className="filter-option">
                         <input
                             type="radio"
                             name="filterMode"
                             value="content"
                             checked={filterMode === "content"}
                             onChange={(e) => setFilterMode(e.target.value)}
-                            className="mr-1"
                         />
                         <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
                     </label>
-                    <label className="flex items-center gap-2">
+                    <label className="filter-option">
                         <input
                             type="radio"
                             name="filterMode"
                             value="all"
                             checked={filterMode === "all"}
                             onChange={(e) => setFilterMode(e.target.value)}
-                            className="mr-1"
                         />
                         <span>All words</span>
                     </label>
                 </div>
             </div>
 
-            {/* Analyse Buttons (PRESERVED) */}
-            <div className="text-center mb-6 flex justify-center gap-4">
-                <button onClick={() => performAnalysis("nltk")} disabled={loading || !uploadedText} className="btn">
-                    Analyse with NLTK
-                </button>
-                <button onClick={() => performAnalysis("sklearn")} disabled={loading || !uploadedText} className="btn">
-                    Analyse with Scikit-Learn
-                </button>
-                <button onClick={() => performAnalysis("gensim")} disabled={loading || !uploadedText} className="btn">
-                    Analyse with Gensim
-                </button>
-                <button onClick={() => performAnalysis("spacy")} disabled={loading || !uploadedText} className="btn">
-                    Analyse with spaCy
-                </button>
-            </div>
+            {/* Library Selection Section */}
+            {showLibraryOptions ? (
+                <div className="library-selection">
+                    <h2 className="library-selection-title">Choose Your Analysis Method</h2>
+                    <div className="library-container">
+                        {libraries.map((library) => (
+                            <div key={library.id} className="library-card">
+                                <div className="library-card-content">
+                                    {/* Left side - Description */}
+                                    <div className="library-description">
+                                        <h3 className="library-title">
+                                            {library.name}: {library.title}
+                                        </h3>
+                                        <p className="library-text">
+                                            {library.description}
+                                        </p>
+                                    </div>
+                                    
+                                    {/* Right side - Button */}
+                                    <div className="library-button-container">
+                                        <button 
+                                            onClick={() => performAnalysis(library.id)} 
+                                            disabled={loading || !uploadedText}
+                                            className="analysis-button"
+                                        >
+                                            Analyse with {library.name}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="collapsed-library-selection">
+                    <div className="current-analysis-info">
+                        <span className="current-analysis-text">
+                            Analysing with <strong>{libraries.find(lib => lib.id === selectedMethod)?.name || selectedMethod.toUpperCase()}</strong>
+                        </span>
+                        <button 
+                            onClick={() => setShowLibraryOptions(true)}
+                            className="change-method-button"
+                            disabled={loading}
+                        >
+                            Change Method
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {loading && (
-                <div className="w-full max-w-xl mx-auto mt-4">
+                <div className="progress-container-wrapper">
                     <ProgressBar loading={loading} />
                 </div>
             )}
 
             {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700 mb-6">
+                <div className="error-message">
                     Error: {error}
                 </div>
             )}
@@ -174,11 +231,6 @@ const KeynessAnalyser = ({
                     stats={stats}
                 />
             )}
-
-            {/* Keep these if your downstream UI uses them */}
-            {/* <ResultsSummary data={comparisonResults} /> */}
-            {/* <Charts data={comparisonResults} /> */}
-            {/* <ResultsTable data={comparisonResults} /> */}
         </div>
     );
 };

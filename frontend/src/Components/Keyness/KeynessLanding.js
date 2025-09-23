@@ -1,4 +1,3 @@
-// frontend/src/Components/Keyness/KeynessLanding.js
 import React, { useState, useEffect } from "react";
 import TextInputSection from "../TextInputSection";
 import KeynessAnalyser from "./KeynessAnalyser";
@@ -15,32 +14,30 @@ const KeynessLanding = ({ onBack, genre }) => {
     const [pastedWordCount, setPastedWordCount] = useState(0);
 
     useEffect(() => {
-    let cancelled = false;
+        let cancelled = false;
 
-    async function fetchCorpusPreview() {
-        try {
-            if (!genre) return;
-            
-            const url = genre
-    ? `http://localhost:8000/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`
-    : "http://localhost:8000/api/corpus-preview-keyness/";
+        async function fetchCorpusPreview() {
+            try {
+                if (!genre) return;
+                
+                const url = genre
+                    ? `http://localhost:8000/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`
+                    : "http://localhost:8000/api/corpus-preview-keyness/";
 
-
-            const response = await fetch(url, { credentials: "include" });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            if (!cancelled) {
-                setCorpusPreview(data.preview || "");
+                const response = await fetch(url, { credentials: "include" });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (!cancelled) {
+                    setCorpusPreview(data.preview || "");
+                }
+            } catch (err) {
+                if (!cancelled) setCorpusPreview("");
             }
-        } catch (err) {
-            if (!cancelled) setCorpusPreview("");
         }
-    }
 
-    fetchCorpusPreview();
-    return () => { cancelled = true; };
-}, [genre]);
-
+        fetchCorpusPreview();
+        return () => { cancelled = true; };
+    }, [genre]);
 
     const handleTextPaste = (e) => {
         const text = e.target.value || "";
@@ -60,7 +57,6 @@ const KeynessLanding = ({ onBack, genre }) => {
         setActiveInput("file");
         setError("");
     };
-    // ===== END TextInputSection block =====
 
     const handleContinue = () => {
         if (!uploadedText.trim()) {
@@ -83,35 +79,48 @@ const KeynessLanding = ({ onBack, genre }) => {
     }
 
     return (
-        <div>
+        <div className="keyness-landing-wrapper">
             <button
                 onClick={onBack}
-                className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+                className="keyness-back-button"
             >
                 ← Back
             </button>
 
-            <h1 className="text-3xl font-bold mb-6">Keyness Analysis</h1>
+            <div className="keyness-header">
+                <h1 className="keyness-title">Keyness Analysis</h1>
+                <p className="keyness-subtitle">
+                    Discover the distinctive words and phrases that make your writing unique by comparing it against a corpus of similar texts.
+                </p>
+            </div>
 
             <div className="keyness-container">
-                {/* TextInputSection block (PRESERVED) */}
-                <TextInputSection
-                    pastedText={pastedText}
-                    handleTextPaste={handleTextPaste}
-                    pastedWordCount={pastedWordCount}
-                    uploadedPreview={uploadedPreview}
-                    corpusPreview={corpusPreview}
-                    error={error}
-                    onFilesUploaded={handleFilesUploaded}
-                />
+                <div className="keyness-content-card">
+                    <TextInputSection
+                        pastedText={pastedText}
+                        handleTextPaste={handleTextPaste}
+                        pastedWordCount={pastedWordCount}
+                        uploadedPreview={uploadedPreview}
+                        corpusPreview={corpusPreview}
+                        error={error}
+                        onFilesUploaded={handleFilesUploaded}
+                    />
 
-                <div className="text-center">
-                    <button
-                        onClick={handleContinue}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
-                    >
-                        Continue to Analysis →
-                    </button>
+                    {error && (
+                        <div className="keyness-error-message">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="keyness-continue-section">
+                        <button
+                            onClick={handleContinue}
+                            className="keyness-continue-button"
+                            disabled={!uploadedText.trim()}
+                        >
+                            Continue to Analysis →
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

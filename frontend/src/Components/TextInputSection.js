@@ -88,15 +88,11 @@ const uploadFilesToBackend = async (files) => {
   );
 }
 
-
     if (result.errors?.length > 0) setUploadErrors(result.errors);
     if (!result.success) setUploadErrors([result.error || "Upload failed"]);
     setUploadProgress(0);
   });
 };
-
-
-
 
   // Handle files
   const handleFiles = (files) => {
@@ -241,154 +237,104 @@ Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
   }, []);
 
   return (
-    <div className="keyness-container">
-      {/* Paste textarea */}
-      <div>
-        <label className="block text-lg font-semibold mb-2">
-          Paste Your Text
-        </label>
-        <textarea
-          value={pastedText}
-          onChange={handleTextPaste}
-          className="keyness-textarea"
-          placeholder="Paste text here..."
-          style={{
-            width: "100%",
-            minHeight: "120px",
-            padding: "12px",
-            border: "1px solid #ccc",
-            borderRadius: "6px",
-            fontSize: "14px",
-            fontFamily: "monospace",
-            resize: "vertical",
-          }}
-        />
-        {pastedText && (
-          <div
-            style={{ fontSize: "0.9em", color: "#666", marginTop: "6px" }}
-          >
-            Word count: {pastedWordCount}
-          </div>
-        )}
-      </div>
-
-      {/* Drag & Drop */}
-      <div
-        ref={dropzoneRef}
-        className={`keyness-dropzone ${hover ? "hover" : ""} ${
-          uploading ? "uploading" : ""
-        }`}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        style={{
-          width: "100%",
-          border: uploading ? "2px solid #007bff" : "2px dashed #ccc",
-          padding: "40px 20px",
-          textAlign: "center",
-          borderRadius: "8px",
-          backgroundColor: uploading
-            ? "#f0f8ff"
-            : hover
-            ? "#f0f8ff"
-            : "transparent",
-          borderColor: uploading ? "#007bff" : hover ? "#007bff" : "#ccc",
-          transition: "all 0.3s ease",
-          opacity: uploading ? 0.7 : 1,
-        }}
-      >
-        <div style={{ pointerEvents: "none" }}>
-          {uploading ? (
-            <div>
-              <Upload className="animate-pulse mx-auto mb-2" size={24} />
-              Uploading… {uploadProgress}%
-              <div
-                style={{
-                  width: "100%",
-                  height: "6px",
-                  background: "#eee",
-                  marginTop: "8px",
-                  borderRadius: "3px",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${uploadProgress}%`,
-                    height: "100%",
-                    background: "#007bff",
-                    transition: "width 0.2s",
-                  }}
-                />
-              </div>
+    <div className="text-input-container">
+      {/* Side by side input methods */}
+      <div className="input-methods-row">
+        {/* Paste textarea - Left side */}
+        <div className="paste-section">
+          <label className="input-label">
+            Paste Your Text
+          </label>
+          <textarea
+            value={pastedText}
+            onChange={handleTextPaste}
+            className="keyness-textarea"
+            placeholder="Paste your text here..."
+          />
+          {pastedText && (
+            <div className="word-count">
+              Word count: {pastedWordCount}
             </div>
-          ) : (
-            <>
-              Drag & drop files here
-              {hover && draggedFileName && (
-                <div style={{ marginTop: "8px", color: "#333" }}>
-                  Release to upload: <strong>{draggedFileName}</strong>
-                </div>
-              )}
-              <div
-                style={{
-                  fontSize: "0.9em",
-                  color: "#666",
-                  marginTop: "8px",
-                }}
-              >
-                Supported: .txt, .doc, .docx (max 5MB each)
-              </div>
-            </>
           )}
         </div>
-        <input
-          id="fileInput"
-          type="file"
-          multiple
-          style={{ display: "none" }}
-          onChange={handleFileSelect}
-          accept=".txt,.doc,.docx"
-          disabled={uploading}
-        />
+
+        {/* Drag & Drop - Right side */}
+        <div className="upload-section">
+          <label className="input-label">
+            Upload Files
+          </label>
+          <div
+            ref={dropzoneRef}
+            className={`keyness-dropzone ${hover ? "hover" : ""} ${
+              uploading ? "uploading" : ""
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            <div className="dropzone-content">
+              {uploading ? (
+                <div className="upload-progress">
+                  <Upload className="upload-icon" size={24} />
+                  <div>Uploading… {uploadProgress}%</div>
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="dropzone-idle">
+                  <Upload className="upload-icon" size={32} />
+                  <div className="dropzone-text">
+                    Drag & drop files here
+                  </div>
+                  {hover && draggedFileName && (
+                    <div className="drag-feedback">
+                      Release to upload: <strong>{draggedFileName}</strong>
+                    </div>
+                  )}
+                  <div className="file-info">
+                    Supported: .txt, .doc, .docx (max 5MB each)
+                  </div>
+                </div>
+              )}
+            </div>
+            <input
+              id="fileInput"
+              type="file"
+              multiple
+              className="hidden-file-input"
+              onChange={handleFileSelect}
+              accept=".txt,.doc,.docx"
+              disabled={uploading}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Select Files Button */}
-      <button
-        type="button"
-        onClick={() =>
-          !uploading && document.getElementById("fileInput").click()
-        }
-        style={{
-          marginTop: "10px",
-          padding: "6px 12px",
-          background: "#007bff",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          cursor: uploading ? "not-allowed" : "pointer",
-        }}
-      >
-        Select Files
-      </button>
+      {/* Select Files Button - Centered below inputs */}
+      <div className="select-button-container">
+        <button
+          type="button"
+          onClick={() =>
+            !uploading && document.getElementById("fileInput").click()
+          }
+          className="select-files-button"
+          disabled={uploading}
+        >
+          Select Files from Computer
+        </button>
+      </div>
 
       {/* Upload Success Messages */}
       {uploadSuccess.length > 0 && (
-        <div
-          style={{
-            backgroundColor: "#d1f2eb",
-            border: "1px solid #52c41a",
-            borderRadius: "6px",
-            padding: "12px",
-            marginTop: "12px",
-          }}
-        >
+        <div className="success-messages">
           {uploadSuccess.map((message, index) => (
-            <div
-              key={index}
-              style={{ color: "#389e0d", marginBottom: "4px" }}
-            >
+            <div key={index} className="success-item">
+              <CheckCircle size={16} />
               {message}
             </div>
           ))}
@@ -397,24 +343,10 @@ Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
 
       {/* Upload Error Messages */}
       {uploadErrors.length > 0 && (
-        <div
-          style={{
-            backgroundColor: "#fff2f0",
-            border: "1px solid #ff4d4f",
-            borderRadius: "6px",
-            padding: "12px",
-            marginTop: "12px",
-          }}
-        >
+        <div className="error-messages">
           {uploadErrors.map((error, index) => (
-            <div
-              key={index}
-              style={{ color: "#cf1322", marginBottom: "4px" }}
-            >
-              <AlertCircle
-                size={16}
-                style={{ display: "inline", marginRight: "6px" }}
-              />
+            <div key={index} className="error-item">
+              <AlertCircle size={16} />
               {error}
             </div>
           ))}
@@ -423,199 +355,79 @@ Array.from(files).forEach(f => console.log(f.name, f.size, f.type));
 
       {/* Selected files */}
       {selectedFiles.length > 0 && (
-        <div
-          className="keyness-file-list"
-          style={{
-            width: "100%",
-            padding: "16px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "6px",
-            border: "1px solid #e9ecef",
-            marginTop: "12px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "12px",
-            }}
-          >
-            <h4 style={{ margin: 0, color: "#495057" }}>Selected Files:</h4>
-            <button
-              onClick={clearAllFiles}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#6c757d",
-                cursor: "pointer",
-                fontSize: "0.9em",
-              }}
-            >
+        <div className="selected-files-section">
+          <div className="files-header">
+            <h4>Selected Files:</h4>
+            <button onClick={clearAllFiles} className="clear-all-button">
               Clear All
             </button>
           </div>
-          {selectedFiles.map((file, index) => (
-            <div
-              key={`${file.name}-${index}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 0",
-                borderBottom:
-                  index < selectedFiles.length - 1
-                    ? "1px solid #dee2e6"
-                    : "none",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <CheckCircle
-                  size={16}
-                  style={{ marginRight: "8px", color: "green" }}
-                />
-                <span>
-                  {file.name} ({Math.round(file.size / 1024)}KB)
-                  {file.processed && file.wordCount && (
-                    <span
-                      style={{
-                        color: "#6c757d",
-                        fontSize: "0.9em",
-                      }}
-                    >
-                      {" "}
-                      • {file.wordCount} words
-                    </span>
-                  )}
-                </span>
+          <div className="files-list">
+            {selectedFiles.map((file, index) => (
+              <div key={`${file.name}-${index}`} className="file-item">
+                <div className="file-info-row">
+                  <CheckCircle size={16} className="file-check" />
+                  <span className="file-details">
+                    {file.name} ({Math.round(file.size / 1024)}KB)
+                    {file.processed && file.wordCount && (
+                      <span className="word-count-info">
+                        • {file.wordCount} words
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeFile(index)}
+                  className="remove-file-button"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => removeFile(index)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#dc3545",
-                  cursor: "pointer",
-                  padding: "4px",
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-{/* Uploaded Preview */}
-{selectedFiles.length > 0 && (
-  <div
-    className="keyness-preview"
-    style={{
-      width: "100%",
-      padding: "16px",
-      backgroundColor: "#f8f9fa",
-      borderRadius: "6px",
-      border: "1px solid #e9ecef",
-      marginTop: "12px",
-    }}
-  >
-    <h3
-      className="font-semibold mb-2"
-      style={{ marginBottom: "12px", color: "#495057" }}
-    >
-      Uploaded Text Preview:
-    </h3>
-    <pre
-      style={{
-        whiteSpace: "pre-wrap",
-        maxHeight: "200px",   // keeps box scrollable
-        overflowY: "auto",
-        backgroundColor: "#ffffff",
-        padding: "12px",
-        borderRadius: "4px",
-        border: "1px solid #dee2e6",
-        fontSize: "13px",
-        fontFamily: "monospace",
-        margin: 0,
-      }}
-    >
-      {selectedFiles.map((file, index) => {
-        const previewText = file.textContent
-          ? file.textContent.split("\n").slice(0, 4).join("\n") // first 4 lines
-          : "";
+      {/* Preview boxes - Stacked vertically */}
+      <div className="preview-sections">
+        {/* Uploaded Preview */}
+        {selectedFiles.length > 0 && (
+          <div className="preview-box">
+            <h3 className="preview-title">Uploaded Text Preview:</h3>
+            <div className="preview-content">
+              {selectedFiles.map((file, index) => {
+                const previewText = file.textContent
+                  ? file.textContent.split("\n").slice(0, 4).join("\n")
+                  : "";
 
-        return (
-          <div key={index} style={{ marginBottom: "1em" }}>
-            <strong>{file.name}</strong>
-            {"\n"}
-            {previewText}
-            {"\n---\n"}
+                return (
+                  <div key={index} className="file-preview">
+                    <strong>{file.name}</strong>
+                    {"\n"}
+                    {previewText}
+                    {index < selectedFiles.length - 1 && "\n---\n"}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        );
-      })}
-    </pre>
-  </div>
-)}
+        )}
 
-
-
-
-
-      {/* Corpus Preview */}
-{corpusPreview && (
-  <div
-    className="keyness-preview"
-    style={{
-      width: "100%",
-      padding: "16px",
-      backgroundColor: "#f8f9fa",
-      borderRadius: "6px",
-      border: "1px solid #e9ecef",
-      marginTop: "12px",
-    }}
-  >
-    <h3
-      className="font-semibold mb-2"
-      style={{ marginBottom: "12px", color: "#495057" }}
-    >
-      Corpus Preview:
-    </h3>
-    <pre
-      style={{
-        whiteSpace: "pre-wrap",
-        maxHeight: "200px",
-        overflowY: "auto",
-        backgroundColor: "#ffffff",
-        padding: "12px",
-        borderRadius: "4px",
-        border: "1px solid #dee2e6",
-        fontSize: "13px",
-        fontFamily: "monospace",
-        margin: 0,
-      }}
-    >
-      {corpusPreview}
-    </pre>
-  </div>
-)}
-
-
+        {/* Corpus Preview */}
+        {corpusPreview && (
+          <div className="preview-box">
+            <h3 className="preview-title">Corpus Preview:</h3>
+            <div className="preview-content">
+              {corpusPreview}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* General error */}
       {error && (
-        <div
-          className="keyness-error"
-          style={{
-            width: "100%",
-            color: "#dc3545",
-            padding: "12px",
-            backgroundColor: "#f8d7da",
-            border: "1px solid #f5c6cb",
-            borderRadius: "6px",
-            marginTop: "12px",
-          }}
-        >
+        <div className="general-error">
+          <AlertCircle size={16} />
           {error}
         </div>
       )}

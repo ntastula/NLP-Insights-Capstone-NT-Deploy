@@ -1,126 +1,673 @@
 /* KeynessLanding.css */
 
-/* General container - Updated to 80% width */
+/* Main wrapper */
+.keyness-landing-wrapper {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Back button styling - matches KeynessAnalyser */
+.keyness-back-button {
+    margin-bottom: 1.5rem;
+    background-color: #e5e7eb;
+    color: #374151;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 0.875rem;
+}
+
+.keyness-back-button:hover {
+    background-color: #d1d5db;
+}
+
+/* Header section */
+.keyness-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.keyness-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 0.75rem;
+}
+
+.keyness-subtitle {
+    font-size: 1.125rem;
+    color: #6b7280;
+    max-width: 42rem;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Main container */
 .keyness-container {
-  width: 80%;
-  margin: 0 auto;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
 }
 
-/* Paste textarea */
-.keyness-textarea {
-  width: 100%;
-  height: 10rem;
-  padding: 1rem;
-  border: 2px solid #ccc;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  resize: vertical;
+/* Content card */
+.keyness-content-card {
+    background-color: #ffffff;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 56rem;
 }
 
-.keyness-textarea:focus {
-  outline: none;
-  border-color: #7c3aed; /* purple border on focus */
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+/* Error message */
+.keyness-error-message {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    color: #991b1b;
+    margin: 1rem 0;
+    text-align: center;
+    font-weight: 500;
 }
 
-/* Dropzone box */
-.keyness-dropzone {
-  border: 3px dashed #aaa;
-  border-radius: 1rem;
-  padding: 3rem;
-  text-align: center;
-  font-size: 1.2rem;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-  background-color: #fafafa;
-  position: relative;
-  width: 100%; /* Ensure it takes full width of container */
-}
-
-.keyness-dropzone.hover {
-  border-color: #7c3aed;
-  background-color: #f3e8ff; /* light purple on hover */
-  color: #7c3aed;
-}
-
-/* Hidden file input inside dropzone */
-.keyness-dropzone input[type="file"] {
-  display: none;
-}
-
-/* Selected files list */
-.keyness-file-list {
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-top: 1rem;
-  width: 100%; /* Ensure it takes full width of container */
-}
-
-.keyness-file-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.keyness-file-item svg {
-  color: #10b981; /* green check */
-}
-
-/* Uploaded text preview */
-.keyness-preview,
-.keyness-corpus-preview {
-  background-color: #f9fafb;
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  font-family: monospace;
-  white-space: pre-wrap;
-  max-height: 10rem;
-  overflow-y: auto;
-  width: 100%; /* Ensure it takes full width of container */
-}
-
-/* Error messages */
-.keyness-error {
-  color: #dc2626; /* red */
-  font-weight: 500;
+/* Continue section */
+.keyness-continue-section {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
 }
 
 /* Continue button */
-.keyness-continue-btn {
-  background: linear-gradient(90deg, #7c3aed, #3b82f6);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
+.keyness-continue-button {
+    background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
+    color: #ffffff;
+    padding: 0.875rem 2rem;
+    border-radius: 0.5rem;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
 }
 
-.keyness-continue-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  background: linear-gradient(90deg, #9333ea, #2563eb);
+.keyness-continue-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #9333ea 0%, #2563eb 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
 }
 
-/* Responsive design - make it wider on small screens */
+.keyness-continue-button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.keyness-continue-button:disabled {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Improved styles for TextInputSection components */
+/* Textarea styles moved above, dropzone styles moved above */
+
+/* Dropzone styling - moved above */
+
+.keyness-dropzone input[type="file"] {
+    display: none;
+}
+
+/* File list styling */
+.keyness-file-list {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.keyness-file-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.keyness-file-item:last-child {
+    margin-bottom: 0;
+}
+
+.keyness-file-item svg {
+    color: #10b981;
+    flex-shrink: 0;
+}
+
+/* Preview sections */
+.keyness-preview,
+.keyness-corpus-preview {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Courier New', Monaco, monospace;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    max-height: 10rem;
+    overflow-y: auto;
+    width: 100%;
+    color: #374151;
+    line-height: 1.5;
+}
+
+/* Scrollbar styling for webkit browsers */
+.keyness-preview::-webkit-scrollbar,
+.keyness-corpus-preview::-webkit-scrollbar {
+    width: 6px;
+}
+
+.keyness-preview::-webkit-scrollbar-track,
+.keyness-corpus-preview::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.keyness-preview::-webkit-scrollbar-thumb,
+.keyness-corpus-preview::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.keyness-preview::-webkit-scrollbar-thumb:hover,
+.keyness-corpus-preview::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* TextInputSection specific styles */
+.text-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Side by side input methods */
+.input-methods-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.paste-section,
+.upload-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 240px; /* Ensure both sections have same minimum height */
+}
+
+.paste-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.upload-section {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Make textarea fill available space to match dropzone */
+.keyness-textarea {
+    flex: 1;
+    min-height: 180px; /* Match dropzone min-height */
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    resize: vertical;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.keyness-textarea:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.word-count {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+}
+
+.input-label {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.word-count {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+    min-height: 1.25rem; /* Reserve space even when empty */
+}
+
+/* Dropzone specific styles - matching textarea dimensions */
+.keyness-dropzone {
+    flex: 1;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 2px dashed #d1d5db;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+    box-sizing: border-box;
+}
+
+.keyness-dropzone:hover,
+.keyness-dropzone.hover {
+    border-color: #7c3aed;
+    background-color: #faf5ff;
+    color: #7c3aed;
+}
+
+.keyness-dropzone.uploading {
+    border-color: #3b82f6;
+    background-color: #f0f8ff;
+    opacity: 0.8;
+}
+
+.dropzone-content {
+    pointer-events: none;
+    text-align: center;
+}
+
+.dropzone-idle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upload-icon {
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.dropzone-text {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.drag-feedback {
+    margin-top: 0.5rem;
+    color: #7c3aed;
+    font-size: 0.875rem;
+}
+
+.file-info {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.5rem;
+}
+
+.upload-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.progress-bar {
+    width: 100%;
+    max-width: 200px;
+    height: 6px;
+    background-color: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #3b82f6;
+    transition: width 0.2s ease;
+}
+
+.hidden-file-input {
+    display: none;
+}
+
+/* Select button */
+.select-button-container {
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.select-files-button {
+    padding: 0.75rem 1.5rem;
+    background-color: #3b82f6;
+    color: #ffffff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.select-files-button:hover:not(:disabled) {
+    background-color: #2563eb;
+}
+
+.select-files-button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* Success and error messages */
+.success-messages {
+    background-color: #d1f2eb;
+    border: 1px solid #52c41a;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.success-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #389e0d;
+    margin-bottom: 0.25rem;
+}
+
+.success-item:last-child {
+    margin-bottom: 0;
+}
+
+.error-messages {
+    background-color: #fff2f0;
+    border: 1px solid #ff4d4f;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.error-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #cf1322;
+    margin-bottom: 0.25rem;
+}
+
+.error-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Selected files section */
+.selected-files-section {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.files-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.files-header h4 {
+    margin: 0;
+    color: #374151;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.clear-all-button {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.clear-all-button:hover {
+    color: #374151;
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.file-check {
+    color: #10b981;
+    flex-shrink: 0;
+}
+
+.file-details {
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+.word-count-info {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.remove-file-button {
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+}
+
+.remove-file-button:hover {
+    background-color: #fee2e2;
+}
+
+/* Preview sections - stacked vertically */
+.preview-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.preview-box {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.preview-title {
+    margin: 0 0 0.75rem 0;
+    color: #374151;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.preview-content {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    font-family: 'Courier New', Monaco, monospace;
+    font-size: 0.75rem;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+    color: #374151;
+    line-height: 1.4;
+}
+
+.file-preview {
+    margin-bottom: 1rem;
+}
+
+.file-preview:last-child {
+    margin-bottom: 0;
+}
+
+/* General error */
+.general-error {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    color: #991b1b;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Responsive design for TextInputSection */
+@media (max-width: 1024px) {
+    .input-methods-row {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .paste-section,
+    .upload-section {
+        min-height: auto;
+    }
+    
+    .keyness-textarea,
+    .keyness-dropzone {
+        min-height: 140px;
+    }
+}
+
 @media (max-width: 768px) {
-  .keyness-container {
-    max-width: 90%;
-  }
+    .keyness-content-card {
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .select-files-button {
+        width: 100%;
+        padding: 1rem;
+    }
+    
+    .files-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+    
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .remove-file-button {
+        align-self: flex-end;
+    }
+    
+    .keyness-content-card {
+        padding: 1rem;
+    }
+}
+@media (max-width: 1024px) {
+    .keyness-content-card {
+        margin: 0 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .keyness-landing-wrapper {
+        padding: 0 0.5rem;
+    }
+    
+    .keyness-title {
+        font-size: 1.875rem;
+    }
+    
+    .keyness-subtitle {
+        font-size: 1rem;
+    }
+    
+    .keyness-content-card {
+        padding: 1.5rem;
+        margin: 0 0.5rem;
+    }
+    
+    .keyness-dropzone {
+        padding: 2rem 1rem;
+    }
 }
 
 @media (max-width: 480px) {
-  .keyness-container {
-    max-width: 95%;
-    padding: 1rem;
-  }
+    .keyness-content-card {
+        padding: 1rem;
+        margin: 0;
+    }
+    
+    .keyness-continue-button {
+        width: 100%;
+        padding: 1rem;
+    }
+    
+    .keyness-dropzone {
+        padding: 1.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
 }
