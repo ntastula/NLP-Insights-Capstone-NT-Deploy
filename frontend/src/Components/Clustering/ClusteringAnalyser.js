@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import CreativeClusteringAnalysis from "./CreativeClusteringAnalysis";
-import '../ProgressBar.css';
-
+import './ClusteringAnalyser.css';
 
 /**
  * Lightweight progress bar for clustering analysis.
@@ -26,14 +25,16 @@ const ProgressBar = ({ loading }) => {
   }, [loading]);
 
   return (
-    <div className="progress-container bg-gray-200 rounded overflow-hidden relative h-6 w-full mb-4">
+    <div className="progress-container-wrapper">
+      <div className="progress-container">
       <div
-        className="progress-fill bg-blue-600 h-full transition-all duration-200"
+          className="progress-fill"
         style={{ width: `${progress}%` }}
       ></div>
-      <div className="progress-text absolute w-full text-center top-0 left-0 font-medium text-white">
+        <div className="progress-text">
         {Math.floor(progress)}%
       </div>
+    </div>
     </div>
   );
 };
@@ -48,10 +49,27 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
   const [error, setError] = useState("");
   const [selectedCluster, setSelectedCluster] = useState("all");
   const [embedding, setEmbedding] = useState("conceptnet");
+  const [showEmbeddingOptions, setShowEmbeddingOptions] = useState(true);
 
   // Toggles
   const [showTopTerms, setShowTopTerms] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+
+  // Embedding options with descriptions
+  const embeddingOptions = [
+    {
+      id: "conceptnet",
+      name: "ConceptNet",
+      title: "Discover thematic and conceptual connections",
+      description: "Choose ConceptNet when you want to uncover deeper thematic relationships and conceptual connections in your writing. This method groups text based on semantic meaning and common-sense knowledge, helping you identify how different parts of your work connect on a conceptual level. Perfect for understanding the underlying themes, motifs, and conceptual threads that run through your creative work."
+    },
+    {
+      id: "spacy",
+      name: "spaCy",
+      title: "Find linguistic patterns and structural similarities",
+      description: "Choose spaCy when you want to discover patterns based on linguistic structure, grammar, and word relationships. This method focuses on how you actually use language - sentence structure, grammatical patterns, and word choice similarities. Ideal for understanding your writing style, identifying recurring linguistic habits, and seeing how different sections of your work share similar structural approaches."
+    }
+  ];
 
   const runAnalysis = async () => {
     if (!uploadedText) return;
@@ -81,6 +99,7 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       setNumClusters(data.num_clusters || null);
       setNumDocs(data.num_docs || null);
       setSelectedCluster("all"); // reset filter
+      setShowEmbeddingOptions(false); // Hide embedding options when results are displayed
 
     } catch (err) {
       setError(err.message);
@@ -100,39 +119,85 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
     link.click();
   };
 
+  const handleEmbeddingChange = (embeddingId) => {
+    setEmbedding(embeddingId);
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+    <div className="clustering-container">
       <button
         onClick={onBack}
-        className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+        className="clustering-back-button"
       >
         ← Back
       </button>
 
-      <div className="bg-white rounded-2xl shadow-lg p-10 max-w-5xl w-full">
-        <h1 className="text-3xl font-bold text-green-600 mb-6 text-center">
+      <div className="clustering-card">
+        <h1 className="clustering-title">
           Clustering Analysis
         </h1>
 
-        {/* Embedding selection */}
-        <div className="mb-4">
-          <label className="mr-2 font-medium">Embeddings:</label>
-          <select
-            value={embedding}
-            onChange={(e) => setEmbedding(e.target.value)}
-            className="border rounded p-1"
-          >
-            <option value="conceptnet">ConceptNet</option>
-            <option value="spacy">spaCy</option>
-          </select>
+        {/* Embedding Selection Section or Collapsed State */}
+        {showEmbeddingOptions ? (
+          <div className="embedding-selection">
+            <h2 className="embedding-selection-title">Choose Your Analysis Method</h2>
+            <div className="embedding-container">
+              {embeddingOptions.map((option) => (
+                <div 
+                  key={option.id} 
+                  className={`embedding-card ${embedding === option.id ? 'selected' : ''}`}
+                  onClick={() => handleEmbeddingChange(option.id)}
+                >
+                  <div className="embedding-card-content">
+                    {/* Left side - Description */}
+                    <div className="embedding-description">
+                      <h3 className="embedding-title">
+                        {option.name}: {option.title}
+                      </h3>
+                      <p className="embedding-text">
+                        {option.description}
+                      </p>
         </div>
 
+                    {/* Right side - Radio button */}
+                    <div className="embedding-radio-container">
+                      <input
+                        type="radio"
+                        name="embedding"
+                        value={option.id}
+                        checked={embedding === option.id}
+                        onChange={(e) => handleEmbeddingChange(e.target.value)}
+                        className="embedding-radio"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="collapsed-embedding-selection">
+            <div className="current-embedding-info">
+              <span className="current-embedding-text">
+                Using <strong>{embeddingOptions.find(opt => opt.id === embedding)?.name || embedding}</strong> embeddings
+              </span>
+              <button 
+                onClick={() => setShowEmbeddingOptions(true)}
+                className="change-embedding-button"
+                disabled={loading}
+              >
+                Change Method
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Run Analysis button */}
-        <div className="mb-6">
+        <div className="text-center">
           <button
             onClick={runAnalysis}
             disabled={loading || !uploadedText}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+            className="analysis-button"
           >
             {loading ? "Analysing..." : "Run Analysis"}
           </button>
@@ -142,22 +207,28 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
           {loading && <ProgressBar loading={loading} />}
 
         {/* Error */}
-        {error && <p className="text-red-500 mb-4">Error: {error}</p>}
+        {error && (
+          <div className="error-message">
+            Error: {error}
+          </div>
+        )}
 
         {/* Metadata */}
         {!loading && !error && numClusters && numDocs && (
-          <p className="text-gray-600 text-center mb-6">
+          <p className="analysis-metadata">
             Automatically grouped into {numClusters} clusters based on {numDocs} text segments.
           </p>
         )}
 
         {/* Results */}
         {!loading && !error && clusters.length > 0 && (
+          <div className="results-section">
           <CreativeClusteringAnalysis
             clusters={clusters}
             topTerms={topTerms}
             themes={themes}
           />
+          </div>
         )}
       </div>
     </div>

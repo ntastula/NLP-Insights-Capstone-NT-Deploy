@@ -1,0 +1,201 @@
+/* ClusteringCharts.css */
+
+.clustering-charts-container {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  padding: 2rem;
+  border-radius: 1.5rem;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+    0 10px 10px -5px rgba(0, 0, 0, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  width: 100%;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.clustering-charts-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+}
+
+.controls-section {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  backdrop-filter: blur(5px);
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.control-input {
+  margin-left: 0.5rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  width: 4rem;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.control-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: white;
+}
+
+.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.plot-container {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: white;
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.plot-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(59, 130, 246, 0.02), rgba(168, 85, 247, 0.02));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Enhanced color palette for clusters */
+.cluster-colors {
+  --cluster-0: #ef4444; /* Red */
+  --cluster-1: #3b82f6; /* Blue */
+  --cluster-2: #10b981; /* Green */
+  --cluster-3: #f59e0b; /* Amber */
+  --cluster-4: #8b5cf6; /* Violet */
+  --cluster-5: #ec4899; /* Pink */
+  --cluster-6: #06b6d4; /* Cyan */
+  --cluster-7: #84cc16; /* Lime */
+  --cluster-8: #f97316; /* Orange */
+  --cluster-9: #6366f1; /* Indigo */
+  --cluster-10: #14b8a6; /* Teal */
+  --cluster-11: #eab308; /* Yellow */
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .clustering-charts-container {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .controls-section {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .control-group {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .clustering-charts-container {
+    border-radius: 1rem;
+    padding: 0.75rem;
+  }
+  
+  .controls-section {
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+  }
+}
+
+/* Loading states and animations */
+.plot-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: linear-gradient(45deg, #f8fafc, #e2e8f0);
+  border-radius: 1rem;
+}
+
+.loading-spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Enhanced hover effects */
+.control-group:hover .control-input {
+  border-color: #94a3b8;
+}
+
+.checkbox-control:hover {
+  color: #3b82f6;
+}
+
+/* Focus styles for accessibility */
+.control-input:focus-visible,
+.checkbox-input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  .clustering-charts-container {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  
+  .controls-section {
+    display: none;
+  }
+}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import ClusteringCharts from "./ClusteringCharts";
+import "./CreativeClusteringAnalysis.css";
 
 const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
     const [showChart, setShowChart] = useState(true);
@@ -45,61 +46,55 @@ const handleDownload = () => {
       ? clusters
       : clusters.filter(c => c.label === Number(selectedCluster));
 
+    const handleViewChange = (view) => {
+        setShowChart(view === 'chart');
+        setShowTopTerms(view === 'terms');
+        setShowDocuments(view === 'documents');
+    };
+
   return (
-  <div className="space-y-6">
-  {/* Buttons */}
-  <div className="mt-4 flex gap-4">
+        <div className="clustering-results-container">
+            {/* View Controls */}
+            <div className="clustering-view-controls">
     <button
-      className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
-      onClick={() => {
-        setShowChart(true);
-        setShowTopTerms(false);
-        setShowDocuments(false);
-      }}
+                    className={`clustering-btn btn-chart ${showChart ? 'active' : ''}`}
+                    onClick={() => handleViewChange('chart')}
     >
       Show Chart
     </button>
 
     <button
-      className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-      onClick={() => {
-        setShowTopTerms(true);
-        setShowChart(false);
-        setShowDocuments(false);
-      }}
+                    className={`clustering-btn btn-terms ${showTopTerms ? 'active' : ''}`}
+                    onClick={() => handleViewChange('terms')}
     >
       Show Top Terms
     </button>
 
     <button
-      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-      onClick={() => {
-        setShowDocuments(true);
-        setShowChart(false);
-        setShowTopTerms(false);
-      }}
+                    className={`clustering-btn btn-documents ${showDocuments ? 'active' : ''}`}
+                    onClick={() => handleViewChange('documents')}
     >
       Show Clustered Documents
     </button>
 
     <button
-      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-      onClick={downloadResults}
+                    className="clustering-btn btn-download"
+                    onClick={handleDownload}
     >
       Download Results
     </button>
   </div>
 
-    {/* Cluster selection dropdown */}
+            {/* Cluster Filter */}
     {clusters.length > 0 && (
-      <div className="mb-4">
-        <label className="mr-2 font-medium">Filter Cluster:</label>
+                <div className="cluster-filter-section">
+                    <label className="cluster-filter-label">Filter Cluster:</label>
         <select
           value={selectedCluster}
           onChange={e => setSelectedCluster(e.target.value)}
-          className="border rounded p-1"
+                        className="cluster-filter-select"
         >
-          <option value="all">All</option>
+                        <option value="all">All Clusters</option>
           {clusterOptions.map(label => (
             <option key={label} value={label}>
               Cluster {label}
@@ -109,9 +104,9 @@ const handleDownload = () => {
       </div>
     )}
 
-    {/* Scatterplot chart */}
+            {/* Chart View */}
     {showChart && clusters.length > 0 && (
-      <div className="mb-6">
+                <div className="chart-section">
         <ClusteringCharts 
   clusters={clusters} 
   selectedCluster={selectedCluster} 
@@ -119,35 +114,50 @@ const handleDownload = () => {
       </div>
     )}
 
-    {/* Top terms per cluster */}
+            {/* Top Terms View */}
     {showTopTerms && Object.keys(topTerms).length > 0 && (
-      <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="top-terms-grid">
         {Object.entries(topTerms).map(([cluster, terms]) => (
-          <div key={cluster} className="bg-gray-50 p-4 rounded shadow">
-            <h3 className="font-bold text-purple-600">Cluster {cluster}</h3>
-            <p>{terms.join(", ")}</p>
+                        <div key={cluster} className="cluster-term-card">
+                            <h3 className="cluster-term-title">
+                                Cluster {cluster}
+                            </h3>
+                            <div className="cluster-terms-list">
+                                {terms.join(", ")}
+                            </div>
             {themes[cluster] && (
-              <p className="text-sm text-green-600 mt-1">
+                                <div className="cluster-theme">
                 Suggested theme: {themes[cluster]}
-              </p>
+                                </div>
             )}
           </div>
         ))}
       </div>
     )}
 
-    {/* Clustered documents */}
+            {/* Documents View */}
     {showDocuments && displayedClusters.length > 0 && (
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Clustered Documents</h2>
-        <ul className="space-y-2">
+                <div className="documents-section">
+                    <h2 className="documents-title">Clustered Documents</h2>
+                    <div className="documents-list">
           {displayedClusters.map((item, idx) => (
-            <li key={idx} className="bg-gray-50 p-3 rounded shadow">
-              <span className="font-bold text-blue-600">Cluster {item.label}:</span>{" "}
+                            <div key={idx} className="document-item">
+                                <span className="document-cluster-label">
+                                    Cluster {item.label}:
+                                </span>
+                                <span className="document-text">
               {item.doc}
-            </li>
+                                </span>
+                            </div>
           ))}
-        </ul>
+                    </div>
+                </div>
+            )}
+
+            {/* Empty State */}
+            {!showChart && !showTopTerms && !showDocuments && (
+                <div className="no-data-message">
+                    Select a view to see your clustering results
       </div>
     )}
   </div>

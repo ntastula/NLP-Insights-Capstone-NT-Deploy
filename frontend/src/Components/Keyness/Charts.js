@@ -1,118 +1,282 @@
-import React from "react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ScatterChart, Scatter, ReferenceLine
-} from "recharts";
-import { TrendingUp } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import Plot from "react-plotly.js";
+import { TrendingUp, BarChart3, ScatterChart, ToggleLeft, ToggleRight } from "lucide-react";
+import "./Charts.css";
 
 const Charts = ({ results, method = "nltk" }) => {
-  if (!results || results.length === 0) {
-    return <p className="text-gray-500 italic">No chart data available.</p>;
-  }
+  const [chartType, setChartType] = useState("primary");
+  const [topN, setTopN] = useState(20);
+  const topResults = results ? results.slice(0, topN) : [];
 
-  const topResults = results.slice(0, 20);
 
-  // Determine axis labels and data keys dynamically
-let xKey = "log_likelihood";
-let xLabel = "Log-Likelihood";
-let yKey = "effect_size";
-let yLabel = "Effect Size";
-let showReferenceLine = false;
+  // Chart configurations for each method
+  const chartConfigs = {
+    nltk: {
+      primary: {
+        type: "bar",
+        title: "Log-Likelihood Analysis",
+        xKey: "log_likelihood",
+        xLabel: "Log-Likelihood",
+        description: "Higher values indicate stronger association with your text"
+      },
+      secondary: {
+        type: "scatter",
+        title: "Effect Size vs Log-Likelihood",
+        xKey: "log_likelihood",
+        yKey: "effect_size",
+        xLabel: "Log-Likelihood",
+        yLabel: "Effect Size",
+        description: "Relationship between statistical significance and practical significance"
+      }
+    },
+    sklearn: {
+      primary: {
+        type: "bar",
+        title: "Chi-Square Analysis",
+        xKey: "chi2",
+        xLabel: "Chi² Score",
+        description: "Higher Chi² values indicate stronger feature importance"
+      },
+      secondary: {
+        type: "scatter",
+        title: "Chi² vs P-value",
+        xKey: "chi2",
+        yKey: "p_value",
+        xLabel: "Chi² Score",
+        yLabel: "P-value (log scale)",
+        description: "Statistical significance visualization"
+      }
+    },
+    gensim: {
+      primary: {
+        type: "bar",
+        title: "TF-IDF Analysis",
+        xKey: "tfidf_score",
+        xLabel: "TF-IDF Score",
+        description: "Term frequency-inverse document frequency scores"
+      }
+    },
+    spacy: {
+      primary: {
+        type: "bar",
+        title: "Log-Likelihood Analysis",
+        xKey: "log_likelihood",
+        xLabel: "Log-Likelihood",
+        description: "Primary keyness measure for linguistic analysis"
+      },
+      secondary: {
+        type: "scatter",
+        title: "Effect Size vs Chi²",
+        xKey: "chi2",
+        yKey: "effect_size",
+        xLabel: "Chi² Score",
+        yLabel: "Effect Size",
+        description: "Practical vs statistical significance"
+      }
+    }
+  };
 
-if (method.toLowerCase() === "nltk") {
-  xKey = "log_likelihood";
-  xLabel = "Log-Likelihood";
-  yKey = "effect_size";
-  yLabel = "Effect Size";
-  showReferenceLine = true;
-} else if (method.toLowerCase() === "sklearn") {
-  xKey = "chi2";
-  xLabel = "Chi²";
-  yKey = null; // No scatter for sklearn
-} else if (method.toLowerCase() === "gensim") {
-  xKey = "tfidf_score";
-  xLabel = "TF-IDF Score";
-  yKey = null; // No scatter for gensim
-} else if (method.toLowerCase() === "spacy") {
-  xKey = "chi2";
-  xLabel = "Chi²";
-  yKey = "effect_size";
-  yLabel = "Effect Size";
-  showReferenceLine = true;
-}
+  const currentConfig = chartConfigs[method.toLowerCase()] || chartConfigs.nltk;
+  const hasSecondaryChart = currentConfig.secondary !== undefined;
+  const activeConfig = currentConfig[chartType] || currentConfig.primary;
 
-  // Prepare bar chart data
-  const barData = topResults.map(r => ({
+  // Prepare chart data
+  const chartData = useMemo(() => {
+  if (!results || results.length === 0) return [];
+
+  return topResults.map(r => ({
     word: r.word,
     uploaded: r.uploaded_count ?? r.count_a ?? 0,
     sample: r.sample_count ?? r.count_b ?? 0,
-    score: r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+    keyness_score: r.keyness_score ?? r.keyness ?? 0,
+    direction: r.direction ?? "Neutral",
+    x: r[activeConfig.xKey] ?? r.keyness_score ?? 0,  
+    y: r[activeConfig.yKey] ?? r.effect_size ?? 0     
   }));
+}, [topResults, activeConfig, results]);
 
-  // Determine if scatter chart should be displayed
-  const showScatter = ["nltk", "spacy"].includes(method.toLowerCase());
+
+
+  if (!results || results.length === 0) {
+    return <p className="no-data-message">No chart data available.</p>;
+  }
+
+  // Create bar chart with uploaded vs corpus counts
+const createBarChart = () => {
+  return [
+    {
+      x: chartData.map(d => d.word),
+      y: chartData.map(d => d.uploaded),
+      name: "Uploaded Text",
+      type: "bar",
+      marker: { color: "#3b82f6", line: { color: "#1e40af", width: 1 } },
+      hovertemplate: "<b>%{x}</b><br>Uploaded: %{y}<extra></extra>"
+    },
+    {
+      x: chartData.map(d => d.word),
+      y: chartData.map(d => d.sample),
+      name: "Corpus",
+      type: "bar",
+      marker: { color: "#10b981", line: { color: "#059669", width: 1 } },
+      hovertemplate: "<b>%{x}</b><br>Corpus: %{y}<extra></extra>"
+    }
+  ];
+};
+
+
+// Create scatter chart with x/y keyness fields
+const createScatterChart = () => [
+  {
+    x: chartData.map(d => d.x),
+    y: chartData.map(d => d.y),
+    text: chartData.map(d => d.word),
+    mode: "markers+text",
+    type: "scatter",
+    marker: { size: 12, color: "#3b82f6", line: { color: "#1e40af", width: 2 }, opacity: 0.8 },
+    textposition: "top center",
+    textfont: { size: 10, color: "#1e40af" },
+    hovertemplate: "<b>%{text}</b><br>" +
+                   `${activeConfig.xLabel}: %{x:.3f}<br>` +
+                   `${activeConfig.yLabel}: %{y:.3f}<extra></extra>`
+  }
+];
+
+
+
+  const plotData = activeConfig.type === "bar" ? createBarChart() : createScatterChart();
+
+  const getLayout = () => {
+    const baseLayout = {
+      title: { text: activeConfig.title, font: { size: 24, family: "Inter, sans-serif", color: "#1e293b" }, x: 0.5 },
+      paper_bgcolor: "rgba(255, 255, 255, 0.95)",
+      plot_bgcolor: "rgba(248, 250, 252, 0.8)",
+      margin: { l: 80, r: 80, t: 100, b: 120 },
+      showlegend: true,
+      legend: {
+        orientation: "h",
+        x: 0.5,
+        xanchor: "center",
+        y: -0.2,
+        bgcolor: "rgba(255, 255, 255, 0.9)",
+        bordercolor: "#e2e8f0",
+        borderwidth: 1
+      },
+      hovermode: "closest"
+    };
+
+    if (activeConfig.type === "bar") {
+      return {
+        ...baseLayout,
+        xaxis: {
+          title: { text: "Words", font: { size: 14, color: "#475569" } },
+          tickangle: -45,
+          tickfont: { size: 11, color: "#64748b" },
+          gridcolor: "rgba(226, 232, 240, 0.6)"
+        },
+        yaxis: {
+          title: { text: activeConfig.xLabel, font: { size: 14, color: "#475569" } },
+          tickfont: { color: "#64748b" },
+          gridcolor: "rgba(226, 232, 240, 0.6)"
+        },
+        barmode: "group"
+      };
+    } else {
+      return {
+        ...baseLayout,
+        xaxis: {
+          title: { text: activeConfig.xLabel, font: { size: 14, color: "#475569" } },
+          tickfont: { color: "#64748b" },
+          gridcolor: "rgba(226, 232, 240, 0.6)",
+          type: activeConfig.yKey === "p_value" ? "linear" : "linear"
+        },
+        yaxis: {
+          title: { text: activeConfig.yLabel, font: { size: 14, color: "#475569" } },
+          tickfont: { color: "#64748b" },
+          gridcolor: "rgba(226, 232, 240, 0.6)",
+          type: activeConfig.yKey === "p_value" ? "log" : "linear"
+        }
+      };
+    }
+  };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-6">
-      <h3 className="font-bold text-gray-800 mb-6 text-xl flex items-center gap-2">
-        <TrendingUp className="w-6 h-6 text-green-500" />
-        Keyword Frequency Comparison ({method.toUpperCase()})
-      </h3>
+    <div className="charts-container">
+      <div className="chart-header">
+        <h3 className="chart-title">
+          <TrendingUp className="chart-icon" />
+          Keyness Analysis ({method.toUpperCase()})
+        </h3>
 
-      {/* Bar Chart */}
-      <div className="mb-8" style={{ width: "100%", height: 400 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="word" angle={-45} textAnchor="end" height={80} fontSize={12} />
-            <YAxis label={{ value: yLabel, angle: -90, position: "insideLeft" }} />
-            <Tooltip formatter={value => value} labelFormatter={word => `Word: ${word}`} />
-            <Legend />
-            <Bar dataKey="uploaded" name="Your Text" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="sample" name="Sample Corpus" fill="#10b981" radius={[2, 2, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {hasSecondaryChart && (
+          <div className="chart-toggle">
+            <button
+              onClick={() => setChartType(chartType === "primary" ? "secondary" : "primary")}
+              className={`toggle-button ${chartType}`}
+            >
+              {chartType === "primary" ? (
+                <>
+                  <BarChart3 className="toggle-icon" />
+                  Switch to Scatter
+                  <ToggleRight className="toggle-indicator" />
+                </>
+              ) : (
+                <>
+                  <ScatterChart className="toggle-icon" />
+                  Switch to Bar
+                  <ToggleLeft className="toggle-indicator" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Scatter Chart */}
-{ xKey && yKey && (
-  <div className="mb-8" style={{ width: "100%", height: 400 }}>
-    <ResponsiveContainer width="100%" height="100%">
-      <ScatterChart data={topResults} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
-          dataKey={xKey}
-          name={xLabel}
-          label={{ value: xLabel, position: "insideBottom", offset: -10 }}
-        />
-        <YAxis
-          dataKey={yKey}
-          name={yLabel}
-          label={{ value: yLabel, angle: -90, position: "insideLeft" }}
-        />
-        {showReferenceLine && <ReferenceLine x={3.84} stroke="#ef4444" strokeDasharray="5 5" />}
-        <Tooltip
-          formatter={(value) => value}
-          labelFormatter={(_, payload) =>
-            payload?.[0]?.payload ? `Word: ${payload[0].payload.word} (${payload[0].payload.keyness})` : ""
-          }
-          contentStyle={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
-        />
-        <Scatter
-          name="Positive Keyness"
-          data={results.filter(r => r.keyness === "Positive")}
-          fill="#3b82f6"
-        />
-        <Scatter
-          name="Negative Keyness"
-          data={results.filter(r => r.keyness === "Negative")}
-          fill="#ef4444"
-        />
-      </ScatterChart>
-    </ResponsiveContainer>
-  </div>
-)}
+      <div className="chart-description">
+        <p>{activeConfig.description}</p>
+      </div>
 
+      <div className="chart-slider">
+  <label htmlFor="topNSlider">
+    Number of results: <strong>{topN}</strong>
+  </label>
+  <input
+    id="topNSlider"
+    type="range"
+    min={5}
+    max={50}
+    step={1}
+    value={topN}
+    onChange={(e) => setTopN(parseInt(e.target.value))}
+  />
+</div>
+
+      <div className="chart-wrapper">
+        <Plot
+          data={plotData}
+          layout={getLayout()}
+          style={{ width: "100%", height: "600px" }}
+          useResizeHandler={true}
+          config={{
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+            toImageButtonOptions: {
+              format: 'png',
+              filename: `${method}_keyness_analysis`,
+              height: 800,
+              width: 1200,
+              scale: 2
+            }
+          }}
+        />
+      </div>
+
+      <div className="chart-footer">
+        <div className="method-info">
+          <strong>Method:</strong> {method.toUpperCase()} | 
+          <strong> Chart Type:</strong> {activeConfig.type === "bar" ? "Bar Chart" : "Scatter Plot"}
+        </div>
+      </div>
     </div>
   );
 };

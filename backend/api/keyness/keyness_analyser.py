@@ -122,45 +122,62 @@ def extract_sentences(text, word):
 # Keyness Functions
 # ---------------------------
 
-def compute_keyness(uploaded_text, corpus_text=None, top_n=50, filter_func=filter_content_words):
+def compute_keyness(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """
-    TEMP: Return top words with POS from uploaded_text only.
-    Ignore corpus and keyness scoring.
+    Compute a simple, writer-friendly keyness score:
+    - Based on chi-square (like sklearn/gensim versions).
+    - Groups results by POS (NOUN, VERB, ADJ, ADV).
     """
+
     if filter_func is None:
-        # Simple fallback: split words and mark as OTHER
         filter_func = lambda text: [{"word": w.lower(), "pos": "OTHER"} for w in text.split()]
 
-    tokens = filter_func(uploaded_text)
+    # Tokenise uploaded text
+    tokens_uploaded = filter_func(uploaded_text)
+    uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
+    uploaded_total = sum(uploaded_counts.values())
 
-    # Count frequencies
-    freq = Counter(t["word"] for t in tokens)
+    # Use provided corpus counts
+    corpus_counts = corpus_counts_map.copy()
+    corpus_total = sum(corpus_counts.values())
 
-    # Get top_n words
-    top_words = freq.most_common(top_n)
-
-    # Build results with POS
     results = []
-    for word, count in top_words:
-        pos = next((t["pos"] for t in tokens if t["word"] == word), "OTHER")
+    for word, u_count in uploaded_counts.items():
+        c_count = corpus_counts.get(word, 0)
+
+        contingency = np.array([
+            [u_count, uploaded_total - u_count],
+            [c_count, corpus_total - c_count]
+        ])
+
+        try:
+            chi2_val, p, _, _ = chi2_contingency(contingency, correction=False)
+        except ValueError:
+            chi2_val, p = 0, 1
+
+        # POS tag (default to OTHER if not in ALLOWED_POS)
+        pos = next((t["pos"] for t in tokens_uploaded if t["word"] == word), "OTHER")
+        if pos not in ALLOWED_POS:
+            pos = "OTHER"
+
         results.append({
             "word": word,
-            "count_a": count,
-            "count_b": 0,
-            "log_likelihood": 0,  # placeholder
-            "effect_size": 0,  # placeholder
-            "keyness": "Positive",  # placeholder
+            "uploaded_count": u_count,
+            "sample_count": c_count,
+            "chi2": float(chi2_val),
+            "p_value": float(p),
+            "keyness": float(chi2_val),  # numeric score, not positive/negative
             "pos": pos
         })
 
-    # Group by POS
-    pos_groups = {}
-    for item in results:
-        pos_groups.setdefault(item["pos"], []).append(item)
+    # Sort by chi2 descending
+    sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
 
-    return pos_groups
+    return {
+        "results": sorted_results[:top_n],
+        "total_significant": len(sorted_results)
+    }
 
-ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
 def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """NLTK-style log-likelihood using counts-based corpus."""
@@ -188,6 +205,7 @@ def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_
         ll = 2 * ((count_a * log(count_a / E1) if count_a > 0 else 0) +
                   (count_b * log(count_b / E2) if count_b > 0 else 0))
 
+        effect_size = (count_a / uploaded_total - count_b / max(1, corpus_total))
         pos = next((t["pos"] for t in uploaded_tokens if t["word"] == word), "OTHER")
         if pos not in ALLOWED_POS:
             pos = "OTHER"
@@ -197,23 +215,21 @@ def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_
             "uploaded_count": count_a,
             "sample_count": count_b,
             "log_likelihood": round(ll, 2),
-            "effect_size": round((count_a / uploaded_total - count_b / max(1, corpus_total)), 4),
-            "keyness": round(ll, 2),
+            "effect_size": round(effect_size, 4),
+            "keyness_score": round(ll, 2),  # numeric
+            "direction": "Positive" if count_a > count_b else "Negative",
             "pos": pos
         })
 
-    sorted_results = sorted(results, key=lambda x: x["keyness"], reverse=True)
+    sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
+
 def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
-    """
-    Gensim-style TF-IDF + chi2 keyness using counts-based corpus from _keyness.json
-    uploaded_text: raw text from user
-    corpus_counts_map: Counter from _keyness.json
-    """
+    """Gensim-style TF-IDF + chi2 keyness using counts-based corpus from _keyness.json"""
     if filter_func is None:
-        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
     # Tokens
     tokens_uploaded = filter_func(uploaded_text)
@@ -231,7 +247,6 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
     tfidf_scores = [tfidf[doc] for doc in corpus_gensim]
 
     uploaded_tfidf = {dictionary[id]: score for id, score in tfidf_scores[0]}
-    # corpus_tfidf = {dictionary[id]: score for id, score in tfidf_scores[1]}  # optional
 
     uploaded_counts = Counter(words_uploaded)
     corpus_counts = Counter(words_corpus)
@@ -264,11 +279,12 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
             "chi2": float(chi2_val),
             "p_value": float(p),
             "tfidf_score": float(uploaded_tfidf.get(word, 0)),
-            "keyness": float(chi2_val),
+            "keyness_score": float(chi2_val),  # numeric
+            "direction": "Positive" if u_count > c_count else "Negative",
             "pos": pos
         })
 
-    results_sorted = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    results_sorted = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {
         "results": results_sorted[:top_n],
         "total_significant": len(results_sorted),
@@ -277,9 +293,10 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
     }
 
 
+
 def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     if filter_func is None:
-        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
     tokens_uploaded = filter_func(uploaded_text)
     uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
@@ -311,9 +328,10 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
             "sample_count": b,
             "chi2": float(chi2),
             "p_value": float(p),
-            "log_likelihood": float(chi2),
+            "log_likelihood": float(chi2),  # keep for compatibility
             "effect_size": float(effect_size),
-            "keyness": "Positive" if a > b else "Negative",
+            "keyness_score": float(chi2),   # numeric, consistent across methods
+            "direction": "Positive" if a > b else "Negative",  # keep for filtering
             "pos": pos
         })
 
@@ -321,9 +339,10 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
+
 def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None):
     if filter_func is None:
-        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
+        filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
     tokens_uploaded = filter_func(uploaded_text)
     uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
@@ -354,9 +373,11 @@ def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None
             "sample_count": c_count,
             "chi2": float(chi2),
             "p_value": float(p),
-            "keyness": float(chi2),
+            "keyness_score": float(chi2),  # numeric
+            "direction": "Positive" if u_count > c_count else "Negative",
             "pos": pos
         })
 
-    sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
+    sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
+

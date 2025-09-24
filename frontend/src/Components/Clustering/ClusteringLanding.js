@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import TextInputSection from "../TextInputSection";
 import ClusteringAnalyser from "./ClusteringAnalyser";
-// import "./ClusteringLanding.css";
+import "./ClusteringLanding.css";
 
 const ClusteringLanding = ({ onBack }) => {
   const [pastedText, setPastedText] = useState("");
@@ -49,17 +49,23 @@ const ClusteringLanding = ({ onBack }) => {
   }
 
   return (
-    <div>
+    <div className="Clustering-landing-wrapper">
       <button
         onClick={onBack}
-        className="mb-6 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow"
+                className="Clustering-back-button"
       >
         ← Back
       </button>
 
-      <h1 className="text-3xl font-bold mb-6">Clustering Analysis</h1>
+            <div className="Clustering-header">
+                <h1 className="Clustering-title">Clustering Analysis</h1>
+                <p className="Clustering-subtitle">
+                    See how your words naturally group together into clusters, highlighting the themes, styles, and repeated ideas that shape your writing.
+                </p>
+            </div>
 
-      <div className="clustering-container">
+            <div className="Clustering-container">
+                <div className="Clustering-content-card">
         <TextInputSection
           pastedText={pastedText}
           handleTextPaste={handleTextPaste}
@@ -69,16 +75,24 @@ const ClusteringLanding = ({ onBack }) => {
           onFilesUploaded={handleFilesUploaded}
         />
 
-        <div className="text-center mb-12">
+                    {error && (
+                        <div className="Clustering-error-message">
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="Clustering-continue-section">
   <button
     onClick={handleContinue}
-    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transform hover:-translate-y-1 transition-all"
+                            className="Clustering-continue-button"
+                            disabled={!uploadedText.trim()}
   >
     Continue to Analysis →
   </button>
 </div>
       </div>
     </div>
+        </div>
   );
 };
 
