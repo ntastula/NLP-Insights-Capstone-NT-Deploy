@@ -35,7 +35,7 @@ const KeynessResultsGrid = ({ results, method }) => {
               {r.tfidf_score !== undefined && <p className="text-gray-600">TF-IDF Score: {r.tfidf_score?.toFixed(3)}</p>}
               <p className="text-gray-600">Log-Likelihood: {r.log_likelihood}</p>
               <p className="text-gray-600">Effect Size: {r.effect_size}</p>
-              <p className="text-gray-600">Keyness: {r.keyness}</p>
+              <p className="text-gray-600">Keyness: {r.keyness_score}</p>
             </>  
           ) : (
             <>
@@ -43,7 +43,7 @@ const KeynessResultsGrid = ({ results, method }) => {
               <p className="text-gray-600">Uploaded Text Count: {r.uploaded_count ?? r.count_a}</p>
               <p className="text-gray-600">Corpus Count: {r.sample_count ?? r.count_b}</p>
               <p className="text-gray-600">Effect Size: {r.effect_size}</p>
-              <p className="text-gray-600">Keyness: {r.keyness}</p>
+              <p className="text-gray-600">Keyness: {r.keyness_score}</p>
             </>
           )}
         </div>

@@ -9,20 +9,36 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
     const [showDocuments, setShowDocuments] = useState(false);
 
     // Unique cluster labels for dropdown
-    const clusterOptions = Array.from(new Set(clusters.map(c => c.label))).sort(
-        (a, b) => a - b
-    );
+  const clusterOptions = Array.from(new Set(clusters.map(c => c.label))).sort(
+    (a, b) => a - b
+  );
 
-    const handleDownload = () => {
-        const dataStr = JSON.stringify({ clusters, topTerms, themes }, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "clustering_results.json";
-        a.click();
-        URL.revokeObjectURL(url);
+const handleDownload = () => {
+    const dataStr = JSON.stringify({ clusters, topTerms, themes }, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clustering_results.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Download results as JSON
+  const downloadResults = () => {
+    const data = {
+      clusters,
+      topTerms,
+      themes,
     };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "clustering_results.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
     // Filtered clusters based on dropdown
     const displayedClusters =
@@ -36,16 +52,16 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
         setShowDocuments(view === 'documents');
     };
 
-    return (
+  return (
         <div className="clustering-results-container">
             {/* View Controls */}
             <div className="clustering-view-controls">
-                <button
+    <button
                     className={`clustering-btn btn-chart ${showChart ? 'active' : ''}`}
                     onClick={() => handleViewChange('chart')}
-                >
-                    Show Chart
-                </button>
+    >
+      Show Chart
+    </button>
 
                 <button
                     className={`clustering-btn btn-terms ${showTopTerms ? 'active' : ''}`}
@@ -91,9 +107,9 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
             {/* Chart View */}
             {showChart && clusters.length > 0 && (
                 <div className="chart-section">
-                    <ClusteringCharts 
-                        clusters={clusters} 
-                        selectedCluster={selectedCluster} 
+                    <ClusteringCharts
+                        clusters={clusters}
+                        selectedCluster={selectedCluster}
                     />
                 </div>
             )}

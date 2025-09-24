@@ -68,7 +68,7 @@ const ResultsTable = ({ results = [], method = "nltk" }) => {
   <>
     <td className="px-4 py-2 border-b">{formatNumber(row.effect_size)}</td>
     <td className="px-4 py-2 border-b">{formatNumber(row.log_likelihood)}</td>
-    <td className="px-4 py-2 border-b">{row.keyness ?? "-"}</td>
+    <td className="px-4 py-2 border-b">{row.keyness_score ?? "-"}</td>
   </>
 )}
 

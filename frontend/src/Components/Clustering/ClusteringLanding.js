@@ -50,12 +50,12 @@ const ClusteringLanding = ({ onBack }) => {
 
   return (
     <div className="Clustering-landing-wrapper">
-            <button
-                onClick={onBack}
+      <button
+        onClick={onBack}
                 className="Clustering-back-button"
-            >
-                ← Back
-            </button>
+      >
+        ← Back
+      </button>
 
             <div className="Clustering-header">
                 <h1 className="Clustering-title">Clustering Analysis</h1>
@@ -66,14 +66,14 @@ const ClusteringLanding = ({ onBack }) => {
 
             <div className="Clustering-container">
                 <div className="Clustering-content-card">
-                    <TextInputSection
-                        pastedText={pastedText}
-                        handleTextPaste={handleTextPaste}
-                        pastedWordCount={pastedWordCount}
-                        uploadedPreview={uploadedPreview}
-                        error={error}
-                        onFilesUploaded={handleFilesUploaded}
-                    />
+        <TextInputSection
+          pastedText={pastedText}
+          handleTextPaste={handleTextPaste}
+          pastedWordCount={pastedWordCount}
+          uploadedPreview={uploadedPreview}
+          error={error}
+          onFilesUploaded={handleFilesUploaded}
+        />
 
                     {error && (
                         <div className="Clustering-error-message">
@@ -82,18 +82,20 @@ const ClusteringLanding = ({ onBack }) => {
                     )}
 
                     <div className="Clustering-continue-section">
-                        <button
-                            onClick={handleContinue}
+  <button
+    onClick={handleContinue}
                             className="Clustering-continue-button"
                             disabled={!uploadedText.trim()}
-                        >
-                            Continue to Analysis →
-                        </button>
-                    </div>
-                </div>
-            </div>
+  >
+    Continue to Analysis →
+  </button>
+</div>
+      </div>
+    </div>
         </div>
   );
 };
 
 export default ClusteringLanding;
+
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import CreativeClusteringAnalysis from "./CreativeClusteringAnalysis";
+import '../ProgressBar.css';
 import './ClusteringAnalyser.css';
 
 /**
@@ -143,8 +144,8 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
             <h2 className="embedding-selection-title">Choose Your Analysis Method</h2>
             <div className="embedding-container">
               {embeddingOptions.map((option) => (
-                <div 
-                  key={option.id} 
+                <div
+                  key={option.id}
                   className={`embedding-card ${embedding === option.id ? 'selected' : ''}`}
                   onClick={() => handleEmbeddingChange(option.id)}
                 >
@@ -158,7 +159,7 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
                         {option.description}
                       </p>
                     </div>
-                    
+
                     {/* Right side - Radio button */}
                     <div className="embedding-radio-container">
                       <input
@@ -181,7 +182,7 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
               <span className="current-embedding-text">
                 Using <strong>{embeddingOptions.find(opt => opt.id === embedding)?.name || embedding}</strong> embeddings
               </span>
-              <button 
+              <button
                 onClick={() => setShowEmbeddingOptions(true)}
                 className="change-embedding-button"
                 disabled={loading}
