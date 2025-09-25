@@ -121,7 +121,6 @@ const KeynessAnalyser = ({
 
             setAnalysisDone(true);
         } catch (e) {
-            console.error("Keyness analysis failed:", e);
             setError(e.message || "Analysis failed");
         } finally {
             setLoading(false);
@@ -234,6 +233,7 @@ const KeynessAnalyser = ({
                     uploadedText={uploadedText}
                     method={selectedMethod}
                     stats={stats}
+                    genre={genre}
                 />
             )}
         </div>

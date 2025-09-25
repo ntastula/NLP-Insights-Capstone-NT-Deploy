@@ -647,4 +647,57 @@ def get_keyness_summary(request):
     summary_text = "".join(summary_parts)
     return Response({"summary": summary_text})
 
+@require_http_methods(["GET"])
+def corpus_meta_keyness(request):
+    """
+    Returns the metadata (titles, authors, genre, version) from corpus JSON files
+    for displaying in the corpus information modal.
+    """
+    # Get the genre from the query string
+    genre = request.GET.get("name", "").strip()
+    if not genre:
+        return JsonResponse({"error": "Genre parameter is required"}, status=400)
 
+    # Remove any trailing '.json' first
+    genre = re.sub(r'\.json$', '', genre)
+
+    # Ensure filename ends with '_keyness.json'
+    if not genre.endswith("_keyness"):
+        filename = f"{genre}_keyness.json"
+    else:
+        filename = f"{genre}.json"
+
+    file_path = KEYNESS_DIR / filename
+
+    if not file_path.exists():
+        logger.warning(f"Corpus metadata file not found: {file_path}")
+        return JsonResponse({"error": "Corpus file not found"}, status=404)
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Extract metadata for the modal
+        metadata = {
+            "genre": data.get("genre", genre),
+            "version": data.get("version", "Unknown"),
+            "previews": []
+        }
+
+        # Extract just title and author from each preview
+        for item in data.get("previews", []):
+            preview_item = {
+                "title": item.get("title", "Unknown Title"),
+                "author": item.get("author", "Unknown Author")
+            }
+            metadata["previews"].append(preview_item)
+
+        logger.info(f"Retrieved metadata for {len(metadata['previews'])} books in {genre} corpus")
+        return JsonResponse(metadata)
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in corpus file {file_path}: {e}")
+        return JsonResponse({"error": "Invalid JSON format"}, status=500)
+    except Exception as e:
+        logger.exception(f"Error reading corpus metadata: {e}")
+        return JsonResponse({"error": "Internal server error"}, status=500)
