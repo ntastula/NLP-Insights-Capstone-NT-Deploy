@@ -49,6 +49,21 @@
 .pos-section h3[data-pos="adv"]::before { background-color: #8b5cf6; }
 .pos-section h3[data-pos="other"]::before { background-color: #6b7280; }
 
+.keywords-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  
+}
+
+.keywords-header p {
+  font-size: 0.95rem;
+  color: #374151;
+  margin: 0;
+}
+
+
 /* Word list container */
 .word-list {
     display: flex;
@@ -372,4 +387,47 @@
         border: 1px solid #000000;
         box-shadow: none;
     }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes progressMove {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Optional: Add some nice styling for the modal loading state */
+.synonym-loading {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.synonym-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+.synonym-progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: #f0f0f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 20px 0;
+}
+
+.synonym-progress-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71, #3498db);
+  background-size: 200% 100%;
+  animation: progressMove 2s ease-in-out infinite;
 }

@@ -515,7 +515,6 @@ def get_keyness_results(request, result_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def get_sentences(request):
-
     try:
         data = json.loads(request.body)
         uploaded_text = data.get("uploaded_text", "")
@@ -524,12 +523,25 @@ def get_sentences(request):
         if not uploaded_text or not word:
             return JsonResponse({"error": "Missing text or word"}, status=400)
 
+        # Extract sentences containing the word
         sentences = extract_sentences(uploaded_text, word)
-        return JsonResponse({"sentences": sentences})
+
+        # Filter out sentences where the match is just "'s" or "s'"
+        filtered_sentences = []
+        word_lower = word.lower()
+        for s in sentences:
+            # Find all words in the sentence
+            words_in_sentence = re.findall(r"\b\w[\w'-]*\b", s)
+            # Only include sentence if the exact word (ignoring apostrophes) is present
+            if any(w.lower().replace("'", "") == word_lower for w in words_in_sentence):
+                filtered_sentences.append(s)
+
+        return JsonResponse({"sentences": filtered_sentences})
 
     except Exception as e:
         logger.exception(f"Error extracting sentences: {e}")
         return JsonResponse({"error": str(e)}, status=500)
+
 
 
 
@@ -621,7 +633,7 @@ def corpus_preview_keyness(request):
 @api_view(['POST'])
 def get_keyness_summary(request):
     keyness_results = request.data.get('keyness_results', [])
-    top_words = keyness_results[:50]  # adjust sorting/filtering as needed
+    top_words = keyness_results[:50]
     prompt = (
         "You are an expert NLP analyst. Here are the top 50 key words in a text, along with their keyness scores and part-of-speech tags:\n"
         f"{top_words}\n"
@@ -701,3 +713,70 @@ def corpus_meta_keyness(request):
     except Exception as e:
         logger.exception(f"Error reading corpus metadata: {e}")
         return JsonResponse({"error": "Internal server error"}, status=500)
+
+
+@api_view(['POST'])
+def get_synonyms(request):
+    word = request.data.get('word', None)
+    if not word:
+        return Response({'error': 'No word provided.'}, status=400)
+
+    prompt = f"""You are a linguistic expert specializing in word analysis and semantic differences.
+
+Task: Provide exactly 5 synonyms for the word "{word}" and analyze their subtle differences.
+
+Format your response as follows:
+
+**Synonyms for "{word}":**
+
+1. **[Synonym 1]**
+   - Meaning: [Brief definition]
+   - Difference from "{word}": [Explain the subtle difference]
+   - Usage context: [When to use this instead]
+   - Example: [Show both words in similar sentences to demonstrate the difference]
+
+2. **[Synonym 2]**
+   - Meaning: [Brief definition]
+   - Difference from "{word}": [Explain the subtle difference]
+   - Usage context: [When to use this instead]
+   - Example: [Show both words in similar sentences to demonstrate the difference]
+
+[Continue for all 5 synonyms]
+
+**Summary:**
+Write a brief paragraph explaining how choosing different synonyms can change the tone, formality, or precise meaning of your text.
+
+Requirements:
+- Choose synonyms that are genuinely interchangeable in at least some contexts
+- Focus on subtle differences rather than obvious ones
+- Provide concrete examples showing the difference in usage
+- Consider connotation, formality level, and context appropriateness"""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=60)
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        return Response({
+            "word": word,
+            "analysis": analysis,
+            "success": True
+        })
+
+    except requests.exceptions.Timeout as e:
+        return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
