@@ -1,18 +1,26 @@
 /* Charts.css */
 
+/* ==========================================================================
+   1. Base Container
+   ========================================================================== */
+
 .charts-container {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-radius: 1.5rem;
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  position: relative;
+  overflow: hidden;
   padding: 2rem;
   margin-bottom: 2rem;
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
-  position: relative;
-  overflow: hidden;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  animation: fadeInUp 0.6s ease-out;
 }
 
 .charts-container::before {
@@ -21,10 +29,15 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 4px;
   background: linear-gradient(90deg, #3b82f6, #10b981, #f59e0b, #ef4444);
-  opacity: 0.6;
+  opacity: 0.8;
 }
+
+
+/* ==========================================================================
+   2. Header & Title
+   ========================================================================== */
 
 .chart-header {
   display: flex;
@@ -32,26 +45,32 @@
   align-items: center;
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  border-bottom: 2px solid rgba(226, 232, 240, 0.6);
 }
 
 .chart-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1e293b;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   margin: 0;
+
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .chart-icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   color: #10b981;
   stroke-width: 2.5;
 }
+
+
+/* ==========================================================================
+   3. Toggle Buttons
+   ========================================================================== */
 
 .chart-toggle {
   display: flex;
@@ -59,20 +78,23 @@
 }
 
 .toggle-button {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
   padding: 0.75rem 1.25rem;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  border-radius: 0.75rem;
   color: #475569;
-  font-weight: 500;
   font-size: 0.9rem;
+  font-weight: 600;
+
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
   overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .toggle-button::before {
@@ -92,10 +114,10 @@
 
 .toggle-button:hover {
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: white;
+  color: #fff;
   border-color: #3b82f6;
   box-shadow: 0 8px 25px -8px rgba(59, 130, 246, 0.5);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .toggle-button.primary:hover {
@@ -124,244 +146,398 @@
 }
 
 .toggle-button:hover .toggle-indicator {
-  transform: scale(1.1);
+  transform: scale(1.2) rotate(5deg);
 }
 
+
+/* ==========================================================================
+   4. Descriptions
+   ========================================================================== */
+
 .chart-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+
   margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: rgba(59, 130, 246, 0.05);
+  padding: 1.25rem;
+
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
   border-left: 4px solid #3b82f6;
-  border-radius: 0 0.5rem 0.5rem 0;
+  border-radius: 0 12px 12px 0;
+  transition: all 0.3s ease;
+}
+
+.description-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #3b82f6;
+  margin-top: 0.1rem;
 }
 
 .chart-description p {
   margin: 0;
-  color: #475569;
   font-size: 0.95rem;
-  line-height: 1.5;
-  font-style: italic;
+  font-weight: 600;
+  line-height: 1.6;
+  color: #1e293b;
 }
 
-.chart-wrapper {
-  background: white;
-  border-radius: 1rem;
-  padding: 1rem;
-  box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.1), 
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+.chart-description:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  transform: translateX(4px);
+  transition: all 0.3s ease;
+}
+
+.chart-description:hover p {
+  color: #edeff1;
+}
+
+/* ==========================================================================
+   5. Controls & Sliders
+   ========================================================================== */
+
+.chart-controls {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+
+  background: rgba(248, 250, 252, 0.8);
   border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.chart-controls:hover {
+  background: rgba(248, 250, 252, 0.95);
+  border-color: rgba(226, 232, 240, 0.8);
+}
+
+.chart-controls:hover .chart-slider label {
+  color: #1e293b;
+}
+
+.chart-slider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.chart-slider label {
+  min-width: 180px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fafbfc;
+  white-space: nowrap;
+}
+
+.slider {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #e2e8f0, #cbd5e1);
+  outline: none;
+  -webkit-appearance: none;
+  transition: all 0.3s ease;
+}
+
+.slider:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
+}
+
+.slider-value {
+  min-width: 60px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1e293b;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+}
+
+
+/* ==========================================================================
+   6. Chart Wrapper & Footer
+   ========================================================================== */
+
+.chart-wrapper {
   position: relative;
   overflow: hidden;
+  padding: 1.5rem;
+
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 1rem;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .chart-wrapper::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
+  inset: 0;
+  background:
     radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
     radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
   pointer-events: none;
 }
 
 .chart-footer {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(226, 232, 240, 0.6);
   display: flex;
   justify-content: center;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid rgba(226, 232, 240, 0.6);
 }
 
 .method-info {
-  color: #64748b;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.9));
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 12px;
+
   font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
   text-align: center;
-  padding: 0.5rem 1rem;
-  background: rgba(248, 250, 252, 0.8);
-  border-radius: 0.5rem;
-  border: 1px solid rgba(226, 232, 240, 0.4);
+}
+
+
+/* ==========================================================================
+   7. States: No Data, Loading, Skeleton
+   ========================================================================== */
+
+.no-data-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4rem 2rem;
+  margin: 2rem 0;
+
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8));
+  border: 2px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 1rem;
+  text-align: center;
+}
+
+.no-data-icon {
+  width: 3rem;
+  height: 3rem;
+  color: #94a3b8;
+  margin-bottom: 1rem;
+}
+
+.no-data-title {
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #475569;
 }
 
 .no-data-message {
-  color: #94a3b8;
-  font-style: italic;
-  text-align: center;
-  padding: 3rem;
-  background: rgba(248, 250, 252, 0.5);
-  border-radius: 1rem;
-  border: 2px dashed rgba(148, 163, 184, 0.3);
-  margin: 2rem 0;
+  max-width: 400px;
+  margin: 0;
+
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #64748b;
 }
 
-/* Loading animation */
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.chart-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: loading 2s infinite;
 }
 
 .chart-loading {
   position: relative;
-  background: #f1f5f9;
+  height: 400px;
   overflow: hidden;
   border-radius: 1rem;
-  height: 400px;
+  background: #f1f5f9;
 }
 
 .chart-loading::after {
   content: '';
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  inset: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   animation: shimmer 2s infinite;
 }
 
-/* Responsive design */
+
+/* ==========================================================================
+   8. Animations & Transitions
+   ========================================================================== */
+
+.chart-transition-enter {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+}
+
+.chart-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chart-transition-exit {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.chart-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.98);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+
+/* ==========================================================================
+   9. Accessibility & High Contrast
+   ========================================================================== */
+
+.toggle-button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+@media (prefers-contrast: high) {
+  .charts-container { border-color: #000; }
+  .chart-title { color: #000; }
+  .toggle-button { border-color: #000; color: #000; }
+  .slider { background: #000; }
+  .slider::-webkit-slider-thumb,
+  .slider::-moz-range-thumb { background: #000; }
+}
+
+
+/* ==========================================================================
+   10. Print Styles
+   ========================================================================== */
+
+@media print {
+  .charts-container {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  .toggle-button,
+  .chart-controls { display: none; }
+  .chart-header { border-bottom-color: #ccc; }
+  .chart-wrapper {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
+
+
+/* ==========================================================================
+   11. Dark Mode
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  .charts-container {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-color: rgba(71, 85, 105, 0.8);
+    color: #e2e8f0;
+  }
+  .chart-title { color: #f1f5f9; }
+  .chart-wrapper {
+    background: #1e293b;
+    border-color: rgba(71, 85, 105, 0.6);
+  }
+  .chart-description {
+    background: rgba(241, 245, 249, 0.95); /* slate-100 style */
+    border-left-color: #60a5fa;
+    color: #1e293b;
+  }
+  .chart-controls {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(71, 85, 105, 0.6);
+  }
+}
+
+
+/* ==========================================================================
+   12. Responsive Design
+   ========================================================================== */
+
 @media (max-width: 1024px) {
   .chart-header {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
   }
-  
-  .toggle-button {
-    align-self: center;
-  }
+  .toggle-button { align-self: center; width: auto; }
+  .chart-slider { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .chart-slider label { min-width: auto; text-align: center; }
 }
 
 @media (max-width: 768px) {
-  .charts-container {
-    padding: 1.5rem;
-    border-radius: 1rem;
-  }
-  
-  .chart-title {
-    font-size: 1.25rem;
-  }
-  
-  .toggle-button {
-    padding: 0.6rem 1rem;
-    font-size: 0.85rem;
-  }
-  
-  .chart-wrapper {
-    padding: 0.5rem;
-  }
-  
-  .method-info {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.8rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .charts-container {
-    padding: 1rem;
-    margin-bottom: 1rem;
-  }
-  
-  .chart-header {
-    gap: 0.75rem;
-  }
-  
-  .chart-title {
-    font-size: 1.1rem;
-  }
-  
-  .chart-description {
-    padding: 0.75rem;
-  }
-  
-  .toggle-button {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-/* Focus states for accessibility */
-.toggle-button:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .charts-container {
-    border-color: #000;
-  }
-  
-  .chart-title {
-    color: #000;
-  }
-  
-  .toggle-button {
-    border-color: #000;
-    color: #000;
-  }
-}
-
-/* Print styles */
-@media print {
-  .charts-container {
-    box-shadow: none;
-    border: 1px solid #ccc;
-  }
-  
-  .toggle-button {
-    display: none;
-  }
-  
-  .chart-header {
-    border-bottom-color: #ccc;
-  }
-}
-
-/* Animation for chart transitions */
-.chart-wrapper {
-  transition: all 0.3s ease-in-out;
-}
-
-.chart-transition-enter {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.chart-transition-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.3s ease-out;
-}
-
-.chart-transition-exit {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.chart-transition-exit-active {
-  opacity: 0;
-  transform: translateY(-20px);
-  transition: all 0.3s ease-in;
-}
-
-.chart-slider {
-  margin: 10px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chart-slider input[type="range"] {
-  flex: 1;
-}
-
-.chart-slider label {
-  font-size: 0.95rem;
-  color: #475569;
-  min-width: 140px;
+  .charts-container { padding: 1.5rem; border-radius: 1rem; }
+  .chart-title { font-size: 1.25rem; }
+  .chart-icon { width: 1.5rem; height: 1.5rem; }
+  .toggle-button { padding: 0.6rem 1rem; font-size: 0.85rem; }
+  .chart-description { padding: 1rem; font-size: 0.9rem; }
+  .chart-controls { padding: 1rem; }
+  .chart-wrapper { padding: 1rem; }
+  .method-info { font-size: 0.85rem; padding: 0.6rem 1rem; }
 }

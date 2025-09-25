@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from "react";
 import Plot from "react-plotly.js";
-import { TrendingUp, BarChart3, ScatterChart, ToggleLeft, ToggleRight } from "lucide-react";
+import { TrendingUp, BarChart3, ScatterChart, ToggleLeft, ToggleRight, Info } from "lucide-react";
 import "./Charts.css";
 
 const Charts = ({ results, method = "nltk" }) => {
   const [chartType, setChartType] = useState("primary");
   const [topN, setTopN] = useState(20);
   const topResults = results ? results.slice(0, topN) : [];
-
 
   // Chart configurations for each method
   const chartConfigs = {
@@ -16,17 +15,19 @@ const Charts = ({ results, method = "nltk" }) => {
         type: "bar",
         title: "Log-Likelihood Analysis",
         xKey: "log_likelihood",
-        xLabel: "Log-Likelihood",
-        description: "Higher values indicate stronger association with your text"
+        xLabel: "Log-Likelihood Score",
+        description: "Higher log-likelihood values indicate stronger statistical association with your text compared to the reference corpus",
+        color: "#10b981"
       },
       secondary: {
         type: "scatter",
         title: "Effect Size vs Log-Likelihood",
         xKey: "log_likelihood",
         yKey: "effect_size",
-        xLabel: "Log-Likelihood",
+        xLabel: "Log-Likelihood Score",
         yLabel: "Effect Size",
-        description: "Relationship between statistical significance and practical significance"
+        description: "Relationship between statistical significance (log-likelihood) and practical significance (effect size)",
+        color: "#8b5cf6"
       }
     },
     sklearn: {
@@ -35,7 +36,8 @@ const Charts = ({ results, method = "nltk" }) => {
         title: "Chi-Square Analysis",
         xKey: "chi2",
         xLabel: "Chi² Score",
-        description: "Higher Chi² values indicate stronger feature importance"
+        description: "Higher Chi² values indicate stronger statistical independence between word frequency and text type",
+        color: "#3b82f6"
       },
       secondary: {
         type: "scatter",
@@ -44,7 +46,8 @@ const Charts = ({ results, method = "nltk" }) => {
         yKey: "p_value",
         xLabel: "Chi² Score",
         yLabel: "P-value (log scale)",
-        description: "Statistical significance visualization"
+        description: "Statistical significance visualization - lower p-values (bottom) with higher Chi² (right) are most significant",
+        color: "#f59e0b"
       }
     },
     gensim: {
@@ -53,16 +56,18 @@ const Charts = ({ results, method = "nltk" }) => {
         title: "TF-IDF Analysis",
         xKey: "tfidf_score",
         xLabel: "TF-IDF Score",
-        description: "Term frequency-inverse document frequency scores"
+        description: "Term Frequency-Inverse Document Frequency scores show words frequent in your text but rare in the corpus",
+        color: "#ef4444"
       }
     },
     spacy: {
       primary: {
         type: "bar",
-        title: "Log-Likelihood Analysis",
+        title: "SpaCy Log-Likelihood Analysis",
         xKey: "log_likelihood",
-        xLabel: "Log-Likelihood",
-        description: "Primary keyness measure for linguistic analysis"
+        xLabel: "Log-Likelihood Score",
+        description: "Primary keyness measure combining multiple statistical indicators for comprehensive linguistic analysis",
+        color: "#10b981"
       },
       secondary: {
         type: "scatter",
@@ -71,7 +76,8 @@ const Charts = ({ results, method = "nltk" }) => {
         yKey: "effect_size",
         xLabel: "Chi² Score",
         yLabel: "Effect Size",
-        description: "Practical vs statistical significance"
+        description: "Comparison of practical significance (effect size) against statistical significance (Chi²)",
+        color: "#8b5cf6"
       }
     }
   };
@@ -80,105 +86,182 @@ const Charts = ({ results, method = "nltk" }) => {
   const hasSecondaryChart = currentConfig.secondary !== undefined;
   const activeConfig = currentConfig[chartType] || currentConfig.primary;
 
-  // Prepare chart data
   const chartData = useMemo(() => {
-  if (!results || results.length === 0) return [];
+    if (!results || results.length === 0) return [];
 
-  return topResults.map(r => ({
-    word: r.word,
-    uploaded: r.uploaded_count ?? r.count_a ?? 0,
-    sample: r.sample_count ?? r.count_b ?? 0,
-    keyness_score: r.keyness_score ?? r.keyness ?? 0,
-    direction: r.direction ?? "Neutral",
-    x: r[activeConfig.xKey] ?? r.keyness_score ?? 0,  
-    y: r[activeConfig.yKey] ?? r.effect_size ?? 0     
-  }));
-}, [topResults, activeConfig, results]);
+    return topResults.map(r => {
+      const uploaded = r.uploaded_count ?? r.count_a ?? r.uploaded_freq ?? 0;
+      const sample = r.sample_count ?? r.count_b ?? r.sample_freq ?? 0;
+      const word = r.word ?? 'Unknown';
+      
+      let xValue = 0;
+      let yValue = 0;
+      
+      if (activeConfig.xKey) {
+        xValue = r[activeConfig.xKey] ?? r.keyness_score ?? r.keyness ?? 0;
+      }
+      
+      if (activeConfig.yKey) {
+        yValue = r[activeConfig.yKey] ?? r.effect_size ?? 0;
+      }
 
-
+      return {
+        word,
+        uploaded,
+        sample,
+        keyness_score: r.keyness_score ?? r.keyness ?? 0,
+        direction: r.direction ?? "Neutral",
+        x: xValue,
+        y: yValue,
+        chi2: r.chi2 ?? 0,
+        p_value: r.p_value ?? 1,
+        effect_size: r.effect_size ?? 0,
+        log_likelihood: r.log_likelihood ?? 0,
+        tfidf_score: r.tfidf_score ?? 0
+      };
+    });
+  }, [topResults, activeConfig, results]);
 
   if (!results || results.length === 0) {
-    return <p className="no-data-message">No chart data available.</p>;
+    return (
+      <div className="charts-container">
+        <div className="no-data-container">
+          <Info className="no-data-icon" />
+          <h3 className="no-data-title">No Chart Data Available</h3>
+          <p className="no-data-message">
+            Charts will appear here once your keyness analysis is complete.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  // Create bar chart with uploaded vs corpus counts
-const createBarChart = () => {
-  return [
-    {
-      x: chartData.map(d => d.word),
-      y: chartData.map(d => d.uploaded),
-      name: "Uploaded Text",
-      type: "bar",
-      marker: { color: "#3b82f6", line: { color: "#1e40af", width: 1 } },
-      hovertemplate: "<b>%{x}</b><br>Uploaded: %{y}<extra></extra>"
-    },
-    {
-      x: chartData.map(d => d.word),
-      y: chartData.map(d => d.sample),
-      name: "Corpus",
-      type: "bar",
-      marker: { color: "#10b981", line: { color: "#059669", width: 1 } },
-      hovertemplate: "<b>%{x}</b><br>Corpus: %{y}<extra></extra>"
-    }
-  ];
-};
+  const createBarChart = () => {
+    const colors = {
+      uploaded: "#3b82f6",
+      sample: "#10b981"
+    };
 
+    return [
+      {
+        x: chartData.map(d => d.word),
+        y: chartData.map(d => d.uploaded),
+        name: "Your Text",
+        type: "bar",
+        marker: { 
+          color: colors.uploaded, 
+          line: { color: "#1e40af", width: 1 },
+          opacity: 0.8
+        },
+        hovertemplate: "<b>%{x}</b><br>" +
+                      "Your Text: %{y}<br>" +
+                      `${activeConfig.xLabel}: %{customdata:.3f}<extra></extra>`,
+        customdata: chartData.map(d => d.x)
+      },
+      {
+        x: chartData.map(d => d.word),
+        y: chartData.map(d => d.sample),
+        name: "Reference Corpus",
+        type: "bar",
+        marker: { 
+          color: colors.sample, 
+          line: { color: "#059669", width: 1 },
+          opacity: 0.8
+        },
+        hovertemplate: "<b>%{x}</b><br>" +
+                      "Corpus: %{y}<br>" +
+                      `${activeConfig.xLabel}: %{customdata:.3f}<extra></extra>`,
+        customdata: chartData.map(d => d.x)
+      }
+    ];
+  };
 
-// Create scatter chart with x/y keyness fields
-const createScatterChart = () => [
-  {
-    x: chartData.map(d => d.x),
-    y: chartData.map(d => d.y),
-    text: chartData.map(d => d.word),
-    mode: "markers+text",
-    type: "scatter",
-    marker: { size: 12, color: "#3b82f6", line: { color: "#1e40af", width: 2 }, opacity: 0.8 },
-    textposition: "top center",
-    textfont: { size: 10, color: "#1e40af" },
-    hovertemplate: "<b>%{text}</b><br>" +
-                   `${activeConfig.xLabel}: %{x:.3f}<br>` +
-                   `${activeConfig.yLabel}: %{y:.3f}<extra></extra>`
-  }
-];
+  const createScatterChart = () => {
+    const getPointColor = (point) => {
+      if (method.toLowerCase() === 'sklearn' && point.p_value < 0.05) {
+        return "#ef4444"; 
+      } else if (point.keyness_score > 0) {
+        return "#10b981"; 
+      }
+      return activeConfig.color;
+    };
 
-
+    return [{
+      x: chartData.map(d => d.x),
+      y: chartData.map(d => d.y),
+      text: chartData.map(d => d.word),
+      mode: "markers+text",
+      type: "scatter",
+      marker: { 
+        size: chartData.map(d => Math.max(8, Math.min(16, d.uploaded / 2 + 8))),
+        color: chartData.map(d => getPointColor(d)),
+        line: { color: "#1e40af", width: 1.5 },
+        opacity: 0.7,
+        colorscale: "Viridis"
+      },
+      textposition: "top center",
+      textfont: { size: 9, color: "#1e40af", family: "Inter, sans-serif" },
+      hovertemplate: "<b>%{text}</b><br>" +
+                     `${activeConfig.xLabel}: %{x:.3f}<br>` +
+                     `${activeConfig.yLabel}: %{y:.3f}<br>` +
+                     "Your Text: %{customdata.uploaded}<br>" +
+                     "Corpus: %{customdata.sample}<br>" +
+                     "<extra></extra>",
+      customdata: chartData.map(d => ({
+        uploaded: d.uploaded,
+        sample: d.sample,
+        keyness: d.keyness_score
+      }))
+    }];
+  };
 
   const plotData = activeConfig.type === "bar" ? createBarChart() : createScatterChart();
 
   const getLayout = () => {
     const baseLayout = {
-      title: { text: activeConfig.title, font: { size: 24, family: "Inter, sans-serif", color: "#1e293b" }, x: 0.5 },
+      title: { 
+        text: activeConfig.title, 
+        font: { size: 20, family: "Inter, sans-serif", color: "#1e293b" }, 
+        x: 0.5,
+        y: 0.95
+      },
       paper_bgcolor: "rgba(255, 255, 255, 0.95)",
       plot_bgcolor: "rgba(248, 250, 252, 0.8)",
-      margin: { l: 80, r: 80, t: 100, b: 120 },
+      margin: { l: 80, r: 80, t: 80, b: 100 },
       showlegend: true,
       legend: {
         orientation: "h",
         x: 0.5,
         xanchor: "center",
-        y: -0.2,
-        bgcolor: "rgba(255, 255, 255, 0.9)",
+        y: -0.15,
+        bgcolor: "rgba(255, 255, 255, 0.95)",
         bordercolor: "#e2e8f0",
-        borderwidth: 1
+        borderwidth: 1,
+        font: { size: 12 }
       },
-      hovermode: "closest"
+      hovermode: "closest",
+      font: { family: "Inter, sans-serif" }
     };
 
     if (activeConfig.type === "bar") {
       return {
         ...baseLayout,
         xaxis: {
-          title: { text: "Words", font: { size: 14, color: "#475569" } },
+          title: { text: "Keywords", font: { size: 14, color: "#475569" } },
           tickangle: -45,
-          tickfont: { size: 11, color: "#64748b" },
-          gridcolor: "rgba(226, 232, 240, 0.6)"
+          tickfont: { size: 10, color: "#64748b" },
+          gridcolor: "rgba(226, 232, 240, 0.6)",
+          linecolor: "#e2e8f0"
         },
         yaxis: {
-          title: { text: activeConfig.xLabel, font: { size: 14, color: "#475569" } },
+          title: { text: "Frequency Count", font: { size: 14, color: "#475569" } },
           tickfont: { color: "#64748b" },
-          gridcolor: "rgba(226, 232, 240, 0.6)"
+          gridcolor: "rgba(226, 232, 240, 0.6)",
+          linecolor: "#e2e8f0"
         },
-        barmode: "group"
+        barmode: "group",
+        bargap: 0.4,
+        bargroupgap: 0.1
       };
     } else {
       return {
@@ -187,13 +270,18 @@ const createScatterChart = () => [
           title: { text: activeConfig.xLabel, font: { size: 14, color: "#475569" } },
           tickfont: { color: "#64748b" },
           gridcolor: "rgba(226, 232, 240, 0.6)",
-          type: activeConfig.yKey === "p_value" ? "linear" : "linear"
+          linecolor: "#e2e8f0",
+          zeroline: true,
+          zerolinecolor: "rgba(0, 0, 0, 0.3)"
         },
         yaxis: {
           title: { text: activeConfig.yLabel, font: { size: 14, color: "#475569" } },
           tickfont: { color: "#64748b" },
           gridcolor: "rgba(226, 232, 240, 0.6)",
-          type: activeConfig.yKey === "p_value" ? "log" : "linear"
+          linecolor: "#e2e8f0",
+          type: activeConfig.yKey === "p_value" ? "log" : "linear",
+          zeroline: true,
+          zerolinecolor: "rgba(0, 0, 0, 0.3)"
         }
       };
     }
@@ -204,7 +292,7 @@ const createScatterChart = () => [
       <div className="chart-header">
         <h3 className="chart-title">
           <TrendingUp className="chart-icon" />
-          Keyness Analysis ({method.toUpperCase()})
+          Keyness Visualization ({method.toUpperCase()})
         </h3>
 
         {hasSecondaryChart && (
@@ -212,6 +300,7 @@ const createScatterChart = () => [
             <button
               onClick={() => setChartType(chartType === "primary" ? "secondary" : "primary")}
               className={`toggle-button ${chartType}`}
+              title={`Switch to ${chartType === "primary" ? "scatter plot" : "bar chart"}`}
             >
               {chartType === "primary" ? (
                 <>
@@ -232,23 +321,28 @@ const createScatterChart = () => [
       </div>
 
       <div className="chart-description">
+        <Info className="description-icon" />
         <p>{activeConfig.description}</p>
       </div>
 
-      <div className="chart-slider">
-  <label htmlFor="topNSlider">
-    Number of results: <strong>{topN}</strong>
-  </label>
-  <input
-    id="topNSlider"
-    type="range"
-    min={5}
-    max={50}
-    step={1}
-    value={topN}
-    onChange={(e) => setTopN(parseInt(e.target.value))}
-  />
-</div>
+      <div className="chart-controls">
+        <div className="chart-slider">
+          <label htmlFor="topNSlider">
+            Displaying top <strong>{topN}</strong> keywords
+          </label>
+          <input
+            id="topNSlider"
+            type="range"
+            min={5}
+            max={Math.min(50, results.length)}
+            step={1}
+            value={topN}
+            onChange={(e) => setTopN(parseInt(e.target.value))}
+            className="slider"
+          />
+          <span className="slider-value">{topN}/{results.length}</span>
+        </div>
+      </div>
 
       <div className="chart-wrapper">
         <Plot
@@ -259,22 +353,24 @@ const createScatterChart = () => [
           config={{
             displayModeBar: true,
             displaylogo: false,
-            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d', 'autoScale2d'],
             toImageButtonOptions: {
               format: 'png',
-              filename: `${method}_keyness_analysis`,
+              filename: `${method}_keyness_${chartType}_analysis`,
               height: 800,
               width: 1200,
               scale: 2
-            }
+            },
+            responsive: true
           }}
         />
       </div>
 
       <div className="chart-footer">
         <div className="method-info">
-          <strong>Method:</strong> {method.toUpperCase()} | 
-          <strong> Chart Type:</strong> {activeConfig.type === "bar" ? "Bar Chart" : "Scatter Plot"}
+          <strong>Analysis:</strong> {method.toUpperCase()} | 
+          <strong> Visualization:</strong> {activeConfig.type === "bar" ? "Frequency Comparison" : "Statistical Relationship"} |
+          <strong> Data Points:</strong> {chartData.length}
         </div>
       </div>
     </div>

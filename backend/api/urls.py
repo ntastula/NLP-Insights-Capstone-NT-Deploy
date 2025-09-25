@@ -13,7 +13,7 @@ urlpatterns = [
     path('clustering-analysis/', clustering_analysis, name='clustering-analysis'),
     path("corpus-preview-keyness/", views.corpus_preview_keyness, name="corpus_preview_keyness"),
     path('get-keyness-summary/', views.get_keyness_summary, name="get_keyness_summary"),
-
+    path('corpus-meta-keyness/', views.corpus_meta_keyness, name='corpus_meta_keyness'),
 ]
 
 

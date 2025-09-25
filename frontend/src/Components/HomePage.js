@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import CreativeKeynessResults from "./Keyness/CreativeKeynessResults";
 import "./HomePage.css";
 
 const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
@@ -8,47 +9,54 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
 
   const [localGenre, setLocalGenre] = useState("");
   const [analysisType, setAnalysisType] = useState("");
+  const [analysisDone, setAnalysisDone] = useState(false);
+
 
   // Fetch corpora list from backend
-  useEffect(() => {
-    if (!analysisType) return; // don't fetch before user selects analysis type
+useEffect(() => {
+  if (!analysisType) return; 
 
-    let cancelled = false;
+  let cancelled = false;
 
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const r = await fetch(`http://localhost:8000/api/corpora/?analysis=${analysisType}`, { credentials: "include" });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        if (cancelled) return;
+  (async () => {
+    try {
+      setLoading(true);
+      setErr("");
+      const r = await fetch(`http://localhost:8000/api/corpora/?analysis=${analysisType}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json();
+      if (cancelled) return;
 
-        const list = Array.isArray(d.corpora) ? d.corpora : [];
-        setCorpora(list);
+      const list = Array.isArray(d.corpora) ? d.corpora : [];
+      setCorpora(list);
 
-        // Set default genre if none selected yet
-        if (!localGenre && list.length) {
-          let defaultFile = list[0];
-          if (analysisType === "keyness") {
-            defaultFile = list.find(f => f.startsWith("general_english")) || list[0];
-          }
-          setLocalGenre(defaultFile);
-        }
-      } catch (e) {
-        if (!cancelled) setErr(String(e.message || e));
-      } finally {
-        if (!cancelled) setLoading(false);
+      if (!list.length) {
+        setErr("No corpora found for this analysis type.");
+        setLocalGenre("");
+        return;
       }
-    })();
 
-    return () => { cancelled = true; };
-  }, [analysisType]);
+      let defaultFile = localGenre || list[0];
+      if (analysisType === "keyness") {
+        defaultFile = list.find(f => f.startsWith("general_english")) || list[0];
+      }
+      setLocalGenre(defaultFile);
+    } catch (e) {
+      if (!cancelled) setErr(String(e.message || e));
+      setLocalGenre("");
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
+
+  return () => { cancelled = true; };
+}, [analysisType]);
+
 
   const handleAnalysisChange = (e) => {
     const type = e.target.value;
     setAnalysisType(type);
-    setLocalGenre(""); // reset genre when analysis changes
+    setLocalGenre(""); 
   };
 
   const handleGenreChange = (e) => {
@@ -60,13 +68,13 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
     if (!Array.isArray(corpora)) return [];
 
     return corpora.filter(file => {
-      if (analysisType === "keyness") return true; // all valid
+      if (analysisType === "keyness") return true; 
       if (analysisType === "sentiment" || analysisType === "sensorimotor") return true;
       return false; // clustering: no dropdown
     });
   }, [analysisType, corpora]);
 
-  return (
+    return (
     <div className="homepage-container">
       <div className="homepage-card">
         <h1 className="homepage-title">Welcome to TTC Writing Analysis</h1>
@@ -108,13 +116,8 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
                   disabled={loading || !!err || filteredCorpora.length === 0}
                 >
                   {filteredCorpora.map((file) => {
-                    // Remove "_keyness" and ".json"
                     let displayName = file.replace(/_keyness$/, "").replace(/\.json$/, "");
-                    
-                    // Replace underscores with spaces
                     displayName = displayName.replace(/_/g, " ");
-                    
-                    // Capitalise each word
                     displayName = displayName.replace(/\b\w/g, (c) => c.toUpperCase());
 
                     return (
@@ -128,12 +131,16 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
             </div>
 
             <button
-              onClick={() => onProceed({ analysisType, genre: localGenre })}
-              className="homepage-button"
-              disabled={!localGenre || loading || !!err}
-            >
-              Go to {analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis
-            </button>
+  onClick={() => {
+    onProceed({ analysisType, genre: localGenre });
+    setAnalysisDone(true); 
+  }}
+  className="homepage-button"
+  disabled={!localGenre || loading || !!err}
+>
+  Go to {analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis
+</button>
+
           </>
         )}
 
@@ -147,6 +154,16 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
           </button>
         )}
       </div>
+
+      {/* Render CreativeKeynessResults below the selection UI */}
+    {analysisDone && localGenre && (
+  <CreativeKeynessResults
+    genre={localGenre}
+    onSelect={onSelect}
+    selectedGenre={localGenre}
+    onProceed={onProceed}
+  />
+)}
     </div>
   );
 };

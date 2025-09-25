@@ -17,7 +17,7 @@ const posColors = {
   OTHER: "other",
 };
 
-const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
+const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre }) => {
   const [activeView, setActiveView] = useState("keywords");
   const [selectedWord, setSelectedWord] = useState(null);
   const [sentences, setSentences] = useState([]);
@@ -25,10 +25,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  // Ensure results is always an array
   const safeResults = Array.isArray(results) ? results : [];
-  console.log("API results:", results);
-  console.log("Safe results:", safeResults);
 
   // Group by POS
   const uploadedWordsSet = useMemo(() => {
@@ -132,7 +129,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
 
   return (
     <div className="results-container">
-      <ResultsSummary stats={stats} selectedMethod={method} comparisonResults={safeResults} />
+      <ResultsSummary stats={stats} selectedMethod={method} comparisonResults={safeResults} genre={genre}/>
 
       {/* View Toggle Buttons */}
       <div className="view-controls">
@@ -171,21 +168,20 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText }) => {
           Download XLSX
         </button>
       </div>
+      
+
 
       {/* Summary View */}
       {activeView === "summary" && (
-        <div className="keyness-summary">
-          {summaryLoading ? (
-            "Loading summary..."
-          ) : (
-            summary
-              .split(/\n{2,}|(?<=\.)\s+/) // Split on double newlines or after periods
-              .map((p, i) => (
-                <p key={i}>{p.trim()}</p>
-              ))
-          )}
-        </div>
-      )}
+  <div className="keyness-summary">
+    <ResultsSummary
+      stats={stats}
+      selectedMethod={method}
+      comparisonResults={results}
+      genre={genre ? genre.replace(/_keyness$/, "").replace(/\.json$/, "") : undefined}
+    />
+  </div>
+)}
 
       {/* Keywords View */}
       {activeView === "keywords" && (
