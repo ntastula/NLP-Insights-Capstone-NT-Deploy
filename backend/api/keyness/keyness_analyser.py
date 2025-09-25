@@ -103,7 +103,7 @@ def filter_all_words(text):
 def extract_sentences(text, word):
     """
     Return all sentences from text containing the exact word (case-insensitive),
-    ignoring punctuation attached to words.
+    excluding possessive forms like 's or s'.
     """
     if not text or not word:
         return []
@@ -113,8 +113,9 @@ def extract_sentences(text, word):
 
     matched = []
     for s in sentences:
-        # Use regex to match whole word boundaries
-        if re.search(rf'\b{re.escape(word_lower)}\b', s, flags=re.IGNORECASE):
+        tokens = word_tokenize(s)
+        # Check for exact match, but skip tokens with apostrophe
+        if any(t.lower() == word_lower and "'" not in t for t in tokens):
             matched.append(s)
     return matched
 
