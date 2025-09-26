@@ -572,35 +572,6 @@
   }
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .keyness-word-detail-container {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    color: #f1f5f9;
-  }
-  
-  .tab-content-container {
-    background: #1e293b;
-    border-color: #475569;
-  }
-  
-  .keyword-card {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    border-color: #475569;
-    color: #f1f5f9;
-  }
-  
-  .stat-item {
-    background: linear-gradient(135deg, #334155 0%, #475569 100%);
-    border-color: #64748b;
-  }
-  
-  .sentences-list li {
-    background: linear-gradient(135deg, #334155 0%, #475569 100%);
-    color: #e2e8f0;
-  }
-}
-
 /* Print styles */
 @media print {
   .keyness-word-detail-container {

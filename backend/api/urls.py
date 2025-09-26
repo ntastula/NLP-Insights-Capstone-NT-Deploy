@@ -16,6 +16,7 @@ urlpatterns = [
     path('corpus-meta-keyness/', views.corpus_meta_keyness, name='corpus_meta_keyness'),
     path('get-synonyms/', views.get_synonyms, name='get_synonyms'),
     path('get-concepts/', views.get_concepts, name='get_concepts'),
+    path('summarise-chart/', views.summarise_chart, name='summarise_chart'),
 ]
 
 

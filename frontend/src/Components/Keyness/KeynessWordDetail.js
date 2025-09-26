@@ -181,7 +181,7 @@ const KeynessWordDetail = ({
         wordData: "📊 Word Data",
         sentences: "📝 Sentences",
         alternateWords: "🔄 Alternate Words",
-        overusedWords: "⚠️ Overused Words",
+        // overusedWords: "⚠️ Overused Words",
         concepts: "💡 Concepts"
     };
 
@@ -473,13 +473,6 @@ const KeynessWordDetail = ({
                         ) : (
                             renderEmptyState("alternate words", "🔄")
                         )}
-                    </div>
-                )}
-
-                {/* Overused Words */}
-                {activeTab === "overusedWords" && (
-                    <div className="tab-content">
-                        {renderPlaceholder("⚠️ Overused Words")}
                     </div>
                 )}
 

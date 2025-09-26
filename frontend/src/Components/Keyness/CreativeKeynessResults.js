@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Charts from "./Charts";
 import ResultsTable from "./ResultsTable";
 import ResultsSummary from "./ResultsSummary";
 import KeynessResultsGrid from "./KeynessResultsGrid";
 import "./CreativeKeynessResults.css";
 import { exportKeynessToXlsx } from "./ExportXlsx";
+import axios from "axios";
 
 const posColors = {
   NOUN: "noun",
@@ -18,8 +19,105 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   const [activeView, setActiveView] = useState("keywords");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
+  
+  // Enhanced chart summary state - now handles multiple chart types
+  const [chartSummaries, setChartSummaries] = useState({
+    primary: { summary: "", loading: false, error: null },
+    secondary: { summary: "", loading: false, error: null }
+  });
+  const [activeChart, setActiveChart] = useState("primary"); // Track which chart is currently active
 
   const safeResults = Array.isArray(results) ? results : [];
+
+  // ✅ Compute chart data for both primary and secondary charts
+  const chartData = useMemo(() => {
+    if (!safeResults || safeResults.length === 0) return { primary: [], secondary: [] };
+    
+    const primaryData = safeResults.slice(0, 20).map((r) => ({
+      label: r.word,
+      value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+    }));
+
+    // Secondary chart could be frequency vs keyness scatter plot
+    const secondaryData = safeResults.slice(0, 30).map((r) => ({
+      label: r.word,
+      x: r.frequency || r.count || 0,
+      y: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+    }));
+
+    return { primary: primaryData, secondary: secondaryData };
+  }, [safeResults]);
+
+  // ✅ Enhanced function to fetch chart summaries
+  const fetchChartSummary = async (chartType, data, forceRefresh = false) => {
+    // Don't fetch if already loaded and not forcing refresh
+    if (chartSummaries[chartType].summary && !forceRefresh) return;
+    
+    setChartSummaries(prev => ({
+      ...prev,
+      [chartType]: { ...prev[chartType], loading: true, error: null }
+    }));
+
+    try {
+      const payload = chartType === "primary" 
+        ? {
+            title: `${method.toUpperCase()} Keyness Analysis - Top Keywords`,
+            chart_type: "bar",
+            chart_data: data,
+          }
+        : {
+            title: `${method.toUpperCase()} Keyness Analysis - Frequency vs Keyness`,
+            chart_type: "scatter",
+            chart_data: data,
+          };
+
+      const response = await fetch("http://localhost:8000/api/summarise-chart/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      
+      setChartSummaries(prev => ({
+        ...prev,
+        [chartType]: {
+          summary: responseData.analysis || "No summary available.",
+          loading: false,
+          error: null
+        }
+      }));
+    } catch (err) {
+      console.error(`Error fetching ${chartType} chart summary:`, err);
+      setChartSummaries(prev => ({
+        ...prev,
+        [chartType]: {
+          summary: "",
+          loading: false,
+          error: `Failed to fetch ${chartType} chart summary.`
+        }
+      }));
+    }
+  };
+
+  // ✅ Effect to fetch chart summaries when Charts tab becomes active
+  useEffect(() => {
+    if (activeView !== "charts" || chartData.primary.length === 0) return;
+
+    // Fetch primary chart summary immediately
+    fetchChartSummary("primary", chartData.primary);
+    
+    // Pre-fetch secondary chart summary in background (optional)
+    if (chartData.secondary.length > 0) {
+      setTimeout(() => {
+        fetchChartSummary("secondary", chartData.secondary);
+      }, 1000); // Delay to not overwhelm the API
+    }
+  }, [activeView, chartData, method]);
 
   // Group by POS and filter to only words from uploaded text
   const uploadedWordsSet = useMemo(() => {
@@ -70,22 +168,28 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
 
   // Handle clicking on a keyword
   const handleKeywordClick = (w) => {
-  if (!w) return;
-  const wordData = safeResults.find(item => item.word?.toLowerCase() === w.word.toLowerCase());
-  if (wordData && onWordDetail) {
-    onWordDetail({
-      word: w.word,
-      wordData,
-      uploadedText,
-      method,
-      results: safeResults
-    });
-  }
-};
+    if (!w) return;
+    const wordData = safeResults.find(item => item.word?.toLowerCase() === w.word.toLowerCase());
+    if (wordData && onWordDetail) {
+      onWordDetail({
+        word: w.word,
+        wordData,
+        uploadedText,
+        method,
+        results: safeResults
+      });
+    }
+  };
 
-  const closeModal = () => {
-    // No longer needed since we're navigating to a new page
-    // Keep for backward compatibility if needed elsewhere
+  // Handle chart toggle
+  const handleChartToggle = (chartType) => {
+    setActiveChart(chartType);
+    
+    // Fetch summary for the newly active chart if not already loaded
+    const currentChartData = chartType === "primary" ? chartData.primary : chartData.secondary;
+    if (!chartSummaries[chartType].summary && !chartSummaries[chartType].loading && currentChartData.length > 0) {
+      fetchChartSummary(chartType, currentChartData);
+    }
   };
 
   if (!results || Object.keys(results).length === 0) {
@@ -98,7 +202,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
     );
   }
 
-  const chartData = results?.slice(0, 20).map((r) => ({
+  const chartDataForExport = results?.slice(0, 20).map((r) => ({
     label: r.word,
     value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
   }));
@@ -141,7 +245,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
               stats,
               posGroups,
               [],
-              chartData
+              chartDataForExport
             )
           }
         >
@@ -215,7 +319,83 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
       )}
 
       {/* Charts View */}
-      {activeView === "charts" && <Charts results={safeResults} method={method} />}
+      {activeView === "charts" && (
+        <div className="charts-container">
+          {/* Chart Toggle Buttons */}
+          <div className="chart-controls mb-4">
+            <button
+              className={`btn mr-2 ${activeChart === "primary" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
+              onClick={() => handleChartToggle("primary")}
+            >
+              Top Keywords
+            </button>
+            <button
+              className={`btn ${activeChart === "secondary" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
+              onClick={() => handleChartToggle("secondary")}
+            >
+              Frequency vs Keyness
+            </button>
+          </div>
+
+          {/* Charts Component with active chart prop */}
+          <Charts 
+            results={safeResults} 
+            method={method} 
+            activeChart={activeChart}
+          />
+
+          {/* Enhanced AI Summary Section */}
+          <div className="chart-summary-section mt-6">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+              <div className="flex items-center mb-4">
+                <div className="w-2 h-6 bg-blue-500 rounded-full mr-3"></div>
+                <h4 className="font-semibold text-xl text-gray-800">
+                  AI Analysis: {activeChart === "primary" ? "Top Keywords Chart" : "Frequency vs Keyness Chart"}
+                </h4>
+              </div>
+              
+              <div className="chart-summary-content">
+                {chartSummaries[activeChart].loading ? (
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <p>Analyzing chart data...</p>
+                  </div>
+                ) : chartSummaries[activeChart].error ? (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                    <p className="text-red-700">{chartSummaries[activeChart].error}</p>
+                    <button 
+                      className="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded"
+                      onClick={() => fetchChartSummary(activeChart, activeChart === "primary" ? chartData.primary : chartData.secondary, true)}
+                    >
+                      Retry Analysis
+                    </button>
+                  </div>
+                ) : chartSummaries[activeChart].summary ? (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {chartSummaries[activeChart].summary}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 italic">No analysis available yet.</p>
+                )}
+              </div>
+
+              {/* Optional: Add a refresh button */}
+              {chartSummaries[activeChart].summary && !chartSummaries[activeChart].loading && (
+                <div className="mt-4 pt-4 border-t border-blue-100">
+                  <button 
+                    className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-md transition-colors"
+                    onClick={() => fetchChartSummary(activeChart, activeChart === "primary" ? chartData.primary : chartData.secondary, true)}
+                  >
+                    Refresh Analysis
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table View */}
       {activeView === "table" && <ResultsTable results={safeResults} method={method} />}
