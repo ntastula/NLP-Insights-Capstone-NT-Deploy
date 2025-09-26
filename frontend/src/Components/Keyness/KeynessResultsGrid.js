@@ -1,8 +1,8 @@
 import React from "react";
 import "./KeynessResultsGrid.css";
 
-const KeynessResultsGrid = ({ results, method }) => {
-  if (!results || results.length === 0) return null;
+const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
+  if (!results || results.length === 0) return <p>No results available.</p>;
 
   const methodUpper = method.toUpperCase();
   const isSklearn = methodUpper === "SKLEARN";
@@ -44,11 +44,13 @@ const KeynessResultsGrid = ({ results, method }) => {
   };
 
   const methodInfo = getMethodExplanation();
-  const filteredResults = results.filter(r => r.word && r.word.match(/\w/));
+  const filteredResults = word
+    ? results.filter((r) => r.word === word)
+    : results;
 
   return (
     <div className="keyness-results-container">
-      {/* Method Explanation Section */}
+      {/* Method Explanation Section (always visible) */}
       <div className="method-explanation">
         <h3 className="method-title">{methodInfo.title}</h3>
         <p className="method-description">{methodInfo.description}</p>
@@ -57,31 +59,52 @@ const KeynessResultsGrid = ({ results, method }) => {
         </div>
       </div>
 
-      {/* Results Grid */}
+      {/* Results Section */}
       <div className="results-section">
-        <h3 className="results-title">
-          Top Distinctive Keywords
-          <span className="results-count">({filteredResults.length} words found)</span>
-        </h3>
-        
+        {!word && (
+          <h3 className="results-title">
+            Top Distinctive Keywords
+            <span className="results-count">
+              ({filteredResults.length} words found)
+            </span>
+          </h3>
+        )}
+
         <div className="keywords-grid">
           {filteredResults.map((r, idx) => (
-            <div key={idx} className="keyword-card">
+            <div
+              key={idx}
+              className="keyword-card"
+              onClick={() =>
+                onWordDetail &&
+                onWordDetail({
+                  word: r.word,
+                  wordData: r,
+                  method,
+                  results, // pass full list for navigation
+                })
+              }
+            >
               <div className="keyword-header">
                 <h4 className="keyword-word">{r.word}</h4>
-                <div className="keyword-rank">#{idx + 1}</div>
+                {!word && <div className="keyword-rank">#{idx + 1}</div>}
               </div>
 
               <div className="keyword-stats">
+                {/* Method-specific sections unchanged */}
                 {isSklearn && (
                   <>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Your Text:</span>
-                      <span className="stat-value">{r.uploaded_count ?? r.count_a}</span>
+                      <span className="stat-value">
+                        {r.uploaded_count ?? r.count_a}
+                      </span>
                     </div>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Corpus:</span>
-                      <span className="stat-value">{r.sample_count ?? r.count_b}</span>
+                      <span className="stat-value">
+                        {r.sample_count ?? r.count_b}
+                      </span>
                     </div>
                     <div className="stat-item primary-stat">
                       <span className="stat-label">Chi²:</span>
@@ -89,7 +112,9 @@ const KeynessResultsGrid = ({ results, method }) => {
                     </div>
                     <div className="stat-item significance-stat">
                       <span className="stat-label">p-value:</span>
-                      <span className="stat-value p-value">{r.p_value?.toExponential(2)}</span>
+                      <span className="stat-value p-value">
+                        {r.p_value?.toExponential(2)}
+                      </span>
                     </div>
                   </>
                 )}
@@ -106,7 +131,9 @@ const KeynessResultsGrid = ({ results, method }) => {
                     </div>
                     <div className="stat-item primary-stat">
                       <span className="stat-label">TF-IDF Score:</span>
-                      <span className="stat-value">{r.tfidf_score?.toFixed(3)}</span>
+                      <span className="stat-value">
+                        {r.tfidf_score?.toFixed(3)}
+                      </span>
                     </div>
                   </>
                 )}
@@ -115,11 +142,15 @@ const KeynessResultsGrid = ({ results, method }) => {
                   <>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Your Text:</span>
-                      <span className="stat-value">{r.uploaded_count ?? r.count_a}</span>
+                      <span className="stat-value">
+                        {r.uploaded_count ?? r.count_a}
+                      </span>
                     </div>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Corpus:</span>
-                      <span className="stat-value">{r.sample_count ?? r.count_b}</span>
+                      <span className="stat-value">
+                        {r.sample_count ?? r.count_b}
+                      </span>
                     </div>
                     {r.chi2 !== undefined && (
                       <div className="stat-item">
@@ -130,13 +161,17 @@ const KeynessResultsGrid = ({ results, method }) => {
                     {r.p_value !== undefined && (
                       <div className="stat-item significance-stat">
                         <span className="stat-label">p-value:</span>
-                        <span className="stat-value p-value">{r.p_value?.toExponential(2)}</span>
+                        <span className="stat-value p-value">
+                          {r.p_value?.toExponential(2)}
+                        </span>
                       </div>
                     )}
                     {r.tfidf_score !== undefined && (
                       <div className="stat-item">
                         <span className="stat-label">TF-IDF:</span>
-                        <span className="stat-value">{r.tfidf_score?.toFixed(3)}</span>
+                        <span className="stat-value">
+                          {r.tfidf_score?.toFixed(3)}
+                        </span>
                       </div>
                     )}
                     <div className="stat-item">
@@ -149,7 +184,9 @@ const KeynessResultsGrid = ({ results, method }) => {
                     </div>
                     <div className="stat-item primary-stat">
                       <span className="stat-label">Keyness:</span>
-                      <span className="stat-value keyness-value">{r.keyness_score}</span>
+                      <span className="stat-value keyness-value">
+                        {r.keyness_score}
+                      </span>
                     </div>
                   </>
                 )}
@@ -162,11 +199,15 @@ const KeynessResultsGrid = ({ results, method }) => {
                     </div>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Your Text:</span>
-                      <span className="stat-value">{r.uploaded_count ?? r.count_a}</span>
+                      <span className="stat-value">
+                        {r.uploaded_count ?? r.count_a}
+                      </span>
                     </div>
                     <div className="stat-item frequency-stat">
                       <span className="stat-label">Corpus:</span>
-                      <span className="stat-value">{r.sample_count ?? r.count_b}</span>
+                      <span className="stat-value">
+                        {r.sample_count ?? r.count_b}
+                      </span>
                     </div>
                     <div className="stat-item">
                       <span className="stat-label">Effect Size:</span>
@@ -174,7 +215,9 @@ const KeynessResultsGrid = ({ results, method }) => {
                     </div>
                     <div className="stat-item primary-stat">
                       <span className="stat-label">Keyness:</span>
-                      <span className="stat-value keyness-value">{r.keyness_score}</span>
+                      <span className="stat-value keyness-value">
+                        {r.keyness_score}
+                      </span>
                     </div>
                   </>
                 )}
@@ -188,4 +231,3 @@ const KeynessResultsGrid = ({ results, method }) => {
 };
 
 export default KeynessResultsGrid;
-

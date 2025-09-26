@@ -41,7 +41,9 @@ const KeynessAnalyser = ({
     corpusPreview,
     method,      
     onBack,
-    genre        
+    genre,
+    onWordDetail,
+    onResults        
 }) => {
     const [comparisonResults, setComparisonResults] = useState([]);
     const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0, totalSignificant: 0 });
@@ -120,11 +122,24 @@ const KeynessAnalyser = ({
             });
 
             setAnalysisDone(true);
+            if (onResults) {
+    onResults({
+        results: resultsArray,
+        method: methodName,
+        uploadedText: uploadedText,
+        stats: {
+            uploadedTotal: json.uploaded_total ?? uploadedText.split(/\s+/).filter(Boolean).length,
+            corpusTotal: json.corpus_total ?? 0,
+            totalSignificant: json.total_significant ?? (resultsArray ? resultsArray.length : 0)
+        }
+    });
+}
         } catch (e) {
             setError(e.message || "Analysis failed");
         } finally {
             setLoading(false);
         }
+        
     };
 
     return (
@@ -234,6 +249,7 @@ const KeynessAnalyser = ({
                     method={selectedMethod}
                     stats={stats}
                     genre={genre}
+                    onWordDetail={onWordDetail}
                 />
             )}
         </div>

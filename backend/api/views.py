@@ -780,3 +780,82 @@ Requirements:
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+@api_view(['POST'])
+def get_concepts(request):
+    word = request.data.get('word', None)
+    uploaded_text = request.data.get("uploaded_text", "")
+
+    if not word or not uploaded_text:
+        return Response({'error': 'No word or text provided.'}, status=400)
+
+    # Reuse your sentence extraction logic
+    sentences = extract_sentences(uploaded_text, word)
+
+    # Filter like in get_sentences
+    filtered_sentences = []
+    word_lower = word.lower()
+    for s in sentences:
+        words_in_sentence = re.findall(r"\b\w[\w'-]*\b", s)
+        if any(w.lower().replace("'", "") == word_lower for w in words_in_sentence):
+            filtered_sentences.append(s)
+
+    # Limit how many sentences we pass to the model (to avoid prompt bloat)
+    sample_sentences = filtered_sentences[:5]
+    sentences_text = "\n".join([f"- {s}" for s in sample_sentences]) if sample_sentences else "No real sentences found."
+
+    # Build the prompt with real examples
+    prompt = f"""You are a linguistic and conceptual analysis expert.
+
+Task: Given the word "{word}", provide a breakdown of the 3–5 main concepts or senses that this word might refer to.
+Use the example sentences provided below as your evidence. For each concept, select one of the provided sentences
+that best illustrates this sense. Do not invent sentences; only use the given ones.
+
+Example sentences:
+{sentences_text}
+
+Format your response as follows:
+
+Concepts related to "{word}":
+
+[Concept 1 Name]
+Type: [Physical object, Metaphor, Abstract concept, Role, Process]
+Description: [Brief definition]
+Example usage: [Choose one of the given sentences, copy it exactly, and explain why it illustrates this concept]
+Distinction: [How this differs from other senses]
+
+[Continue for 3–5 concepts]
+
+Summary:
+[Why distinguishing between these senses matters for interpretation]
+"""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=60)
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        return Response({
+            "word": word,
+            "analysis": analysis,
+            "sentences": sample_sentences,
+            "success": True
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)

@@ -3,7 +3,7 @@ import TextInputSection from "../TextInputSection";
 import KeynessAnalyser from "./KeynessAnalyser";
 import "./KeynessLanding.css";
 
-const KeynessLanding = ({ onBack, genre }) => {
+const KeynessLanding = ({ onBack, genre, onWordDetail, onResults }) => {
     const [pastedText, setPastedText] = useState("");
     const [uploadedText, setUploadedText] = useState("");
     const [uploadedPreview, setUploadedPreview] = useState("");
@@ -73,7 +73,9 @@ const KeynessLanding = ({ onBack, genre }) => {
                 uploadedPreview={uploadedPreview}
                 corpusPreview={corpusPreview}
                 onBack={() => setAnalysisStarted(false)}
-                genre={genre} // pass selected genre through to analyser
+                genre={genre} 
+                onWordDetail={onWordDetail}
+                onResults={onResults}
             />
         );
     }
