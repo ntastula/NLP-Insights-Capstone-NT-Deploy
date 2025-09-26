@@ -859,3 +859,111 @@ Summary:
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+def summarise_chart(request):
+    chart_type = request.data.get('chart_type', 'bar')  # 'bar' or 'scatter'
+    chart_title = request.data.get('title', 'Chart')
+    chart_data = request.data.get('chart_data', [])
+
+    if not chart_data:
+        return Response({'error': 'No chart data provided.'}, status=400)
+
+    # Enhanced prompts with better context and structure
+    if chart_type == "bar":
+        # Extract chart data for bar chart (label: value pairs)
+        chart_text = "\n".join([f"- {item['label']}: {item['value']:.3f}" for item in chart_data[:15]])
+
+        prompt = f"""You are an expert data analyst and computational linguist.
+
+Task: Analyze the bar chart titled "{chart_title}" showing keyness analysis results.
+
+Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analyzed text compared to a reference corpus.
+
+Chart Data (Top 15 keywords):
+{chart_text}
+
+Please provide a comprehensive analysis with the following structure:
+
+**Summary:**
+Provide a 2-3 sentence overview of the main patterns in the data.
+
+**Key Insights:**
+- Identify the top 3-5 most significant keywords and what they might indicate about the text
+- Comment on the distribution pattern (steep drop-off, gradual decline, clusters)
+- Note any interesting linguistic patterns (word types, themes)
+
+**Notable Keywords:**
+Highlight 3-4 specific words that stand out and briefly explain why they're significant.
+
+Keep the analysis concise but insightful, focusing on what these keywords reveal about the text's distinctive characteristics."""
+
+    else:  # scatter plot
+        # Extract chart data for scatter plot (label with x,y coordinates)
+        chart_text = "\n".join(
+            [f"- {item['label']}: Frequency={item.get('x', 0)}, Keyness={item.get('y', 0):.3f}" for item in
+             chart_data[:15]])
+
+        prompt = f"""You are an expert data analyst and computational linguist.
+
+Task: Analyze the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
+
+Context: This visualization plots words based on their frequency (how often they appear) versus their keyness score (how distinctive they are). The most interesting words are often those with moderate-to-high frequency but very high keyness scores.
+
+Chart Data (Top 15 keywords):
+{chart_text}
+
+Please provide a comprehensive analysis with the following structure:
+
+**Summary:**
+Describe the overall relationship between frequency and keyness in 2-3 sentences.
+
+**Key Insights:**
+- Identify words with high keyness but moderate frequency (these are often the most interesting)
+- Comment on any outliers or unusual patterns
+- Discuss the balance between common distinctive words vs. rare distinctive words
+
+**Notable Keywords:**
+Highlight 3-4 specific words that occupy interesting positions in the frequency-keyness space and explain their significance.
+
+Focus on what the frequency-keyness relationship reveals about the text's linguistic characteristics."""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,  # Slightly creative but focused
+                "top_p": 0.9,
+                "num_predict": 500,  # Limit response length
+            }
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=90)  # Increased timeout
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        # Clean up the response a bit
+        analysis = analysis.strip()
+
+        return Response({
+            "chart_title": chart_title,
+            "chart_type": chart_type,
+            "analysis": analysis,
+            "success": True,
+            "data_points_analyzed": len(chart_data)
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)

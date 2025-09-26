@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Plot from "react-plotly.js";
 import { TrendingUp, BarChart3, ScatterChart, ToggleLeft, ToggleRight, Info } from "lucide-react";
 import "./Charts.css";
@@ -7,6 +7,41 @@ const Charts = ({ results, method = "nltk" }) => {
   const [chartType, setChartType] = useState("primary");
   const [topN, setTopN] = useState(20);
   const topResults = results ? results.slice(0, topN) : [];
+  const [summary, setSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState("");
+  const [chartSummary, setChartSummary] = useState("");
+
+  useEffect(() => {
+  if (!results || results.length === 0) return;
+
+  const fetchSummary = async () => {
+    setLoadingSummary(true);
+    try {
+      const response = await fetch("/summarise-chart/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${method.toUpperCase()} Keyness Analysis`,
+          chart_type: chartType === "primary" ? "bar" : "scatter",
+          chart_data: results.slice(0, 20).map((r) => ({
+            label: r.word,
+            value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
+          })),
+        }),
+      });
+      const data = await response.json();
+      setChartSummary(data.analysis || "No summary available.");
+    } catch (err) {
+      console.error("Error fetching chart summary:", err);
+      setChartSummary("Failed to fetch chart summary.");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  fetchSummary();
+}, [chartType, results, method]);
+
 
   // Chart configurations for each method
   const chartConfigs = {
@@ -243,7 +278,7 @@ const Charts = ({ results, method = "nltk" }) => {
       font: { family: "Inter, sans-serif" }
     };
 
-    if (activeConfig.type === "bar") {
+      if (activeConfig.type === "bar") {
       return {
         ...baseLayout,
         xaxis: {
@@ -297,7 +332,7 @@ const Charts = ({ results, method = "nltk" }) => {
 
         {hasSecondaryChart && (
           <div className="chart-toggle">
-            <button
+          <button
               onClick={() => setChartType(chartType === "primary" ? "secondary" : "primary")}
               className={`toggle-button ${chartType}`}
               title={`Switch to ${chartType === "primary" ? "scatter plot" : "bar chart"}`}
@@ -315,7 +350,7 @@ const Charts = ({ results, method = "nltk" }) => {
                   <ToggleLeft className="toggle-indicator" />
                 </>
               )}
-            </button>
+          </button>
           </div>
         )}
       </div>
@@ -342,7 +377,7 @@ const Charts = ({ results, method = "nltk" }) => {
           />
           <span className="slider-value">{topN}/{results.length}</span>
         </div>
-      </div>
+          </div>
 
       <div className="chart-wrapper">
         <Plot
@@ -364,15 +399,21 @@ const Charts = ({ results, method = "nltk" }) => {
             responsive: true
           }}
         />
-      </div>
+                    </div>
+
+      {/* summary */}
+      <div className="chart-summary">
+        <h4>AI Chart Summary</h4>
+        <p>{summary}</p>
+                  </div>
 
       <div className="chart-footer">
         <div className="method-info">
           <strong>Analysis:</strong> {method.toUpperCase()} | 
           <strong> Visualization:</strong> {activeConfig.type === "bar" ? "Frequency Comparison" : "Statistical Relationship"} |
           <strong> Data Points:</strong> {chartData.length}
-        </div>
-      </div>
+    </div>
+  </div>
     </div>
   );
 };
