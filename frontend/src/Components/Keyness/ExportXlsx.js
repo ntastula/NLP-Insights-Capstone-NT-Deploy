@@ -62,7 +62,7 @@ export function exportKeynessToXlsx(
   const keywordRows = [["Word", "Keyness", "POS"]];
   Object.entries(posGroups || {}).forEach(([pos, words]) => {
     (words || []).forEach((w) => {
-      keywordRows.push([w.word ?? "-", w.keyness ?? w.log_likelihood ?? "-", pos]);
+      keywordRows.push([w.word ?? "-", w.keyness_score ?? w.log_likelihood ?? "-", pos]);
     });
   });
   const keywordsWS = XLSX.utils.aoa_to_sheet(keywordRows);

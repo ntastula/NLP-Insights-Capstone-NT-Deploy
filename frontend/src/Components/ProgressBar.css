@@ -1,10 +1,10 @@
 .progress-container {
-  width: 400px;
+  width: 100%;
   height: 24px;
-  background-color: #d1d5db; /* Tailwind gray-300 */
+  background-color: #e5e7eb; /* Tailwind gray-300 */
   border-radius: 9999px;
   overflow: hidden;
-  margin: 1rem auto;
+  margin: 1rem 0;
   position: relative;
 }
 
@@ -13,6 +13,31 @@
   background-color: #3b82f6; /* Tailwind blue-500 */
   width: 0%;
   transition: width 0.2s ease-in-out;
+}
+
+.shimmer-bar {
+  height: 100%;
+  width: 50%; /* width of the moving highlight */
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0) 0%,
+    rgba(59, 130, 246, 0.6) 50%,
+    rgba(59, 130, 246, 0) 100%
+  ); /* Tailwind blue-500 shimmer */
+  position: absolute;
+  top: 0;
+  left: -50%; /* start off-screen */
+  animation: shimmer 1.5s infinite;
+  border-radius: 9999px;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -50%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .progress-text {
@@ -24,4 +49,5 @@
   color: white;
   font-weight: 500;
   pointer-events: none;
+  font-size: 0.875rem;
 }

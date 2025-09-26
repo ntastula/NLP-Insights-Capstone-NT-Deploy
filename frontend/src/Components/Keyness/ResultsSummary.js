@@ -56,33 +56,39 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
         </div>
         
         <div className="stats-grid">
-          <div className="stat-card user-text-card">
-            <div className="stat-number user-text-number">{stats.uploadedTotal}</div>
-            <div className="stat-label">Words in your text</div>
-          </div>
-          
-          <div className="stat-card corpus-card">
-            <div className="stat-number corpus-number">{stats.corpusTotal}</div>
-            <div className="stat-label">
-              Words in sample{" "}
-              <button 
-                className="corpus-button"
-                onClick={openCorpusModal}
-                disabled={loading}
-                title="Click to see corpus details"
-              >
-                <BookOpen className="corpus-icon" />
-                {loading ? "Loading..." : "Corpus"}
-              </button>
-            </div>
-          </div>
-          
-          <div className="stat-card keywords-card">
-            <div className="stat-number keywords-number">{stats.totalSignificant || 0}</div>
-            <div className="stat-label">Significant keywords</div>
-          </div>
-        </div>
-      </div>
+  <div className="stat-card user-text-card">
+    <div className="stat-number user-text-number">
+      {stats.uploadedTotal?.toLocaleString()}
+    </div>
+    <div className="stat-label">Words in your text</div>
+  </div>
+  
+  <div className="stat-card corpus-card">
+    <div className="stat-number corpus-number">
+      {stats.corpusTotal?.toLocaleString()}
+    </div>
+    <div className="stat-label">
+      Words in sample{" "}
+      <button 
+        className="corpus-button"
+        onClick={openCorpusModal}
+        disabled={loading}
+        title="Click to see corpus details"
+      >
+        <BookOpen className="corpus-icon" />
+        {loading ? "Loading..." : "Corpus"}
+      </button>
+    </div>
+  </div>
+  
+  <div className="stat-card keywords-card">
+    <div className="stat-number keywords-number">
+      {(stats.totalSignificant || 0).toLocaleString()}
+    </div>
+    <div className="stat-label">Significant keywords</div>
+  </div>
+</div>
+</div>
 
       {/* Corpus Modal */}
       {showCorpusModal && (
@@ -111,9 +117,9 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
     <strong>Genre:</strong>{" "}
     {corpusData.genre
       ? corpusData.genre
-          .replace(/_keyness$/, "")       // optional: remove "_keyness" suffix
-          .replace(/_/g, " ")             // underscores → spaces
-          .replace(/\b\w/g, (c) => c.toUpperCase()) // capitalise each word
+          .replace(/_keyness$/, "")       
+          .replace(/_/g, " ")             
+          .replace(/\b\w/g, (c) => c.toUpperCase()) 
       : "General"}
   </p>
 </div>
