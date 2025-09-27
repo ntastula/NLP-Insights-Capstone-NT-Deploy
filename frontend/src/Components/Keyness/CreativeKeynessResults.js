@@ -71,7 +71,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
             chart_data: data,
           };
 
-      const response = await fetch("http://localhost:8000/api/summarise-chart/", {
+      const response = await fetch("http://localhost:8000/api/summarise-keyness-chart/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -350,7 +350,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
               <div className="flex items-center mb-4">
                 <div className="w-2 h-6 bg-blue-500 rounded-full mr-3"></div>
                 <h4 className="font-semibold text-xl text-gray-800">
-                  AI Analysis: {activeChart === "primary" ? "Top Keywords Chart" : "Frequency vs Keyness Chart"}
+                  What this chart shows: {activeChart === "primary" ? "Top Keywords Chart" : "Frequency vs Keyness Chart"}
                 </h4>
               </div>
               

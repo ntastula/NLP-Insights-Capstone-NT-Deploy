@@ -17,7 +17,7 @@ const Charts = ({ results, method = "nltk" }) => {
   const fetchSummary = async () => {
     setLoadingSummary(true);
     try {
-      const response = await fetch("/summarise-chart/", {
+      const response = await fetch("/summarise-keyness-chart/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
