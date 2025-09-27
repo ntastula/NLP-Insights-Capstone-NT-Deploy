@@ -862,7 +862,7 @@ Summary:
 
 
 @api_view(['POST'])
-def summarise_chart(request):
+def summarise_keyness_chart(request):
     chart_type = request.data.get('chart_type', 'bar')  # 'bar' or 'scatter'
     chart_title = request.data.get('title', 'Chart')
     chart_data = request.data.get('chart_data', [])
@@ -963,6 +963,162 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+def summarise_clustering_chart(request):
+    clusters = request.data.get('clusters', [])
+    top_terms = request.data.get('top_terms', {})
+    themes = request.data.get('themes', {})
+    selected_cluster = request.data.get('selected_cluster', 'all')
+    chart_title = request.data.get('title', 'Clustering Analysis')
+
+    if not clusters:
+        return Response({'error': 'No clustering data provided.'}, status=400)
+
+    # Filter clusters if specific cluster is selected
+    if selected_cluster != 'all':
+        try:
+            cluster_num = int(selected_cluster)
+            filtered_clusters = [c for c in clusters if c.get('label') == cluster_num]
+        except (ValueError, TypeError):
+            filtered_clusters = clusters
+    else:
+        filtered_clusters = clusters
+
+    # Prepare cluster statistics
+    cluster_stats = {}
+    for cluster in filtered_clusters:
+        label = cluster.get('label', 'Unknown')
+        if label not in cluster_stats:
+            cluster_stats[label] = {
+                'count': 0,
+                'sample_docs': [],
+                'x_coords': [],
+                'y_coords': []
+            }
+
+        cluster_stats[label]['count'] += 1
+        cluster_stats[label]['x_coords'].append(cluster.get('x', 0))
+        cluster_stats[label]['y_coords'].append(cluster.get('y', 0))
+
+        # Add sample document (truncated for brevity)
+        doc = cluster.get('doc', '')
+        if doc and len(cluster_stats[label]['sample_docs']) < 3:
+            cluster_stats[label]['sample_docs'].append(doc[:100] + '...' if len(doc) > 100 else doc)
+
+    # Generate cluster summary text
+    cluster_summary = []
+    total_documents = len(filtered_clusters)
+    num_clusters = len(cluster_stats)
+
+    for label, stats in sorted(cluster_stats.items()):
+        # Calculate cluster position (centroid)
+        avg_x = sum(stats['x_coords']) / len(stats['x_coords']) if stats['x_coords'] else 0
+        avg_y = sum(stats['y_coords']) / len(stats['y_coords']) if stats['y_coords'] else 0
+
+        # Get top terms for this cluster
+        cluster_terms = top_terms.get(str(label), [])[:5]  # Top 5 terms
+        terms_text = ", ".join(cluster_terms) if cluster_terms else "No terms available"
+
+        # Get theme if available
+        theme = themes.get(str(label), "No theme identified")
+
+        cluster_info = (
+            f"- Cluster {label}: {stats['count']} documents "
+            f"(Position: x={avg_x:.2f}, y={avg_y:.2f})\n"
+            f"  Top terms: {terms_text}\n"
+            f"  Theme: {theme}"
+        )
+
+        if stats['sample_docs']:
+            cluster_info += f"\n  Sample documents: {' | '.join(stats['sample_docs'][:2])}"
+
+        cluster_summary.append(cluster_info)
+
+    cluster_text = "\n\n".join(cluster_summary)
+
+    # Build the analysis scope description
+    scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster} only"
+
+    prompt = f"""You are an expert data scientist specializing in text clustering and unsupervised machine learning analysis.
+
+Task: Analyze the clustering visualization titled "{chart_title}" showing document clustering results using dimensionality reduction (PCA).
+
+Context: This scatter plot displays documents clustered using machine learning algorithms, where each point represents a document positioned in 2D space based on similarity. The x and y coordinates represent the first two principal components from PCA dimensionality reduction. Documents that are closer together are more similar in content.
+
+Analysis Scope: {scope_desc}
+Total Documents Analyzed: {total_documents}
+Number of Clusters: {num_clusters}
+
+Detailed Cluster Information:
+{cluster_text}
+
+Please provide a comprehensive analysis with the following structure:
+
+**Executive Summary:**
+Provide a 3-4 sentence overview of the clustering results, including the main patterns and overall quality of the clustering.
+
+**Cluster Analysis:**
+- Describe the spatial distribution of clusters (are they well-separated, overlapping, or forming clear groups?)
+- Identify the largest and smallest clusters and what this might indicate
+- Comment on any clusters that appear to be outliers or have unusual positioning
+- Analyze the thematic coherence based on the top terms and identified themes
+
+**Key Insights:**
+- What do the cluster themes reveal about the underlying document collection?
+- Are there any interesting relationships or patterns between clusters?
+- Comment on the effectiveness of the clustering (clear separation vs. ambiguous boundaries)
+- Identify any potential subclusters or hierarchical relationships
+
+**Notable Findings:**
+Highlight 3-4 specific observations about individual clusters, their content, or positioning that provide meaningful insights about the document collection.
+
+**Recommendations:**
+Suggest potential next steps for analysis or ways to improve the clustering results.
+
+Focus on actionable insights about what these clusters reveal about the document collection's structure and content themes."""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "num_predict": 600,  # Slightly longer for comprehensive analysis
+            }
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=120)  # Longer timeout for complex analysis
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        analysis = analysis.strip()
+
+        return Response({
+            "chart_title": chart_title,
+            "analysis_scope": scope_desc,
+            "total_documents": total_documents,
+            "num_clusters": num_clusters,
+            "analysis": analysis,
+            "success": True,
+            "cluster_summary": cluster_stats
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out. The clustering analysis is taking too long to process.'},
+                        status=504)
     except requests.exceptions.RequestException as e:
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:

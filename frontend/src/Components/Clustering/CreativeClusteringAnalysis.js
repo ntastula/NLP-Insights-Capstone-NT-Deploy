@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import "./CreativeClusteringAnalysis.css";
 
@@ -7,6 +7,57 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
     const [selectedCluster, setSelectedCluster] = useState("all");
     const [showTopTerms, setShowTopTerms] = useState(false);
     const [showDocuments, setShowDocuments] = useState(false);
+    const [showSummary, setShowSummary] = useState(false);
+    const [chartSummaryData, setChartSummaryData] = useState(null);
+    const [isLoadingChartSummary, setIsLoadingChartSummary] = useState(false);
+    const [chartSummaryError, setChartSummaryError] = useState(null);
+
+    // Function to call the clustering summary API
+    const generateChartSummary = async () => {
+        setIsLoadingChartSummary(true);
+        setChartSummaryError(null);
+        
+        try {
+            const response = await fetch("http://localhost:8000/api/summarise-clustering-chart/", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    clusters: clusters,
+                    top_terms: topTerms,
+                    themes: themes,
+                    selected_cluster: selectedCluster,
+                    title: `Clustering Analysis - ${selectedCluster === 'all' ? 'All Clusters' : `Cluster ${selectedCluster}`}`
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            setChartSummaryData(data);
+            
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            setChartSummaryError(error.message);
+        } finally {
+            setIsLoadingChartSummary(false);
+        }
+    };
+
+    // Auto-generate chart summary when showing chart or cluster selection changes
+    useEffect(() => {
+        if (showChart && clusters.length > 0) {
+            generateChartSummary();
+        }
+    }, [showChart, selectedCluster, clusters.length]);
+
+    // Function for general summary (placeholder for later)
+    const generateGeneralSummary = async () => {
+       
+    };
 
     // Unique cluster labels for dropdown
   const clusterOptions = Array.from(new Set(clusters.map(c => c.label))).sort(
@@ -50,18 +101,19 @@ const handleDownload = () => {
         setShowChart(view === 'chart');
         setShowTopTerms(view === 'terms');
         setShowDocuments(view === 'documents');
+        setShowSummary(view === 'summary');
     };
 
   return (
         <div className="clustering-results-container">
             {/* View Controls */}
             <div className="clustering-view-controls">
-    <button
+                <button
                     className={`clustering-btn btn-chart ${showChart ? 'active' : ''}`}
                     onClick={() => handleViewChange('chart')}
-    >
-      Show Chart
-    </button>
+                >
+                    Show Chart
+                </button>
 
                 <button
                     className={`clustering-btn btn-terms ${showTopTerms ? 'active' : ''}`}
@@ -75,6 +127,14 @@ const handleDownload = () => {
                     onClick={() => handleViewChange('documents')}
                 >
                     Show Clustered Documents
+                </button>
+
+                {/* Summary Button */}
+                <button
+                    className={`clustering-btn btn-summary ${showSummary ? 'active' : ''}`}
+                    onClick={() => handleViewChange('summary')}
+                >
+                    General Summary
                 </button>
 
                 <button
@@ -104,13 +164,57 @@ const handleDownload = () => {
                 </div>
             )}
 
-            {/* Chart View */}
+            {/* Chart View with integrated summary */}
             {showChart && clusters.length > 0 && (
                 <div className="chart-section">
-                    <ClusteringCharts
-                        clusters={clusters}
-                        selectedCluster={selectedCluster}
+                    <ClusteringCharts 
+                        clusters={clusters} 
+                        selectedCluster={selectedCluster} 
                     />
+                    
+                    {/* Chart Summary Section */}
+                    <div className="chart-summary-section">
+                        <div className="chart-summary-header">
+                            <h3 className="chart-summary-title">Chart Analysis</h3>
+                            <button
+                                className={`clustering-btn btn-refresh-small ${isLoadingChartSummary ? 'loading' : ''}`}
+                                onClick={generateChartSummary}
+                                disabled={isLoadingChartSummary}
+                                title="Regenerate analysis"
+                            >
+                                {isLoadingChartSummary ? '⟳' : '↻'}
+                            </button>
+                        </div>
+                        
+                        {isLoadingChartSummary && (
+                            <div className="chart-summary-loading">
+                                <div className="loading-spinner"></div>
+                                <p>Analyzing clustering results...</p>
+                            </div>
+                        )}
+                        
+                        {chartSummaryError && (
+                            <div className="chart-summary-error">
+                                <p>Error generating analysis: {chartSummaryError}</p>
+                                <button onClick={generateChartSummary} className="clustering-btn btn-small">
+                                    Try Again
+                                </button>
+                            </div>
+                        )}
+                        
+                        {chartSummaryData && !isLoadingChartSummary && (
+                            <div className="chart-summary-content">
+                                <div className="chart-summary-meta">
+                                    <span>Scope: {chartSummaryData.analysis_scope}</span>
+                                    <span>Documents: {chartSummaryData.total_documents}</span>
+                                    <span>Clusters: {chartSummaryData.num_clusters}</span>
+                                </div>
+                                <div className="chart-summary-text">
+                                    <pre>{chartSummaryData.analysis}</pre>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -154,8 +258,28 @@ const handleDownload = () => {
                 </div>
             )}
 
+            {/* General Summary View (placeholder) */}
+            {showSummary && (
+                <div className="summary-section">
+                    <div className="summary-header">
+                        <h2 className="summary-title">General Analysis Summary</h2>
+                        <button
+                            className="clustering-btn btn-generate"
+                            onClick={generateGeneralSummary}
+                        >
+                            Coming Soon
+                        </button>
+                    </div>
+                    
+                    <div className="summary-placeholder">
+                        <p>General summary functionality will be implemented here.</p>
+                        <p>This will provide an overall analysis of your clustering results across all views.</p>
+                    </div>
+                </div>
+            )}
+
             {/* Empty State */}
-            {!showChart && !showTopTerms && !showDocuments && (
+            {!showChart && !showTopTerms && !showDocuments && !showSummary && (
                 <div className="no-data-message">
                     Select a view to see your clustering results
                 </div>
