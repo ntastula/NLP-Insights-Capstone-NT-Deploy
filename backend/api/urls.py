@@ -5,7 +5,6 @@ from .clustering.clustering_analyser import clustering_analysis
 urlpatterns = [
     path("corpora/", views.list_corpora, name="list_corpora"),                   # NEW
     path("corpus-preview/", views.get_corpus_preview, name="corpus_preview"),    # UPDATED (accepts ?name=)
-
     path("analyse-keyness/", views.analyse_keyness, name="keyness_view"),
     path('upload-files/', views.upload_files, name='upload_files'),
     path("analyse-sentiment/", views.analyse_sentiment, name="analyse-sentiment"),
@@ -18,7 +17,7 @@ urlpatterns = [
     path('get-concepts/', views.get_concepts, name='get_concepts'),
     path('summarise-keyness-chart/', views.summarise_keyness_chart, name='summarise_keyness_chart'),
     path('summarise-clustering-chart/', views.summarise_clustering_chart, name='summarise_clustering_chart'),
-
+    path('analyse-themes/', views.analyse_themes, name='analyse_themes'),
 ]
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import CreativeClusteringAnalysis from "./CreativeClusteringAnalysis";
 import '../ProgressBar.css';
@@ -71,6 +71,29 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       description: "Choose spaCy when you want to discover patterns based on linguistic structure, grammar, and word relationships. This method focuses on how you actually use language - sentence structure, grammatical patterns, and word choice similarities. Ideal for understanding your writing style, identifying recurring linguistic habits, and seeing how different sections of your work share similar structural approaches."
     }
   ];
+
+  // Parse uploaded text into document array
+  const parseTextDocuments = (text) => {
+    if (!text) return [];
+    
+    // Split by double line breaks (common document separator)
+    let documents = text.split(/\n\s*\n/).filter(doc => doc.trim());
+    
+    // If no double line breaks, split by single line breaks
+    if (documents.length === 1) {
+      documents = text.split(/\n/).filter(doc => doc.trim());
+    }
+    
+    // If still just one document, split by sentences (for very long text)
+    if (documents.length === 1 && text.length > 1000) {
+      documents = text.match(/[^.!?]+[.!?]+/g) || [text];
+    }
+    
+    return documents.map(doc => doc.trim()).filter(doc => doc.length > 0);
+  };
+
+  // Create the textDocuments array
+  const textDocuments = parseTextDocuments(uploadedText);
 
   const runAnalysis = async () => {
     if (!uploadedText) return;
@@ -224,11 +247,12 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
         {/* Results */}
         {!loading && !error && clusters.length > 0 && (
           <div className="results-section">
-            <CreativeClusteringAnalysis
-              clusters={clusters}
-              topTerms={topTerms}
-              themes={themes}
-            />
+          <CreativeClusteringAnalysis
+            clusters={clusters}
+            topTerms={topTerms}
+            themes={themes}
+            textDocuments={textDocuments}
+          />
           </div>
         )}
       </div>

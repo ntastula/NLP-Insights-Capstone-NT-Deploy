@@ -2,12 +2,16 @@ import React, { useState, useEffect } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import "./CreativeClusteringAnalysis.css";
 
-const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
+const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments }) => {
     const [showChart, setShowChart] = useState(true);
     const [selectedCluster, setSelectedCluster] = useState("all");
     const [showTopTerms, setShowTopTerms] = useState(false);
     const [showDocuments, setShowDocuments] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
+    const [showThemes, setShowThemes] = useState(false);
+    const [themeAnalysisData, setThemeAnalysisData] = useState(null);
+    const [isLoadingThemeAnalysis, setIsLoadingThemeAnalysis] = useState(false);
+    const [themeAnalysisError, setThemeAnalysisError] = useState(null);
     const [chartSummaryData, setChartSummaryData] = useState(null);
     const [isLoadingChartSummary, setIsLoadingChartSummary] = useState(false);
     const [chartSummaryError, setChartSummaryError] = useState(null);
@@ -46,6 +50,51 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes }) => {
             setIsLoadingChartSummary(false);
         }
     };
+
+    const generateThemeAnalysis = async () => {
+    setIsLoadingThemeAnalysis(true);
+    setThemeAnalysisError(null);
+    
+    try {
+        const response = await fetch("http://localhost:8000/api/analyse-themes/", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text_documents: textDocuments,
+                clusters: clusters,
+                top_terms: topTerms,
+                themes: themes,
+                title: 'Document Collection Theme Analysis'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setThemeAnalysisData(data);
+        
+    } catch (error) {
+        console.error('Error generating theme analysis:', error);
+        setThemeAnalysisError(error.message);
+    } finally {
+        setIsLoadingThemeAnalysis(false);
+    }
+};
+
+useEffect(() => {
+    console.log('Theme tab shown:', showThemes);
+    console.log('Text documents count:', textDocuments?.length);
+    console.log('Theme analysis data:', themeAnalysisData);
+    console.log('Loading:', isLoadingThemeAnalysis);
+    console.log('Error:', themeAnalysisError);
+    if (showThemes && !themeAnalysisData && !isLoadingThemeAnalysis && !themeAnalysisError) {
+        generateThemeAnalysis();
+    }
+}, [showThemes]);
 
     // Auto-generate chart summary when showing chart or cluster selection changes
     useEffect(() => {
@@ -101,7 +150,9 @@ const handleDownload = () => {
         setShowChart(view === 'chart');
         setShowTopTerms(view === 'terms');
         setShowDocuments(view === 'documents');
+        setShowThemes(view === 'themes');
         setShowSummary(view === 'summary');
+
     };
 
   return (
@@ -127,6 +178,13 @@ const handleDownload = () => {
                     onClick={() => handleViewChange('documents')}
                 >
                     Show Clustered Documents
+                </button>
+
+                <button
+                    className={`clustering-btn btn-themes ${showThemes ? 'active' : ''}`}
+                    onClick={() => handleViewChange('themes')}
+                >
+                    Themes
                 </button>
 
                 {/* Summary Button */}
@@ -258,6 +316,60 @@ const handleDownload = () => {
                 </div>
             )}
 
+            {showThemes && (
+    <div className="themes-section">
+        <div className="themes-header">
+            <h2 className="themes-title">Theme Analysis</h2>
+            <button
+                className={`clustering-btn btn-refresh ${isLoadingThemeAnalysis ? 'loading' : ''}`}
+                onClick={generateThemeAnalysis}
+                disabled={isLoadingThemeAnalysis}
+            >
+                {isLoadingThemeAnalysis ? 'Analyzing...' : 'Regenerate'}
+            </button>
+        </div>
+        
+        {isLoadingThemeAnalysis && (
+            <div className="themes-loading">
+                <div className="loading-spinner"></div>
+                <p>Analyzing themes and topics in your document collection...</p>
+            </div>
+        )}
+        
+        {themeAnalysisError && (
+            <div className="themes-error">
+                <p>Error generating theme analysis: {themeAnalysisError}</p>
+                <button onClick={generateThemeAnalysis} className="clustering-btn">
+                    Try Again
+                </button>
+            </div>
+        )}
+        
+        {themeAnalysisData && !isLoadingThemeAnalysis && (
+            <div className="themes-content">
+                <div className="themes-meta">
+                    <span>Data Source: {themeAnalysisData.data_source}</span>
+                    <span>Total Documents: {themeAnalysisData.total_documents}</span>
+                    <span>Analyzed: {themeAnalysisData.documents_analyzed}</span>
+                    {themeAnalysisData.has_clustering_context && (
+                        <span>Clustering Context: Available</span>
+                    )}
+                </div>
+                <div className="themes-analysis">
+                    <pre>{themeAnalysisData.analysis}</pre>
+                </div>
+            </div>
+        )}
+        
+        {!themeAnalysisData && !themeAnalysisError && !isLoadingThemeAnalysis && (
+            <div className="themes-placeholder">
+                <p>Theme analysis will automatically generate when you first view this tab.</p>
+                <p>This analysis identifies dominant themes, topics, and conceptual patterns in your document collection.</p>
+            </div>
+        )}
+    </div>
+)}
+
             {/* General Summary View (placeholder) */}
             {showSummary && (
                 <div className="summary-section">
@@ -275,13 +387,6 @@ const handleDownload = () => {
                         <p>General summary functionality will be implemented here.</p>
                         <p>This will provide an overall analysis of your clustering results across all views.</p>
                     </div>
-                </div>
-            )}
-
-            {/* Empty State */}
-            {!showChart && !showTopTerms && !showDocuments && !showSummary && (
-                <div className="no-data-message">
-                    Select a view to see your clustering results
                 </div>
             )}
         </div>
