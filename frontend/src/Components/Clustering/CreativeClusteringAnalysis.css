@@ -726,3 +726,154 @@
     max-height: 50vh;
   }
 }
+
+/* Themes Button Styles */
+.btn-themes {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.btn-themes:hover:not(.active) {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.btn-themes.active {
+  background: linear-gradient(135deg, #b45309, #92400e);
+}
+
+/* Themes Section Styles */
+.themes-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.themes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 1rem;
+}
+
+.themes-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.themes-loading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  background: #fefefe;
+  border-radius: 6px;
+  color: #64748b;
+  border: 1px solid #f1f5f9;
+  text-align: center;
+  justify-content: center;
+}
+
+.themes-meta {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.themes-meta span {
+  padding: 0.25rem 0.75rem;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.themes-content {
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.themes-analysis {
+  background: #fefefe;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 80vh;
+}
+
+.themes-analysis pre {
+  padding: 1.5rem;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #334155;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.themes-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.themes-error p {
+  color: #dc2626;
+  margin: 0 0 1rem 0;
+  font-weight: 500;
+}
+
+.themes-placeholder {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 2px dashed #cbd5e1;
+}
+
+.themes-placeholder p {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.themes-placeholder p:last-child {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Responsive adjustments for Themes */
+@media (max-width: 768px) {
+  .themes-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  .themes-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .themes-analysis {
+    max-height: 300px;
+  }
+}

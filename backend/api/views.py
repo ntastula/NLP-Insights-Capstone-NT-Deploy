@@ -1123,3 +1123,154 @@ Focus on actionable insights about what these clusters reveal about the document
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+def analyse_themes(request):
+    # Accept either raw text data or clustering data
+    text_documents = request.data.get('text_documents', [])
+    clusters = request.data.get('clusters', [])
+    top_terms = request.data.get('top_terms', {})
+    themes = request.data.get('themes', {})
+    analysis_title = request.data.get('title', 'Theme Analysis')
+
+    # Determine the best data source for theme analysis
+    if not text_documents and not clusters:
+        return Response({'error': 'No text data or clustering data provided.'}, status=400)
+
+    # Prepare text for analysis
+    if text_documents:
+        # Use original text documents if available (best for theme analysis)
+        sample_size = min(50, len(text_documents))  # Limit for prompt size
+        text_sample = text_documents[:sample_size]
+        total_docs = len(text_documents)
+        data_source = "original text documents"
+
+        # Create text summary for prompt
+        text_preview = []
+        for i, doc in enumerate(text_sample[:10]):  # Show first 10 for preview
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1}: {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+
+    else:
+        # Fall back to clustering data if no original text
+        sample_size = min(30, len(clusters))
+        cluster_sample = clusters[:sample_size]
+        total_docs = len(clusters)
+        data_source = "clustered documents"
+
+        # Create text from clustering data
+        text_preview = []
+        for i, cluster in enumerate(cluster_sample):
+            doc = cluster.get('doc', '')
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1} (Cluster {cluster.get('label', 'N/A')}): {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+
+    # Prepare clustering context if available
+    clustering_context = ""
+    if top_terms:
+        cluster_info = []
+        for cluster_id, terms in list(top_terms.items())[:10]:  # Top 10 clusters
+            theme = themes.get(cluster_id, "No theme identified")
+            cluster_info.append(f"- Cluster {cluster_id}: {', '.join(terms[:5])} (Theme: {theme})")
+
+        if cluster_info:
+            clustering_context = f"""
+Additional Context from Clustering Analysis:
+{chr(10).join(cluster_info)}
+"""
+
+    prompt = f"""You are an expert qualitative researcher and thematic analyst specializing in identifying patterns, themes, and topics in text data.
+
+Task: Conduct a comprehensive thematic analysis of the document collection titled "{analysis_title}".
+
+Data Source: {data_source}
+Total Documents: {total_docs}
+Sample Analyzed: {sample_size} documents
+
+Document Sample:
+{documents_text}
+{clustering_context}
+
+Instructions:
+Analyze the provided text to identify dominant themes, recurring ideas, and key topics. Look for both explicit topics (directly stated) and implicit themes (underlying patterns, sentiments, or conceptual frameworks).
+
+Please provide your analysis in the following structured format:
+
+**Major Themes (3-5 primary themes):**
+For each major theme, provide:
+- Theme name and brief description
+- Supporting evidence from the text
+- Estimated prevalence/importance
+- Key concepts and terms associated with this theme
+
+**Secondary Topics (3-4 supporting topics):**
+Identify important but less dominant topics that appear across the documents:
+- Topic name and description
+- How it relates to major themes
+- Frequency of occurrence
+
+**Conceptual Patterns:**
+- What overarching narrative or perspective emerges?
+- Are there contrasting viewpoints or tensions?
+- What underlying assumptions or frameworks are present?
+
+**Key Terms and Phrases:**
+List the most significant terms, phrases, or concepts that characterize this collection:
+- High-frequency meaningful terms
+- Distinctive vocabulary or jargon
+- Emotionally charged or significant phrases
+
+**Thematic Relationships:**
+- How do the themes interconnect?
+- Are there hierarchical relationships between themes?
+- Do themes complement, conflict, or build upon each other?
+
+**Summary Insight:**
+Provide a 2-3 sentence synthesis of what this collection is fundamentally about - its core purpose, perspective, or focus.
+
+Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritize themes that appear across multiple documents rather than isolated topics."""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.6,  # Balanced creativity for theme identification
+                "top_p": 0.9,
+                "num_predict": 700,  # Longer response for comprehensive analysis
+            }
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=150)  # Longer timeout for complex analysis
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        analysis = analysis.strip()
+
+        return Response({
+            "analysis_title": analysis_title,
+            "data_source": data_source,
+            "total_documents": total_docs,
+            "documents_analyzed": sample_size,
+            "analysis": analysis,
+            "success": True,
+            "has_clustering_context": bool(clustering_context)
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out. Theme analysis is taking too long to process.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
