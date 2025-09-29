@@ -381,7 +381,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
                 )}
               </div>
 
-              {/* Optional: Add a refresh button */}
+              {/* Refresh button */}
               {chartSummaries[activeChart].summary && !chartSummaries[activeChart].loading && (
                 <div className="mt-4 pt-4 border-t border-blue-100">
                   <button 

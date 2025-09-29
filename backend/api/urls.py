@@ -18,6 +18,8 @@ urlpatterns = [
     path('summarise-keyness-chart/', views.summarise_keyness_chart, name='summarise_keyness_chart'),
     path('summarise-clustering-chart/', views.summarise_clustering_chart, name='summarise_clustering_chart'),
     path('analyse-themes/', views.analyse_themes, name='analyse_themes'),
+    path('analyse-thematic-flow/', views.analyse_thematic_flow, name='analyse_thematic_flow'),
+    path('analyse-overused-themes/', views.analyse_overused_themes, name='analyse_overused_themes'),
 ]
 
 

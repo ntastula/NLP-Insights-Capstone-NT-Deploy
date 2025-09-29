@@ -58,7 +58,7 @@ def list_corpus_files(analysis_type=None):
     if analysis_type == "keyness":
         # strip _keyness suffix
         files = [f.replace("_keyness", "") for f in files]
-        files.sort(key=lambda x: (0 if x == "general_english" else 1, x))
+        files.sort(key=lambda x: (0 if x == "general_fiction" else 1, x))
     else:
         files.sort()
 
@@ -102,7 +102,7 @@ def list_corpora(request):
 
         # If keyness, add the suffix back for the frontend
         if analysis_type == "keyness":
-            files = [f"{f}_keyness" if f != "general_english" else f"{f}_keyness" for f in files]
+            files = [f"{f}_keyness" if f != "general_fiction" else f"{f}_keyness" for f in files]
 
             # Log what was found
             logger.info("list_corpora -> analysis_type=%s, files=%s", analysis_type, files)
@@ -1186,54 +1186,49 @@ Additional Context from Clustering Analysis:
 
     prompt = f"""You are an expert qualitative researcher and thematic analyst specializing in identifying patterns, themes, and topics in text data.
 
-Task: Conduct a comprehensive thematic analysis of the document collection titled "{analysis_title}".
+    Task: Conduct a comprehensive thematic analysis of the document collection titled "{analysis_title}".
 
-Data Source: {data_source}
-Total Documents: {total_docs}
-Sample Analyzed: {sample_size} documents
+    Data Source: {data_source}
+    Total Documents: {total_docs}
+    Sample Analyzed: {sample_size} documents
 
-Document Sample:
-{documents_text}
-{clustering_context}
+    Document Sample:
+    {documents_text}
+    {clustering_context}
 
-Instructions:
-Analyze the provided text to identify dominant themes, recurring ideas, and key topics. Look for both explicit topics (directly stated) and implicit themes (underlying patterns, sentiments, or conceptual frameworks).
+    Instructions:
+    Analyze the provided text to identify dominant themes, recurring ideas, and key topics. Look for both explicit topics (directly stated) and implicit themes (underlying patterns, sentiments, or conceptual frameworks).
 
-Please provide your analysis in the following structured format:
+    Please provide your analysis in the following structured format:
 
-**Major Themes (3-5 primary themes):**
-For each major theme, provide:
-- Theme name and brief description
-- Supporting evidence from the text
-- Estimated prevalence/importance
-- Key concepts and terms associated with this theme
+    **Major Themes (3-5 primary themes):**
+    For each major theme, provide:
+    - Theme name and brief description
+    - Supporting evidence from the text
+    - Estimated prevalence/importance
+    - Key concepts and terms associated with this theme
 
-**Secondary Topics (3-4 supporting topics):**
-Identify important but less dominant topics that appear across the documents:
-- Topic name and description
-- How it relates to major themes
-- Frequency of occurrence
+    **Secondary Topics (3-4 supporting topics):**
+    Identify important but less dominant topics that appear across the documents:
+    - Topic name and description
+    - How it relates to major themes
+    - Frequency of occurrence
 
-**Conceptual Patterns:**
-- What overarching narrative or perspective emerges?
-- Are there contrasting viewpoints or tensions?
-- What underlying assumptions or frameworks are present?
+    **Conceptual Patterns:**
+    - What overarching narrative or perspective emerges?
+    - Are there contrasting viewpoints or tensions?
+    - What underlying assumptions or frameworks are present?
 
-**Key Terms and Phrases:**
-List the most significant terms, phrases, or concepts that characterize this collection:
-- High-frequency meaningful terms
-- Distinctive vocabulary or jargon
-- Emotionally charged or significant phrases
+    **Key Terms and Phrases:**
+    List the most significant terms, phrases, or concepts that characterize this collection:
+    - High-frequency meaningful terms
+    - Distinctive vocabulary or jargon
+    - Emotionally charged or significant phrases
 
-**Thematic Relationships:**
-- How do the themes interconnect?
-- Are there hierarchical relationships between themes?
-- Do themes complement, conflict, or build upon each other?
+    **Summary Insight:**
+    Provide a 2-3 sentence synthesis of what this collection is fundamentally about - its core purpose, perspective, or focus.
 
-**Summary Insight:**
-Provide a 2-3 sentence synthesis of what this collection is fundamentally about - its core purpose, perspective, or focus.
-
-Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritize themes that appear across multiple documents rather than isolated topics."""
+    Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritize themes that appear across multiple documents rather than isolated topics."""
 
     try:
         ollama_url = "http://localhost:11434/api/generate"
@@ -1270,6 +1265,308 @@ Focus on actionable insights that reveal the essential character and intellectua
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. Theme analysis is taking too long to process.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+def analyse_thematic_flow(request):
+    text_documents = request.data.get('text_documents', [])
+    clusters = request.data.get('clusters', [])
+    top_terms = request.data.get('top_terms', {})
+    themes = request.data.get('themes', {})
+    analysis_title = request.data.get('title', 'Thematic Flow Analysis')
+
+    if not text_documents and not clusters:
+        return Response({'error': 'No text data or clustering data provided.'}, status=400)
+
+    # Prepare text for analysis (same as analyse_themes)
+    if text_documents:
+        sample_size = min(50, len(text_documents))
+        text_sample = text_documents[:sample_size]
+        total_docs = len(text_documents)
+        data_source = "original text documents"
+
+        text_preview = []
+        for i, doc in enumerate(text_sample[:10]):
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1}: {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+    else:
+        sample_size = min(30, len(clusters))
+        cluster_sample = clusters[:sample_size]
+        total_docs = len(clusters)
+        data_source = "clustered documents"
+
+        text_preview = []
+        for i, cluster in enumerate(cluster_sample):
+            doc = cluster.get('doc', '')
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1} (Cluster {cluster.get('label', 'N/A')}): {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+
+    clustering_context = ""
+    if top_terms:
+        cluster_info = []
+        for cluster_id, terms in list(top_terms.items())[:10]:
+            theme = themes.get(cluster_id, "No theme identified")
+            cluster_info.append(f"- Cluster {cluster_id}: {', '.join(terms[:5])} (Theme: {theme})")
+
+        if cluster_info:
+            clustering_context = f"""
+Additional Context from Clustering Analysis:
+{chr(10).join(cluster_info)}
+"""
+
+    prompt = f"""You are an expert in discourse analysis and thematic development, specializing in understanding how themes evolve, interconnect, and flow throughout text collections.
+
+Task: Analyze the thematic flow and relationships in the document collection titled "{analysis_title}".
+
+Data Source: {data_source}
+Total Documents: {total_docs}
+Sample Analyzed: {sample_size} documents
+
+Document Sample:
+{documents_text}
+{clustering_context}
+
+Instructions:
+Examine how themes develop, connect, and flow throughout the document collection. Focus on the dynamic relationships between themes rather than static categorization.
+
+Please provide your analysis in the following structured format:
+
+**Thematic Progression:**
+- How do themes develop across the documents?
+- Are there early vs. late emerging themes?
+- Do themes build upon each other or appear independently?
+- Identify any narrative arc or thematic trajectory
+
+**Theme Interconnections:**
+- Which themes are closely related or complementary?
+- Which themes appear together vs. separately?
+- Are there hierarchical relationships (parent themes with sub-themes)?
+- Map out the major theme clusters and their relationships
+
+**Thematic Tensions and Contrasts:**
+- Are there opposing or competing themes?
+- Where do contradictions or tensions emerge?
+- How are contrasting perspectives handled?
+- Identify any dialectical relationships between themes
+
+**Theme Transitions:**
+- How does the text move between different themes?
+- Are transitions smooth or abrupt?
+- What linguistic or structural markers signal theme shifts?
+- Identify bridging concepts that connect disparate themes
+
+**Dominant Thematic Pathways:**
+- What are the most common "routes" through the thematic landscape?
+- Which theme combinations appear most frequently?
+- Are there central "hub" themes that connect to many others?
+- Map the primary thematic flow patterns
+
+**Thematic Balance and Distribution:**
+- Are themes evenly distributed or clustered?
+- Which themes dominate the discourse?
+- Are there underdeveloped themes that deserve more attention?
+- Comment on the overall thematic architecture
+
+Provide insights that reveal the dynamic, interconnected nature of themes and how they create meaning through their relationships and flow."""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.6,
+                "top_p": 0.9,
+                "num_predict": 700,
+            }
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=150)
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        analysis = analysis.strip()
+
+        return Response({
+            "analysis_title": analysis_title,
+            "data_source": data_source,
+            "total_documents": total_docs,
+            "documents_analyzed": sample_size,
+            "analysis": analysis,
+            "success": True,
+            "has_clustering_context": bool(clustering_context)
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out.'}, status=504)
+    except requests.exceptions.RequestException as e:
+        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+    except Exception as e:
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+def analyse_overused_themes(request):
+    text_documents = request.data.get('text_documents', [])
+    clusters = request.data.get('clusters', [])
+    top_terms = request.data.get('top_terms', {})
+    themes = request.data.get('themes', {})
+    analysis_title = request.data.get('title', 'Overused/Underused Analysis')
+
+    if not text_documents and not clusters:
+        return Response({'error': 'No text data or clustering data provided.'}, status=400)
+
+    # Prepare text for analysis (same as above)
+    if text_documents:
+        sample_size = min(50, len(text_documents))
+        text_sample = text_documents[:sample_size]
+        total_docs = len(text_documents)
+        data_source = "original text documents"
+
+        text_preview = []
+        for i, doc in enumerate(text_sample[:10]):
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1}: {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+    else:
+        sample_size = min(30, len(clusters))
+        cluster_sample = clusters[:sample_size]
+        total_docs = len(clusters)
+        data_source = "clustered documents"
+
+        text_preview = []
+        for i, cluster in enumerate(cluster_sample):
+            doc = cluster.get('doc', '')
+            preview = doc[:200] + "..." if len(doc) > 200 else doc
+            text_preview.append(f"Document {i + 1} (Cluster {cluster.get('label', 'N/A')}): {preview}")
+
+        documents_text = "\n\n".join(text_preview)
+
+    clustering_context = ""
+    if top_terms:
+        cluster_info = []
+        for cluster_id, terms in list(top_terms.items())[:10]:
+            theme = themes.get(cluster_id, "No theme identified")
+            cluster_info.append(f"- Cluster {cluster_id}: {', '.join(terms[:5])} (Theme: {theme})")
+
+        if cluster_info:
+            clustering_context = f"""
+Additional Context from Clustering Analysis:
+{chr(10).join(cluster_info)}
+"""
+
+    prompt = f"""You are an expert writing analyst and style critic specializing in identifying patterns of overuse, repetition, and stylistic habits in text collections.
+
+Task: Analyze patterns of overuse and underuse in the document collection titled "{analysis_title}".
+
+Data Source: {data_source}
+Total Documents: {total_docs}
+Sample Analyzed: {sample_size} documents
+
+Document Sample:
+{documents_text}
+{clustering_context}
+
+Instructions:
+Identify elements that are overused (appearing excessively or repetitively) or underused (missing or underdeveloped) in the text collection. Focus on words, phrases, themes, and structural patterns.
+
+Please provide your analysis in the following structured format:
+
+**Overused Words and Phrases:**
+- List specific words that appear with excessive frequency
+- Identify repeated phrases or expressions (clichés, stock phrases)
+- Note any buzzwords or jargon used to the point of diminishing meaning
+- Provide frequency estimates and impact on readability
+- Suggest alternatives or reduction strategies
+
+**Overused Sentence Structures:**
+- Identify repetitive sentence patterns (e.g., always starting with subject-verb)
+- Note overreliance on specific constructions (passive voice, simple sentences, etc.)
+- Comment on syntactic monotony or lack of variety
+- Provide examples of the repetitive patterns
+- Suggest structural variations for improvement
+
+**Overused Themes and Concepts:**
+- Identify themes that dominate to the exclusion of others
+- Note concepts or ideas that are belabored or over-explained
+- Highlight redundant arguments or circular reasoning
+- Comment on thematic saturation points
+- Suggest rebalancing or consolidation strategies
+
+**Underused or Missing Elements:**
+- Identify perspectives or angles that are neglected
+- Note themes that deserve more development
+- Highlight gaps in argumentation or coverage
+- Suggest areas for expansion or elaboration
+- Comment on missed opportunities for depth
+
+**Stylistic Habits and Patterns:**
+- Identify reflexive language choices or "verbal tics"
+- Note overreliance on specific rhetorical devices
+- Comment on predictable transitions or connectors
+- Highlight formulaic approaches that reduce impact
+- Suggest ways to break established patterns
+
+**Impact on Overall Quality:**
+- How does overuse affect readability and engagement?
+- What is the cumulative effect of these patterns?
+- Which overused elements most urgently need addressing?
+- What would most improve the collection's variety and impact?
+
+**Actionable Recommendations:**
+Provide 3-5 concrete suggestions for reducing overuse and improving stylistic balance.
+
+Be specific with examples and constructive in your critique. Focus on patterns that meaningfully impact the text's quality and reader experience."""
+
+    try:
+        ollama_url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.6,
+                "top_p": 0.9,
+                "num_predict": 800,  # Longer for detailed recommendations
+            }
+        }
+
+        response = requests.post(ollama_url, json=payload, timeout=150)
+        response.raise_for_status()
+
+        analysis = response.json().get("response", "")
+
+        if not analysis:
+            return Response({'error': 'No response from model.'}, status=500)
+
+        analysis = analysis.strip()
+
+        return Response({
+            "analysis_title": analysis_title,
+            "data_source": data_source,
+            "total_documents": total_docs,
+            "documents_analyzed": sample_size,
+            "analysis": analysis,
+            "success": True,
+            "has_clustering_context": bool(clustering_context)
+        })
+
+    except requests.exceptions.Timeout:
+        return Response({'error': 'Request timed out.'}, status=504)
     except requests.exceptions.RequestException as e:
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:

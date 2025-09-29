@@ -61,13 +61,72 @@ else:
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
-    "Nature": ["forest","river","mountain","snow","sky","earth","wind","tree","sun"],
-    "Movement": ["walk","run","jump","chase","move","stumble","dance","ride","wander"],
-    "Emotions": ["fear","joy","love","anger","hope","sorrow","desire","happy","sad"],
-    "Characters": ["man","woman","child","friend","stranger","family","hero","villain"],
-    "Time": ["night","morning","dawn","evening","hour","day","moment"],
-    "Objects": ["book","letter","sword","key","lamp","chair","door","tool"],
-    "Communication": ["say","ask","shout","whisper","call","answer","speak"],
+    "Nature": ["forest", "river", "mountain", "snow", "sky", "earth", "wind", "tree", "sun",
+               "moon", "star", "ocean", "sea", "rain", "storm", "cloud", "flower", "garden"],
+
+    "Movement": ["walk", "run", "jump", "chase", "move", "stumble", "dance", "ride", "wander",
+                 "travel", "journey", "climb", "fall", "fly", "swim", "escape", "approach"],
+
+    "Emotions": ["fear", "joy", "love", "anger", "hope", "sorrow", "desire", "happy", "sad",
+                 "anxious", "lonely", "excited", "disappointed", "proud", "ashamed", "confused",
+                 "surprised", "grateful", "envious", "disgusted"],
+
+    "Characters": ["man", "woman", "child", "friend", "stranger", "family", "hero", "villain",
+                   "mother", "father", "brother", "sister", "leader", "follower", "enemy", "ally"],
+
+    "Time": ["night", "morning", "dawn", "evening", "hour", "day", "moment", "week", "month",
+             "year", "past", "present", "future", "yesterday", "tomorrow", "always", "never"],
+
+    "Communication": ["say", "ask", "shout", "whisper", "call", "answer", "speak", "tell",
+                      "listen", "hear", "reply", "argue", "discuss", "explain", "persuade"],
+
+    "Conflict": ["fight", "battle", "struggle", "resist", "oppose", "defend", "attack", "war",
+                 "argue", "conflict", "tension", "challenge", "confront", "compete"],
+
+    "Cognition": ["think", "know", "believe", "remember", "forget", "understand", "wonder",
+                  "imagine", "realize", "consider", "decide", "doubt", "dream", "recognize"],
+
+    "Sensation": ["see", "look", "watch", "hear", "listen", "touch", "feel", "smell", "taste",
+                  "sense", "perceive", "observe", "notice", "aware"],
+
+    "Space/Location": ["house", "home", "room", "city", "village", "place", "inside", "outside",
+                       "above", "below", "near", "far", "here", "there", "where", "path", "road"],
+
+    "Social Relationships": ["marry", "divorce", "betray", "trust", "befriend", "unite", "separate",
+                            "meet", "leave", "join", "abandon", "support", "help", "harm"],
+
+    "Power/Authority": ["king", "queen", "lord", "master", "servant", "ruler", "power", "control",
+                       "command", "obey", "rule", "govern", "lead", "follow", "submit"],
+
+    "Morality/Values": ["good", "evil", "right", "wrong", "just", "unjust", "moral", "honest",
+                       "lie", "truth", "virtue", "sin", "honor", "shame", "duty", "guilt"],
+
+    "Death/Life": ["life", "death", "die", "live", "born", "birth", "survive", "kill", "dead",
+                   "alive", "mortal", "immortal", "grave", "funeral", "resurrection"],
+
+    "Change/Transformation": ["change", "transform", "become", "grow", "evolve", "develop", "shift",
+                             "adapt", "convert", "alter", "turn", "emerge", "transition"],
+
+    "Abstract Concepts": ["freedom", "justice", "beauty", "truth", "wisdom", "knowledge", "fate",
+                         "destiny", "luck", "chance", "purpose", "meaning", "soul", "spirit"],
+
+    "Technology/Modernity": ["computer", "phone", "internet", "machine", "device", "digital",
+                            "technology", "modern", "electric", "automatic", "online"],
+
+    "Economy/Commerce": ["money", "buy", "sell", "trade", "business", "work", "job", "pay",
+                        "rich", "poor", "wealth", "price", "cost", "value", "invest"],
+
+    "Religion/Spirituality": ["god", "pray", "worship", "faith", "believe", "church", "temple",
+                             "sacred", "holy", "divine", "ritual", "blessing", "curse", "sin"],
+
+    "Education/Learning": ["learn", "teach", "study", "school", "student", "teacher", "lesson",
+                          "educate", "train", "practice", "master", "knowledge", "wisdom"],
+
+    "Health/Body": ["body", "hand", "eye", "heart", "blood", "pain", "sick", "heal", "wound",
+                   "healthy", "strong", "weak", "tired", "energy", "medicine", "doctor"],
+
+    "Food/Sustenance": ["eat", "drink", "food", "meal", "hungry", "thirst", "cook", "feast",
+                       "bread", "water", "wine", "fruit", "meat", "taste", "devour"],
 }
 
 # ------------------ Helper Functions ------------------ #

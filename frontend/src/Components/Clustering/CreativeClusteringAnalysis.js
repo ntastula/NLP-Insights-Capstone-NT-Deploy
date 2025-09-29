@@ -2,16 +2,23 @@ import React, { useState, useEffect } from "react";
 import ClusteringCharts from "./ClusteringCharts";
 import "./CreativeClusteringAnalysis.css";
 
-const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments }) => {
+const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments = [] }) => {
     const [showChart, setShowChart] = useState(true);
     const [selectedCluster, setSelectedCluster] = useState("all");
     const [showTopTerms, setShowTopTerms] = useState(false);
     const [showDocuments, setShowDocuments] = useState(false);
-    const [showSummary, setShowSummary] = useState(false);
     const [showThemes, setShowThemes] = useState(false);
+    const [showThematicFlow, setShowThematicFlow] = useState(false);
+    const [showOverusedThemes, setShowOverusedThemes] = useState(false);
     const [themeAnalysisData, setThemeAnalysisData] = useState(null);
     const [isLoadingThemeAnalysis, setIsLoadingThemeAnalysis] = useState(false);
     const [themeAnalysisError, setThemeAnalysisError] = useState(null);
+    const [thematicFlowData, setThematicFlowData] = useState(null);
+    const [isLoadingThematicFlow, setIsLoadingThematicFlow] = useState(false);
+    const [thematicFlowError, setThematicFlowError] = useState(null);
+    const [overusedThemesData, setOverusedThemesData] = useState(null);
+    const [isLoadingOverusedThemes, setIsLoadingOverusedThemes] = useState(false);
+    const [overusedThemesError, setOverusedThemesError] = useState(null);
     const [chartSummaryData, setChartSummaryData] = useState(null);
     const [isLoadingChartSummary, setIsLoadingChartSummary] = useState(false);
     const [chartSummaryError, setChartSummaryError] = useState(null);
@@ -51,6 +58,18 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         }
     };
 
+    // Auto-generate chart summary when showing chart or cluster selection changes
+    useEffect(() => {
+        if (showChart && clusters.length > 0) {
+            generateChartSummary();
+        }
+    }, [showChart, selectedCluster, clusters.length]);
+
+    // Function for general summary (placeholder for later)
+    const generateGeneralSummary = async () => {
+       
+    };
+
     const generateThemeAnalysis = async () => {
     setIsLoadingThemeAnalysis(true);
     setThemeAnalysisError(null);
@@ -86,73 +105,113 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
 };
 
 useEffect(() => {
-    console.log('Theme tab shown:', showThemes);
-    console.log('Text documents count:', textDocuments?.length);
-    console.log('Theme analysis data:', themeAnalysisData);
-    console.log('Loading:', isLoadingThemeAnalysis);
-    console.log('Error:', themeAnalysisError);
     if (showThemes && !themeAnalysisData && !isLoadingThemeAnalysis && !themeAnalysisError) {
         generateThemeAnalysis();
     }
 }, [showThemes]);
 
-    // Auto-generate chart summary when showing chart or cluster selection changes
-    useEffect(() => {
-        if (showChart && clusters.length > 0) {
-            generateChartSummary();
+    // Function for thematic flow analysis
+    const generateThematicFlow = async () => {
+        setIsLoadingThematicFlow(true);
+        setThematicFlowError(null);
+        
+        try {
+            const response = await fetch('http://localhost:8000/api/analyse-thematic-flow/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text_documents: textDocuments,
+                    clusters: clusters,
+                    top_terms: topTerms,
+                    themes: themes,
+                    title: 'Thematic Flow Analysis'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            setThematicFlowData(data);
+            
+        } catch (error) {
+            console.error('Error generating thematic flow:', error);
+            setThematicFlowError(error.message);
+        } finally {
+            setIsLoadingThematicFlow(false);
         }
-    }, [showChart, selectedCluster, clusters.length]);
-
-    // Function for general summary (placeholder for later)
-    const generateGeneralSummary = async () => {
-       
     };
+
+    // Auto-generate thematic flow when tab is first viewed
+    useEffect(() => {
+        if (showThematicFlow && !thematicFlowData && !isLoadingThematicFlow && !thematicFlowError) {
+            generateThematicFlow();
+        }
+    }, [showThematicFlow]);
+
+    // Function for overused themes analysis
+    const generateOverusedThemes = async () => {
+        setIsLoadingOverusedThemes(true);
+        setOverusedThemesError(null);
+        
+        try {
+            const response = await fetch('http://localhost:8000/api/analyse-overused-themes/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text_documents: textDocuments,
+                    clusters: clusters,
+                    top_terms: topTerms,
+                    themes: themes,
+                    title: 'Overused/Underused Analysis'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            setOverusedThemesData(data);
+            
+        } catch (error) {
+            console.error('Error generating overused themes analysis:', error);
+            setOverusedThemesError(error.message);
+        } finally {
+            setIsLoadingOverusedThemes(false);
+        }
+    };
+
+    // Auto-generate overused themes when tab is first viewed
+    useEffect(() => {
+        if (showOverusedThemes && !overusedThemesData && !isLoadingOverusedThemes && !overusedThemesError) {
+            generateOverusedThemes();
+        }
+    }, [showOverusedThemes]);
 
     // Unique cluster labels for dropdown
   const clusterOptions = Array.from(new Set(clusters.map(c => c.label))).sort(
     (a, b) => a - b
   );
 
-const handleDownload = () => {
-    const dataStr = JSON.stringify({ clusters, topTerms, themes }, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "clustering_results.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Download results as JSON
-  const downloadResults = () => {
-    const data = {
-      clusters,
-      topTerms,
-      themes,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "clustering_results.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-    // Filtered clusters based on dropdown
-    const displayedClusters =
-        selectedCluster === "all"
-            ? clusters
-            : clusters.filter(c => c.label === Number(selectedCluster));
+// Filtered clusters based on dropdown
+  const displayedClusters =
+    selectedCluster === "all"
+      ? clusters
+      : clusters.filter(c => c.label === Number(selectedCluster));
 
     const handleViewChange = (view) => {
         setShowChart(view === 'chart');
         setShowTopTerms(view === 'terms');
         setShowDocuments(view === 'documents');
         setShowThemes(view === 'themes');
-        setShowSummary(view === 'summary');
-
+        setShowThematicFlow(view === 'flow');
+        setShowOverusedThemes(view === 'overused');
     };
 
   return (
@@ -180,6 +239,7 @@ const handleDownload = () => {
                     Show Clustered Documents
                 </button>
 
+                {/* Themes Button */}
                 <button
                     className={`clustering-btn btn-themes ${showThemes ? 'active' : ''}`}
                     onClick={() => handleViewChange('themes')}
@@ -187,19 +247,20 @@ const handleDownload = () => {
                     Themes
                 </button>
 
-                {/* Summary Button */}
+                {/* Thematic Flow Button */}
                 <button
-                    className={`clustering-btn btn-summary ${showSummary ? 'active' : ''}`}
-                    onClick={() => handleViewChange('summary')}
+                    className={`clustering-btn btn-flow ${showThematicFlow ? 'active' : ''}`}
+                    onClick={() => handleViewChange('flow')}
                 >
-                    General Summary
+                    Thematic Flow
                 </button>
 
+                {/* Overused Themes Button */}
                 <button
-                    className="clustering-btn btn-download"
-                    onClick={handleDownload}
+                    className={`clustering-btn btn-overused ${showOverusedThemes ? 'active' : ''}`}
+                    onClick={() => handleViewChange('overused')}
                 >
-                    Download Results
+                    Overused Themes
                 </button>
             </div>
 
@@ -316,79 +377,170 @@ const handleDownload = () => {
                 </div>
             )}
 
+            {/* Themes View */}
             {showThemes && (
-    <div className="themes-section">
-        <div className="themes-header">
-            <h2 className="themes-title">Theme Analysis</h2>
-            <button
-                className={`clustering-btn btn-refresh ${isLoadingThemeAnalysis ? 'loading' : ''}`}
-                onClick={generateThemeAnalysis}
-                disabled={isLoadingThemeAnalysis}
-            >
-                {isLoadingThemeAnalysis ? 'Analyzing...' : 'Regenerate'}
-            </button>
-        </div>
-        
-        {isLoadingThemeAnalysis && (
-            <div className="themes-loading">
-                <div className="loading-spinner"></div>
-                <p>Analyzing themes and topics in your document collection...</p>
-            </div>
-        )}
-        
-        {themeAnalysisError && (
-            <div className="themes-error">
-                <p>Error generating theme analysis: {themeAnalysisError}</p>
-                <button onClick={generateThemeAnalysis} className="clustering-btn">
-                    Try Again
-                </button>
-            </div>
-        )}
-        
-        {themeAnalysisData && !isLoadingThemeAnalysis && (
-            <div className="themes-content">
-                <div className="themes-meta">
-                    <span>Data Source: {themeAnalysisData.data_source}</span>
-                    <span>Total Documents: {themeAnalysisData.total_documents}</span>
-                    <span>Analyzed: {themeAnalysisData.documents_analyzed}</span>
-                    {themeAnalysisData.has_clustering_context && (
-                        <span>Clustering Context: Available</span>
-                    )}
-                </div>
-                <div className="themes-analysis">
-                    <pre>{themeAnalysisData.analysis}</pre>
-                </div>
-            </div>
-        )}
-        
-        {!themeAnalysisData && !themeAnalysisError && !isLoadingThemeAnalysis && (
-            <div className="themes-placeholder">
-                <p>Theme analysis will automatically generate when you first view this tab.</p>
-                <p>This analysis identifies dominant themes, topics, and conceptual patterns in your document collection.</p>
-            </div>
-        )}
-    </div>
-)}
-
-            {/* General Summary View (placeholder) */}
-            {showSummary && (
-                <div className="summary-section">
-                    <div className="summary-header">
-                        <h2 className="summary-title">General Analysis Summary</h2>
+                <div className="themes-section">
+                    <div className="themes-header">
+                        <h2 className="themes-title">Theme Analysis</h2>
                         <button
-                            className="clustering-btn btn-generate"
-                            onClick={generateGeneralSummary}
+                            className={`clustering-btn btn-refresh ${isLoadingThemeAnalysis ? 'loading' : ''}`}
+                            onClick={generateThemeAnalysis}
+                            disabled={isLoadingThemeAnalysis}
                         >
-                            Coming Soon
+                            {isLoadingThemeAnalysis ? 'Analyzing...' : 'Regenerate'}
                         </button>
                     </div>
                     
-                    <div className="summary-placeholder">
-                        <p>General summary functionality will be implemented here.</p>
-                        <p>This will provide an overall analysis of your clustering results across all views.</p>
-                    </div>
+                    {isLoadingThemeAnalysis && (
+                        <div className="themes-loading">
+                            <div className="loading-spinner"></div>
+                            <p>Analyzing themes and topics in your document collection...</p>
+                        </div>
+                    )}
+                    
+                    {themeAnalysisError && (
+                        <div className="themes-error">
+                            <p>Error generating theme analysis: {themeAnalysisError}</p>
+                            <button onClick={generateThemeAnalysis} className="clustering-btn">
+                                Try Again
+                            </button>
+                        </div>
+                    )}
+                    
+                    {themeAnalysisData && !isLoadingThemeAnalysis && (
+                        <div className="themes-content">
+                            <div className="themes-meta">
+                                <span>Data Source: {themeAnalysisData.data_source}</span>
+                                <span>Total Documents: {themeAnalysisData.total_documents}</span>
+                                <span>Analyzed: {themeAnalysisData.documents_analyzed}</span>
+                                {themeAnalysisData.has_clustering_context && (
+                                    <span>Clustering Context: Available</span>
+                                )}
+                            </div>
+                            <div className="themes-analysis">
+                                <pre>{themeAnalysisData.analysis}</pre>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {!themeAnalysisData && !themeAnalysisError && !isLoadingThemeAnalysis && (
+                        <div className="themes-placeholder">
+                            <p>Theme analysis will automatically generate when you first view this tab.</p>
+                            <p>This analysis identifies dominant themes, topics, and conceptual patterns in your document collection.</p>
+                        </div>
+                    )}
                 </div>
             )}
+
+            {/* Thematic Flow View */}
+        {showThematicFlow && (
+            <div className="flow-section">
+                <div className="flow-header">
+                    <h2 className="flow-title">Thematic Flow Analysis</h2>
+                    <button
+                        className={`clustering-btn btn-refresh ${isLoadingThematicFlow ? 'loading' : ''}`}
+                        onClick={generateThematicFlow}
+                        disabled={isLoadingThematicFlow}
+                    >
+                        {isLoadingThematicFlow ? 'Analyzing...' : 'Regenerate'}
+                    </button>
+                </div>
+                
+                {isLoadingThematicFlow && (
+                    <div className="flow-loading">
+                        <div className="loading-spinner"></div>
+                        <p>Analyzing thematic relationships and flow patterns...</p>
+                    </div>
+                )}
+                
+                {thematicFlowError && (
+                    <div className="flow-error">
+                        <p>Error generating thematic flow analysis: {thematicFlowError}</p>
+                        <button onClick={generateThematicFlow} className="clustering-btn">
+                            Try Again
+                        </button>
+                    </div>
+                )}
+                
+                {thematicFlowData && !isLoadingThematicFlow && (
+                    <div className="flow-content">
+                        <div className="flow-meta">
+                            <span>Data Source: {thematicFlowData.data_source}</span>
+                            <span>Total Documents: {thematicFlowData.total_documents}</span>
+                            <span>Analyzed: {thematicFlowData.documents_analyzed}</span>
+                            {thematicFlowData.has_clustering_context && (
+                                <span>Clustering Context: Available</span>
+                            )}
+                        </div>
+                        <div className="flow-analysis">
+                            <pre>{thematicFlowData.analysis}</pre>
+                        </div>
+                    </div>
+                )}
+                
+                {!thematicFlowData && !thematicFlowError && !isLoadingThematicFlow && (
+                    <div className="flow-placeholder">
+                        <p>Thematic flow analysis will automatically generate when you first view this tab.</p>
+                        <p>This analysis examines how themes interconnect, develop, and flow throughout your documents.</p>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* Overused Themes View */}
+        {showOverusedThemes && (
+            <div className="overused-section">
+                <div className="overused-header">
+                    <h2 className="overused-title">Overused/Underused Analysis</h2>
+                    <button
+                        className={`clustering-btn btn-refresh ${isLoadingOverusedThemes ? 'loading' : ''}`}
+                        onClick={generateOverusedThemes}
+                        disabled={isLoadingOverusedThemes}
+                    >
+                        {isLoadingOverusedThemes ? 'Analyzing...' : 'Regenerate'}
+                    </button>
+                </div>
+                
+                {isLoadingOverusedThemes && (
+                    <div className="overused-loading">
+                        <div className="loading-spinner"></div>
+                        <p>Analyzing patterns of overuse and underuse...</p>
+                    </div>
+                )}
+                
+                {overusedThemesError && (
+                    <div className="overused-error">
+                        <p>Error generating overused themes analysis: {overusedThemesError}</p>
+                        <button onClick={generateOverusedThemes} className="clustering-btn">
+                            Try Again
+                        </button>
+                    </div>
+                )}
+                
+                {overusedThemesData && !isLoadingOverusedThemes && (
+                    <div className="overused-content">
+                        <div className="overused-meta">
+                            <span>Data Source: {overusedThemesData.data_source}</span>
+                            <span>Total Documents: {overusedThemesData.total_documents}</span>
+                            <span>Analyzed: {overusedThemesData.documents_analyzed}</span>
+                            {overusedThemesData.has_clustering_context && (
+                                <span>Clustering Context: Available</span>
+                            )}
+                        </div>
+                        <div className="overused-analysis">
+                            <pre>{overusedThemesData.analysis}</pre>
+                        </div>
+                    </div>
+                )}
+                
+                {!overusedThemesData && !overusedThemesError && !isLoadingOverusedThemes && (
+                    <div className="overused-placeholder">
+                        <p>Overused/underused analysis will automatically generate when you first view this tab.</p>
+                        <p>This analysis identifies repetitive patterns, overused words/phrases, and areas needing more development.</p>
+                    </div>
+                )}
+            </div>
+        )}
         </div>
     );
 };
