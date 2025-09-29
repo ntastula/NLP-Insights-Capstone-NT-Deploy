@@ -15,7 +15,7 @@ GENRE_BOOKS = {
     "mystery": [1661, 58866, 583, 1872, 76677], # The Adventures of Sherlock Holmes, The Murder on the Links, The Woman in White, The Red House Mystery, The Girl from Scotland Yard
     "romance": [42671, 768, 1399, 64317, 4276], # Pride and Prejudice, Wuthering Heights, Anna Karenina, The Great Gatsby, North and South
     "science_fiction": [164, 36, 1250, 62, 1951], # Twenty Thousand Leagues Under the Sea, The War of the Worlds, The Eyes Have It, A Princess of Mars, The Coming Race
-    "general_english": [1231, 2554, 71865, 98, 174],  # On the Track, Crime and Punishment, Mrs Dalloway, A Tale of Two Cities, The Picture of Dorian Gray
+    "general_fiction": [1231, 2554, 71865, 98, 174],  # On the Track, Crime and Punishment, Mrs Dalloway, A Tale of Two Cities, The Picture of Dorian Gray
     "poetry": [20158, 12242, 3011, 213, 26],  # The Works of Lord Byron Vol 4, Poems by Emily Dickinson, The Lady of the Lake, The Man From Snowy River, Paradise Lost
     "young_adult": [30142, 45, 17396, 271, 236] # Little Brother, Anne of Green Gables, The Secret Garden, Black Beauty, The Jungle Book
 }

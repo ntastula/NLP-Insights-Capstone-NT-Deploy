@@ -38,7 +38,7 @@ useEffect(() => {
 
       let defaultFile = localGenre || list[0];
       if (analysisType === "keyness") {
-        defaultFile = list.find(f => f.startsWith("general_english")) || list[0];
+        defaultFile = list.find(f => f.startsWith("general_fiction")) || list[0];
       }
       setLocalGenre(defaultFile);
     } catch (e) {
