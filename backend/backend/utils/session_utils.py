@@ -161,3 +161,42 @@ def list_session_temp_folders(delete_stale=False):
                     print(f"⚠️ Could not delete {folder_path}: {e}")
 
         return found_folders
+
+# --- US7 helpers -------------------------------------------------------------
+import os, tempfile, threading, shutil
+
+def ensure_session_exists(request):
+    """
+    Guarantee a Django session key so we can isolate temp files per user.
+    """
+    if not hasattr(request, "session"):
+        return
+    if not request.session.session_key:
+        # Touch the session to force creation
+        request.session.save()
+
+def _session_temp_dir(session_key: str) -> str:
+    return os.path.join(tempfile.gettempdir(), f"uploads_{session_key}")
+
+def schedule_session_cleanup(request, delay_minutes: int = 15):
+    """
+    Schedule deletion of this session's temp folder after analysis completes.
+    This complements your existing post_delete(Session) signal cleanup.
+    """
+    if not hasattr(request, "session"):
+        return
+    session_key = request.session.session_key
+    if not session_key:
+        return
+    folder = _session_temp_dir(session_key)
+
+    def _cleanup():
+        try:
+            if os.path.exists(folder):
+                shutil.rmtree(folder, ignore_errors=True)
+        except Exception:
+            pass
+
+    t = threading.Timer(delay_minutes * 60, _cleanup)
+    t.daemon = True
+    t.start()
