@@ -666,3 +666,39 @@
         font-size: 0.875rem;
     }
 }
+
+.comparison-info-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #e8f4fd;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.comparison-info-banner svg {
+  flex-shrink: 0;
+  color: #1976d2;
+  margin-top: 2px;
+}
+
+.comparison-info-banner strong {
+  display: block;
+  color: #1565c0;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.comparison-info-banner p {
+  margin: 4px 0;
+  color: #424242;
+  font-size: 14px;
+}
+
+.comparison-info-banner .info-subtext {
+  color: #666;
+  font-size: 13px;
+  font-style: italic;
+}

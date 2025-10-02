@@ -33,46 +33,49 @@ ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
 def filter_content_words(text):
     """
-    Keep only nouns, verbs, adjectives, adverbs.
-    Also splits concatenated words if needed.
+    Tokenize, POS-tag, and keep only content words:
+    nouns, verbs, adjectives, adverbs.
+    Returns list of {word, pos}.
     """
-    # Tokenize sentences first
+
+    POS_MAP_NLTK = {
+        'NN': 'NOUN', 'NNS': 'NOUN',
+        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
+    }
+
+    # Tokenize words
     tokens = word_tokenize(text)
 
-    # Example: use spaCy or NLTK POS tagging
-    # Here we use NLTK's pos_tag
-    tagged = nltk.pos_tag(tokens)  # returns list of (word, pos)
+    # Merge split contractions - handle both 't and n't variants
+    merged_tokens = []
+    i = 0
+    while i < len(tokens):
+        if i + 1 < len(tokens) and tokens[i + 1] in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+            merged_tokens.append(tokens[i] + tokens[i + 1])
+            i += 2
+        else:
+            merged_tokens.append(tokens[i])
+            i += 1
 
-    pos_map = {
-        'NN': 'NOUN',
-        'NNS': 'NOUN',
-        # 'NNP': 'NOUN',
-        # 'NNPS': 'NOUN',
-        'VB': 'VERB',
-        'VBD': 'VERB',
-        'VBG': 'VERB',
-        'VBN': 'VERB',
-        'VBP': 'VERB',
-        'VBZ': 'VERB',
-        'JJ': 'ADJ',
-        'JJR': 'ADJ',
-        'JJS': 'ADJ',
-        'RB': 'ADV',
-        'RBR': 'ADV',
-        'RBS': 'ADV',
-    }
+    # POS tagging
+    tagged = nltk.pos_tag(merged_tokens)
 
     filtered = []
     for word, pos in tagged:
-        # Only alphabetic words longer than 2 chars
-        if word.isalpha() and len(word) > 2:
-            mapped_pos = pos_map.get(pos, "OTHER")
-            if mapped_pos in ALLOWED_POS:
-                # Split concatenated words using simple regex for camelCase or multiple lowercase
-                split_words = re.findall(r'[A-Z]?[a-z]+', word)
-                for w in split_words:
-                    filtered.append({"word": w.lower(), "pos": mapped_pos})
+        # Skip standalone contraction parts that weren't merged
+        if word.lower() in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+            continue
 
+        # Only accept words that are:
+        # 1. Pure alphabetic (no apostrophes), OR
+        # 2. Valid contractions (word + 't/n't/etc at the end)
+        if re.match(r"^[a-zA-Z]+$", word) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$", word):
+            if len(word) > 2:
+                mapped_pos = POS_MAP_NLTK.get(pos, "OTHER")
+                if mapped_pos in ALLOWED_POS:
+                    filtered.append({"word": word.lower(), "pos": mapped_pos})
     return filtered
 
 
@@ -81,10 +84,7 @@ def filter_all_words(text):
     Keep all alphabetic tokens > 2 chars, lemmatized + lowercased.
     Also returns POS so that words can be coloured and grouped.
     """
-    doc = nlp(text)
-    filtered = []
-
-    POS_MAP = {
+    POS_MAP_SPACY = {
         "NOUN": "NOUN",
         "PROPN": "NOUN",
         "VERB": "VERB",
@@ -92,18 +92,41 @@ def filter_all_words(text):
         "ADV": "ADV",
     }
 
-    for token in doc:
-        if token.is_alpha and len(token) > 2:
-            pos = POS_MAP.get(token.pos_, "OTHER")
-            filtered.append({"word": token.lemma_.lower(), "pos": pos})
+    doc = nlp(text)
+    filtered = []
+
+    i = 0
+    tokens = list(doc)
+
+    while i < len(tokens):
+        token = tokens[i]
+
+        # Check if next token is a contraction part - handle both 't and n't variants
+        if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+            combined_text = token.text + tokens[i + 1].text
+            if len(combined_text) > 2:
+                pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
+                filtered.append({"word": combined_text.lower(), "pos": pos})
+            i += 2
+        # Skip standalone contraction parts
+        elif token.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+            i += 1
+        # Only accept pure alphabetic or valid contractions
+        elif (re.match(r"^[a-zA-Z]+$", token.text) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$",
+                                                               token.text)) and len(token.text) > 2:
+            pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
+            filtered.append({"word": token.text.lower(), "pos": pos})
+            i += 1
+        else:
+            i += 1
 
     return filtered
 
 
 def extract_sentences(text, word):
     """
-    Return all sentences from text containing the exact word (case-insensitive),
-    excluding possessive forms like 's or s'.
+    Return all sentences from text containing the exact word (case-insensitive).
+    Handles contractions properly - won't match "won" in "won't".
     """
     if not text or not word:
         return []
@@ -114,9 +137,22 @@ def extract_sentences(text, word):
     matched = []
     for s in sentences:
         tokens = word_tokenize(s)
-        # Check for exact match, but skip tokens with apostrophe
-        if any(t.lower() == word_lower and "'" not in t for t in tokens):
+
+        # Merge contractions
+        merged_tokens = []
+        i = 0
+        while i < len(tokens):
+            if i + 1 < len(tokens) and tokens[i + 1] in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+                merged_tokens.append(tokens[i] + tokens[i + 1])
+                i += 2
+            else:
+                merged_tokens.append(tokens[i])
+                i += 1
+
+        # Check for exact match (case-insensitive)
+        if any(t.lower() == word_lower for t in merged_tokens):
             matched.append(s)
+
     return matched
 
 # ---------------------------

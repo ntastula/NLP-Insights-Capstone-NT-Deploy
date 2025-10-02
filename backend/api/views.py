@@ -210,6 +210,65 @@ def process_text_file(uploaded_file: UploadedFile) -> tuple[str, str]:
 @csrf_exempt
 @require_POST
 def upload_files(request):
+    # Check if this is a user text comparison upload
+    comparison_mode = request.POST.get('comparison_mode', 'corpus')
+
+    if comparison_mode == 'user_text':
+        reference_file = request.FILES.get('reference_file')
+        target_file = request.FILES.get('target_file')
+
+        if not reference_file or not target_file:
+            logger.warning("User text comparison attempted without both files")
+            return JsonResponse({
+                'error': 'Both reference_file and target_file are required',
+                'success': False
+            }, status=400)
+
+        # Validate both files
+        is_valid_ref, error_ref = validate_file(reference_file)
+        is_valid_tgt, error_tgt = validate_file(target_file)
+
+        if not is_valid_ref:
+            logger.warning(f"Reference file validation failed: {error_ref}")
+            return JsonResponse({'error': f"Reference: {error_ref}", 'success': False}, status=400)
+
+        if not is_valid_tgt:
+            logger.warning(f"Target file validation failed: {error_tgt}")
+            return JsonResponse({'error': f"Target: {error_tgt}", 'success': False}, status=400)
+
+        # Process both files
+        ref_text, ref_error = process_text_file(reference_file)
+        tgt_text, tgt_error = process_text_file(target_file)
+
+        if ref_error:
+            return JsonResponse({'error': f"Reference: {ref_error}", 'success': False}, status=500)
+
+        if tgt_error:
+            return JsonResponse({'error': f"Target: {tgt_error}", 'success': False}, status=500)
+
+        logger.info(
+            f"User text comparison: ref={reference_file.name} ({len(ref_text.split())} words), "
+            f"target={target_file.name} ({len(tgt_text.split())} words)"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'comparison_mode': 'user_text',
+            'reference_file': {
+                'filename': reference_file.name,
+                'file_size': reference_file.size,
+                'text_content': ref_text,
+                'word_count': len(ref_text.split()),
+                'char_count': len(ref_text),
+            },
+            'target_file': {
+                'filename': target_file.name,
+                'file_size': target_file.size,
+                'text_content': tgt_text,
+                'word_count': len(tgt_text.split()),
+                'char_count': len(tgt_text),
+            }
+        })
     if not request.FILES:
         logger.warning("Upload attempt with no files")
         return JsonResponse({'error': 'No files uploaded'}, status=400)
@@ -370,38 +429,26 @@ def compute_keyness_from_counts(
 
     return {"results": top, "total_significant": total_significant}
 
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def analyse_keyness(request):
     try:
         data = json.loads(request.body)
-        corpus_name = data.get("corpus_name").strip()
-        if not corpus_name:
-            return JsonResponse({"error": "No corpus_name provided"}, status=400)
 
-        # Remove .json if already included
-        corpus_name = re.sub(r'\.json$', '', corpus_name)
-
-        # Append _keyness.json only if not already present
-        if not corpus_name.endswith("_keyness"):
-            filename = f"{corpus_name}_keyness.json"
-        else:
-            filename = f"{corpus_name}.json"
-
-        corpus_path = KEYNESS_DIR / filename
-        if not corpus_path.exists():
-            return JsonResponse({"error": f"Unknown corpus_name: {filename}"}, status=400)
+        # Get comparison mode
+        comparison_mode = data.get("comparison_mode", "corpus")
 
         uploaded_text = data.get("uploaded_text", "")
+        if not uploaded_text:
+            logger.warning("Analysis request with empty uploaded_text")
+            return JsonResponse({"error": "No uploaded text provided"}, status=400)
+
         method = data.get("method", "nltk").lower()
         filter_mode = data.get("filter_mode", "content")
 
         # Choose filtering function
         filter_fn = filter_all_words if filter_mode == "all" else filter_content_words
-
-        if not uploaded_text:
-            logger.warning("Analysis request with empty uploaded_text")
-            return JsonResponse({"error": "No uploaded text provided"}, status=400)
 
         # Tokenize/filter uploaded text
         filtered_uploaded = filter_fn(uploaded_text)
@@ -411,83 +458,181 @@ def analyse_keyness(request):
         total_significant = 0
         corpus_total = 0
 
-        # --- Load corpus counts from JSON ---
-        corpus_path = KEYNESS_DIR / filename
-        if not corpus_path.exists():
-            return JsonResponse({"error": f"Unknown corpus_name: {filename}"}, status=400)
+        # Branch based on comparison mode
+        if comparison_mode == "user_text":
+            reference_text = data.get("reference_text", "")
+            if not reference_text:
+                logger.warning("User text comparison without reference_text")
+                return JsonResponse({"error": "No reference text provided"}, status=400)
 
-        with open(corpus_path, "r", encoding="utf-8") as f:
-            meta = json.load(f)
-            logger.info(f"Loaded corpus meta: {filename}")
+            logger.info(
+                f"User text comparison: target={len(uploaded_text.split())} words, "
+                f"reference={len(reference_text.split())} words"
+            )
 
-        # Corpus counts map from JSON
-        corpus_counts_map = Counter(meta.get("counts", {}))
-        corpus_total = sum(corpus_counts_map.values())
+            # Build reference counts map using the same filter function
+            filtered_reference = filter_fn(reference_text)
+            reference_counts_map = Counter([w["word"] for w in filtered_reference])
+            reference_total = sum(reference_counts_map.values())
 
-        # --- Compute keyness using chosen method ---
-        if method == "nltk":
-            data_out = keyness_nltk(
-                uploaded_text,
-                corpus_counts_map=corpus_counts_map,
-                top_n=50,
-                filter_func=filter_fn
+            # Call the selected method exactly as with corpus analysis
+            if method == "nltk":
+                data_out = keyness_nltk(
+                    uploaded_text,
+                    corpus_counts_map=reference_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "sklearn":
+                data_out = keyness_sklearn(
+                    uploaded_text,
+                    corpus_counts_map=reference_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "gensim":
+                data_out = keyness_gensim(
+                    uploaded_text,
+                    corpus_counts_map=reference_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "spacy":
+                data_out = keyness_spacy(
+                    uploaded_text,
+                    corpus_counts_map=reference_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            else:
+                logger.warning(f"Unknown keyness method requested: {method}")
+                return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
+
+            # Extract results
+            results_list = data_out.get("results", [])
+            total_significant = data_out.get("total_significant", len(results_list))
+            corpus_total = reference_total
+
+            # Ensure POS tags
+            for item in results_list:
+                item["pos"] = item.get("pos", item.get("pos_tag", "OTHER")).upper()
+
+            # Save to DB
+            keyness_obj = KeynessResult.objects.create(
+                method=method,
+                uploaded_text=uploaded_text,
+                results=results_list,
+                uploaded_total=uploaded_total,
+                corpus_total=corpus_total,
             )
-        elif method == "sklearn":
-            data_out = keyness_sklearn(
-                uploaded_text,
-                corpus_counts_map=corpus_counts_map,
-                top_n=50,
-                filter_func=filter_fn
+
+            logger.info(
+                f"User text keyness: results={len(results_list)}, id={keyness_obj.id}"
             )
-        elif method == "gensim":
-            data_out = keyness_gensim(
-                uploaded_text,
-                corpus_counts_map=corpus_counts_map,
-                top_n=50,
-                filter_func=filter_fn
-            )
-        elif method == "spacy":
-            data_out = keyness_spacy(
-                uploaded_text,
-                corpus_counts_map=corpus_counts_map,
-                top_n=50,
-                filter_func=filter_fn
-            )
+
+            return JsonResponse({
+                "id": keyness_obj.id,
+                "method": method,
+                "comparison_mode": "user_text",
+                "filter_mode": filter_mode,
+                "results": results_list,
+                "uploaded_total": uploaded_total,
+                "corpus_total": corpus_total,
+                "total_significant": total_significant
+            })
+
         else:
-            logger.warning(f"Unknown keyness method requested: {method}")
-            return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
+            corpus_name = data.get("corpus_name", "").strip()
+            if not corpus_name:
+                return JsonResponse({"error": "No corpus_name provided"}, status=400)
 
-        results_list = data_out.get("results", [])
-        total_significant = data_out.get("total_significant", len(results_list))
+            # Remove .json if already included
+            corpus_name = re.sub(r'\.json$', '', corpus_name)
 
-        # Ensure every item has a POS tag for frontend
-        for item in results_list:
-            item["pos"] = item.get("pos", item.get("pos_tag", "OTHER")).upper()
+            # Append _keyness.json only if not already present
+            if not corpus_name.endswith("_keyness"):
+                filename = f"{corpus_name}_keyness.json"
+            else:
+                filename = f"{corpus_name}.json"
 
-        # Save to DB
-        keyness_obj = KeynessResult.objects.create(
-            method=method,
-            uploaded_text=uploaded_text,
-            results=results_list,
-            uploaded_total=uploaded_total,
-            corpus_total=corpus_total,
-        )
+            corpus_path = KEYNESS_DIR / filename
+            if not corpus_path.exists():
+                return JsonResponse({"error": f"Unknown corpus_name: {filename}"}, status=400)
 
-        logger.info(
-            f"Keyness analysis completed: method={method}, "
-            f"filter_mode={filter_mode}, results_count={len(results_list)}, "
-            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
-        )
+            # Load corpus counts from JSON
+            with open(corpus_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                logger.info(f"Loaded corpus meta: {filename}")
 
-        return JsonResponse({
-            "id": keyness_obj.id,
-            "method": method,
-            "filter_mode": filter_mode,
-            "results": results_list,
-            "uploaded_total": uploaded_total,
-            "corpus_total": corpus_total,
-            "total_significant": total_significant
-        })
+            # Corpus counts map from JSON
+            corpus_counts_map = Counter(meta.get("counts", {}))
+            corpus_total = sum(corpus_counts_map.values())
+
+            # Compute keyness using chosen method
+            if method == "nltk":
+                data_out = keyness_nltk(
+                    uploaded_text,
+                    corpus_counts_map=corpus_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "sklearn":
+                data_out = keyness_sklearn(
+                    uploaded_text,
+                    corpus_counts_map=corpus_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "gensim":
+                data_out = keyness_gensim(
+                    uploaded_text,
+                    corpus_counts_map=corpus_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            elif method == "spacy":
+                data_out = keyness_spacy(
+                    uploaded_text,
+                    corpus_counts_map=corpus_counts_map,
+                    top_n=50,
+                    filter_func=filter_fn
+                )
+            else:
+                logger.warning(f"Unknown keyness method requested: {method}")
+                return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
+
+            results_list = data_out.get("results", [])
+            total_significant = data_out.get("total_significant", len(results_list))
+
+            # Ensure every item has a POS tag for frontend
+            for item in results_list:
+                item["pos"] = item.get("pos", item.get("pos_tag", "OTHER")).upper()
+
+            # Save to DB
+            keyness_obj = KeynessResult.objects.create(
+                method=method,
+                uploaded_text=uploaded_text,
+                results=results_list,
+                uploaded_total=uploaded_total,
+                corpus_total=corpus_total,
+            )
+
+            logger.info(
+                f"Keyness analysis completed: method={method}, "
+                f"filter_mode={filter_mode}, results_count={len(results_list)}, "
+                f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
+            )
+
+            return JsonResponse({
+                "id": keyness_obj.id,
+                "method": method,
+                "comparison_mode": "corpus",
+                "filter_mode": filter_mode,
+                "results": results_list,
+                "uploaded_total": uploaded_total,
+                "corpus_total": corpus_total,
+                "total_significant": total_significant
+            })
 
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
@@ -526,17 +671,7 @@ def get_sentences(request):
         # Extract sentences containing the word
         sentences = extract_sentences(uploaded_text, word)
 
-        # Filter out sentences where the match is just "'s" or "s'"
-        filtered_sentences = []
-        word_lower = word.lower()
-        for s in sentences:
-            # Find all words in the sentence
-            words_in_sentence = re.findall(r"\b\w[\w'-]*\b", s)
-            # Only include sentence if the exact word (ignoring apostrophes) is present
-            if any(w.lower().replace("'", "") == word_lower for w in words_in_sentence):
-                filtered_sentences.append(s)
-
-        return JsonResponse({"sentences": filtered_sentences})
+        return JsonResponse({"sentences": sentences})
 
     except Exception as e:
         logger.exception(f"Error extracting sentences: {e}")
@@ -1571,3 +1706,87 @@ Be specific with examples and constructive in your critique. Focus on patterns t
         return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+def keyness_user_text(target_text, reference_text, method="nltk", top_n=50, filter_func=None):
+    """
+    Compute keyword statistics comparing two user texts.
+    Returns:
+        {
+            "results": top N words as list of dicts,
+            "total_significant": total unique significant words in target_text
+        }
+    """
+    if filter_func is None:
+        from .views import filter_content_words
+        filter_func = filter_content_words
+
+    # Filter / tokenize both texts
+    target_tokens = filter_func(target_text)
+    reference_tokens = filter_func(reference_text)
+
+    # Count frequencies
+    target_counts = Counter([t["word"] for t in target_tokens])
+    reference_counts = Counter([t["word"] for t in reference_tokens])
+
+    # Build all results with counts + POS
+    all_results = []
+    for word, uploaded_count in target_counts.items():
+        ref_count = reference_counts.get(word, 0)
+
+        # Skip words with 0 count in target? optional
+        if uploaded_count == 0:
+            continue
+
+        # Get POS from first occurrence in target_tokens
+        pos = next((t["pos"] for t in target_tokens if t["word"] == word), "OTHER")
+
+        all_results.append({
+            "word": word,
+            "uploaded_count": uploaded_count,
+            "sample_count": ref_count,
+            "pos": pos
+        })
+
+    # Sort results by frequency in target (or implement your keyness formula)
+    all_results_sorted = sorted(all_results, key=lambda x: x["uploaded_count"], reverse=True)
+
+    # Slice top_n for frontend
+    top_results = all_results_sorted[:top_n]
+
+    return {
+        "results": top_results,
+        "total_significant": len(all_results_sorted)
+    }
+
+@csrf_exempt
+def create_temp_corpus(request):
+    if request.method == "POST" and request.FILES.get("file"):
+        uploaded_file = request.FILES["file"]
+        text = uploaded_file.read().decode("utf-8")
+
+        # Tokenise and count frequencies
+        tokens = [t.lower() for t in text.split() if len(t) > 2]
+        freq = dict(Counter(tokens))
+        total_tokens = len(tokens)
+
+        out_data = {
+            "genre": "temp_user_upload",
+            "version": "2025-10-02",
+            "previews": [
+                {"title": uploaded_file.name, "author": "Unknown", "snippet": text[:500]}
+            ],
+            "doc_count": 1,
+            "total_tokens": total_tokens,
+            "counts": freq,
+        }
+
+        # Save as temp JSON in KEYNESS_DIR
+        KEYNESS_DIR.mkdir(parents=True, exist_ok=True)
+        temp_file = KEYNESS_DIR / "temp_user_upload_keyness.json"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(out_data, f, ensure_ascii=False, indent=2)
+
+        return JsonResponse({"success": True, "filename": str(temp_file)})
+
+    return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)

@@ -21,16 +21,28 @@ function App() {
     const [summary, setSummary] = useState("");
     const [posGroups, setPosGroups] = useState({});
     const [stats, setStats] = useState({});
+    const [comparisonMode, setComparisonMode] = useState("");
+    const [analysisType, setAnalysisType] = useState("");
 
     useEffect(() => {
   console.log("Active page changed:", activePage);
 }, [activePage]);
 
     
-    const handleProceed = ({ analysisType, genre }) => {
-        setSelectedGenre(genre || ""); 
-        setActivePage(analysisType);   
-    };
+    const handleProceed = ({ analysisType, genre, comparisonMode }) => {
+  console.log("Parent received from HomePage:", { analysisType, genre, comparisonMode });
+  setSelectedGenre(genre || null);
+  setActivePage(analysisType);
+  setComparisonMode(comparisonMode || null);
+  setAnalysisType(analysisType);
+
+  console.log("Parent state after update:", {
+    selectedGenre: genre,
+    comparisonMode,
+    analysisType,
+  });
+};
+
 
     const handleKeynessResults = (resultsData) => {
     console.log("Received keyness results:", resultsData);
@@ -39,6 +51,10 @@ function App() {
     setUploadedText(resultsData.uploadedText);
     setStats(resultsData.stats);
     setActivePage("keyness-results");
+    console.log("Parent passing to KeynessLanding:", {
+    genre: selectedGenre,
+    comparisonMode: comparisonMode,
+});
 };
 
     const handleWordDetail = (data) => {
@@ -77,7 +93,8 @@ function App() {
                     genre={selectedGenre}
                     onWordDetail={handleWordDetail}
                     posGroups={posGroups}
-                    onResults={handleKeynessResults} 
+                    onResults={handleKeynessResults}
+                    comparisonMode={comparisonMode} 
                 />   
             )}
             {activePage === "keyness-results" && (

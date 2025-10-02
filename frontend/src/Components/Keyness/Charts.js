@@ -3,7 +3,7 @@ import Plot from "react-plotly.js";
 import { TrendingUp, BarChart3, ScatterChart, ToggleLeft, ToggleRight, Info } from "lucide-react";
 import "./Charts.css";
 
-const Charts = ({ results, method = "nltk" }) => {
+const Charts = ({ results, method = "nltk", onChartTypeChange }) => {
   const [chartType, setChartType] = useState("primary");
   const [topN, setTopN] = useState(20);
   const topResults = results ? results.slice(0, topN) : [];
@@ -42,6 +42,14 @@ const Charts = ({ results, method = "nltk" }) => {
   fetchSummary();
 }, [chartType, results, method]);
 
+  // Notify parent when chart type changes
+  useEffect(() => {
+    if (onChartTypeChange) {
+      // Convert primary/secondary to bar/scatter
+      const mappedType = chartType === "primary" ? "bar" : "scatter";
+      onChartTypeChange(mappedType);
+    }
+  }, [chartType, onChartTypeChange]);
 
   // Chart configurations for each method
   const chartConfigs = {

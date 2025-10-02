@@ -17,6 +17,9 @@ backend/data/*
 backend/models/numberbatch-en.txt
 numberbatch-en-19.08.txt.gz
 
+# Temporary user text corpus files
+backend/api/corpus_meta_keyness/temp_*.json
+
 # VSCode
 .vscode/
 

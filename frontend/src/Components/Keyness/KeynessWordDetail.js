@@ -134,18 +134,31 @@ const KeynessWordDetail = ({
     };
 
     const highlightWord = (sentence, targetWord) => {
-        if (!targetWord) return sentence;
-        const regex = new RegExp(`\\b(${targetWord.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})\\b`, "gi");
-        const parts = [];
-        let lastIndex = 0;
-        sentence.replace(regex, (match, _, offset) => {
-            if (offset > lastIndex) parts.push(sentence.slice(lastIndex, offset));
-            parts.push(<mark key={offset}>{match}</mark>);
-            lastIndex = offset + match.length;
-        });
-        if (lastIndex < sentence.length) parts.push(sentence.slice(lastIndex));
-        return parts;
-    };
+    if (!targetWord) return sentence;
+    
+    // Escape special regex characters
+    const escapedWord = targetWord.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    
+    // Use negative lookahead/lookbehind to avoid matching within contractions
+    // This ensures we don't match "won" in "won't"
+    const regex = new RegExp(
+        `\\b(${escapedWord})(?!')\\b`, 
+        "gi"
+    );
+    
+    const parts = [];
+    let lastIndex = 0;
+    
+    sentence.replace(regex, (match, _, offset) => {
+        if (offset > lastIndex) parts.push(sentence.slice(lastIndex, offset));
+        parts.push(<mark key={offset}>{match}</mark>);
+        lastIndex = offset + match.length;
+    });
+    
+    if (lastIndex < sentence.length) parts.push(sentence.slice(lastIndex));
+    
+    return parts;
+};
 
     // Determine method explanation
     const getMethodExplanation = () => {
@@ -451,7 +464,7 @@ const KeynessWordDetail = ({
                         {loadingSynonyms ? (
                             <div>
                                 <p style={{ textAlign: "center", color: "#64748b", marginBottom: "1rem" }}>
-                                    Analyzing alternate words and synonyms for "{word}"...
+                                    Analysing alternate words and synonyms for "{word}"...
                                 </p>
                                 <ProgressBar loading={true} />
                             </div>
@@ -483,7 +496,7 @@ const KeynessWordDetail = ({
                         {loadingConcepts ? (
                             <div>
                                 <p style={{ textAlign: "center", color: "#64748b", marginBottom: "1rem" }}>
-                                    Analyzing concepts and themes related to "{word}"...
+                                    Analysing concepts and themes related to "{word}"...
                                 </p>
                                 <ProgressBar loading={true} />
                             </div>
