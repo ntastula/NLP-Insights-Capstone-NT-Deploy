@@ -39,11 +39,13 @@ const KeynessAnalyser = ({
     uploadedText,
     uploadedPreview,
     corpusPreview,
-    method,      
+    method,
+    comparisonMode = "corpus",
+    referenceText,
     onBack,
     genre,
     onWordDetail,
-    onResults        
+    onResults
 }) => {
     const [comparisonResults, setComparisonResults] = useState([]);
     const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0, totalSignificant: 0 });
@@ -55,8 +57,8 @@ const KeynessAnalyser = ({
     const [showLibraryOptions, setShowLibraryOptions] = useState(true);
 
     useEffect(() => {
-  window.scrollTo(0, 0);
-}, []);
+        window.scrollTo(0, 0);
+    }, []);
 
 
     // Library descriptions and configurations
@@ -70,7 +72,7 @@ const KeynessAnalyser = ({
         {
             id: "sklearn",
             name: "Scikit-Learn",
-            title: "Find your most statistically significant word patterns", 
+            title: "Find your most statistically significant word patterns",
             description: "Choose Scikit-learn when you want to discover which words in your writing are genuinely meaningful patterns versus just random occurrences. This analysis focuses on statistical confidence, helping you identify the word choices that truly define your writing style rather than words that might just appear unusual by chance."
         },
         {
@@ -87,24 +89,70 @@ const KeynessAnalyser = ({
         }
     ];
 
+    const handleChangeMethod = () => {
+                setAnalysisDone(false);      
+                setSelectedMethod("");     
+                setShowLibraryOptions(true); 
+                setComparisonResults([]);
+            };
+
     const performAnalysis = async (methodName) => {
-        if (!uploadedText) return;
+        if (!uploadedText) {
+            setError("No text to analyse");
+            return;
+        }
+        if (comparisonMode === "user_text") {
+            if (!referenceText) {
+                setError("No reference text available for comparison");
+                console.error("Missing reference text in user_text mode");
+                return;
+            }
+        } else {
+            if (!genre) {
+                setError("No genre/corpus selected");
+                console.error("Missing genre in corpus mode");
+                return;
+            }
+        }
         setLoading(true);
         setError("");
         setAnalysisDone(false);
         setSelectedMethod(methodName);
-        setShowLibraryOptions(false); // Hide library options when analysis starts
+        setShowLibraryOptions(false);
 
         try {
+            const payload = {
+                comparison_mode: comparisonMode,
+                uploaded_text: uploadedText,   // string
+                reference_text: comparisonMode === "user_text" ? referenceText : undefined,
+                method: methodName.toLowerCase(),
+                filter_mode: filterMode,
+                corpus_name: comparisonMode === "corpus" ? genre : undefined
+};
+
+            if (comparisonMode === "user_text") {
+                payload.comparison_mode = "user_text";
+                payload.reference_text = referenceText;
+                console.log("Target text type:", typeof uploadedText);
+                console.log("Reference text type:", typeof referenceText);
+                console.log("User text comparison:", {
+                    method: methodName,
+                    targetLength: uploadedText.length,
+                    referenceLength: referenceText.length
+                });
+            } else {
+                payload.comparison_mode = "corpus";
+                payload.corpus_name = genre;
+                console.log("Corpus comparison:", {
+                    method: methodName,
+                    genre: genre
+                });
+            }
+
             const res = await fetch("http://localhost:8000/api/analyse-keyness/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    uploaded_text: uploadedText,
-                    method: methodName.toLowerCase(), 
-                    filter_mode: filterMode,          
-                    corpus_name: genre || ""          
-                })
+                body: JSON.stringify(payload)
             });
 
             const json = await res.json().catch(() => ({}));
@@ -123,137 +171,162 @@ const KeynessAnalyser = ({
 
             setAnalysisDone(true);
             if (onResults) {
-    onResults({
-        results: resultsArray,
-        method: methodName,
-        uploadedText: uploadedText,
-        stats: {
-            uploadedTotal: json.uploaded_total ?? uploadedText.split(/\s+/).filter(Boolean).length,
-            corpusTotal: json.corpus_total ?? 0,
-            totalSignificant: json.total_significant ?? (resultsArray ? resultsArray.length : 0)
-        }
-    });
-}
+                onResults({
+                    results: resultsArray,
+                    method: methodName,
+                    comparisonMode: comparisonMode,
+                    uploadedText: uploadedText,
+                    stats: {
+                        uploadedTotal: json.uploaded_total ?? uploadedText.split(/\s+/).filter(Boolean).length,
+                        corpusTotal: json.corpus_total ?? 0,
+                        totalSignificant: json.total_significant ?? (resultsArray ? resultsArray.length : 0)
+                    }
+
+                });
+            }
+            console.log("Analysis completed successfully:", {
+                mode: comparisonMode,
+                resultsCount: resultsArray.length
+            });
         } catch (e) {
             setError(e.message || "Analysis failed");
         } finally {
             setLoading(false);
         }
-        
-    };
+};
 
-    return (
-        <div className="mb-6">
-            <button
-                onClick={onBack}
-                className="keyness-back-button"
-            >
-                ← Back
-            </button>
+return (
+    <div className="mb-6">
+        <button
+            onClick={onBack}
+            className="keyness-back-button"
+        >
+            ← Back
+        </button>
 
-            {/* Word Filtering Options */}
-            <div className="filter-section">
-                <p className="filter-title">
-                    What words in your text would you like analysed:
-                </p>
-                <div className="filter-options">
-                    <label className="filter-option">
-                        <input
-                            type="radio"
-                            name="filterMode"
-                            value="content"
-                            checked={filterMode === "content"}
-                            onChange={(e) => setFilterMode(e.target.value)}
-                        />
-                        <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
-                    </label>
-                    <label className="filter-option">
-                        <input
-                            type="radio"
-                            name="filterMode"
-                            value="all"
-                            checked={filterMode === "all"}
-                            onChange={(e) => setFilterMode(e.target.value)}
-                        />
-                        <span>All words</span>
-                    </label>
-                </div>
+        {/* Word Filtering Options */}
+        <div className="filter-section">
+            <p className="filter-title">
+                What words in your text would you like analysed:
+            </p>
+            <div className="filter-options">
+                <label className="filter-option">
+                    <input
+                        type="radio"
+                        name="filterMode"
+                        value="content"
+                        checked={filterMode === "content"}
+                        onChange={(e) => setFilterMode(e.target.value)}
+                    />
+                    <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
+                </label>
+                <label className="filter-option">
+                    <input
+                        type="radio"
+                        name="filterMode"
+                        value="all"
+                        checked={filterMode === "all"}
+                        onChange={(e) => setFilterMode(e.target.value)}
+                    />
+                    <span>All words</span>
+                </label>
+            </div>
+        </div>
+
+        <div className="method-header">
+  <span className="current-analysis-text">
+    {showLibraryOptions
+      ? "Choose an analysis method below"
+      : `Analysing with ${
+          libraries.find(lib => lib.id === selectedMethod)?.name ||
+          selectedMethod?.toUpperCase()
+        }`}
+  </span>
+  <button
+    onClick={() => setShowLibraryOptions(!showLibraryOptions)}
+    className="change-method-button"
+    disabled={loading}
+  >
+    {showLibraryOptions ? "Cancel" : "Change Method"}
+  </button>
+</div>
+
+{/* Library Selection Section */}
+{showLibraryOptions ? (
+  <div className="library-selection">
+    <h2 className="library-selection-title">Choose Your Analysis Method</h2>
+    <div className="library-container">
+      {libraries.map((library) => (
+        <div key={library.id} className="library-card">
+          <div className="library-card-content">
+            {/* Left side - Description */}
+            <div className="library-description">
+              <h3 className="library-title">
+                {library.name}: {library.title}
+              </h3>
+              <p className="library-text">
+                {library.description}
+              </p>
             </div>
 
-            {/* Library Selection Section */}
-            {showLibraryOptions ? (
-                <div className="library-selection">
-                    <h2 className="library-selection-title">Choose Your Analysis Method</h2>
-                    <div className="library-container">
-                        {libraries.map((library) => (
-                            <div key={library.id} className="library-card">
-                                <div className="library-card-content">
-                                    {/* Left side - Description */}
-                                    <div className="library-description">
-                                        <h3 className="library-title">
-                                            {library.name}: {library.title}
-                                        </h3>
-                                        <p className="library-text">
-                                            {library.description}
-                                        </p>
-                                    </div>
-                                    
-                                    {/* Right side - Button */}
-                                    <div className="library-button-container">
-                                        <button 
-                                            onClick={() => performAnalysis(library.id)} 
-                                            disabled={loading || !uploadedText}
-                                            className="analysis-button"
-                                        >
-                                            Analyse with {library.name}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <div className="collapsed-library-selection">
-                    <div className="current-analysis-info">
-                        <span className="current-analysis-text">
-                            Analysing with <strong>{libraries.find(lib => lib.id === selectedMethod)?.name || selectedMethod.toUpperCase()}</strong>
-                        </span>
-                        <button 
-                            onClick={() => setShowLibraryOptions(true)}
-                            className="change-method-button"
-                            disabled={loading}
-                        >
-                            Change Method
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {loading && (
-                <div className="progress-container-wrapper">
-                    <ProgressBar loading={loading} />
-                </div>
-            )}
-
-            {error && (
-                <div className="error-message">
-                    Error: {error}
-                </div>
-            )}
-
-            {analysisDone && (
-                <CreativeKeynessResults
-                    results={comparisonResults}
-                    uploadedText={uploadedText}
-                    method={selectedMethod}
-                    stats={stats}
-                    genre={genre}
-                    onWordDetail={onWordDetail}
-                />
-            )}
+            {/* Right side - Button */}
+            <div className="library-button-container">
+              <button
+                onClick={() => performAnalysis(library.id)}
+                disabled={loading || !uploadedText}
+                className="analysis-button"
+              >
+                Analyse with {library.name}
+              </button>
+            </div>
+          </div>
         </div>
-    );
+      ))}
+    </div>
+  </div>
+        ) : (
+            <div className="collapsed-library-selection">
+                <div className="current-analysis-info">
+                    <span className="current-analysis-text">
+                        Analysing with <strong>{libraries.find(lib => lib.id === selectedMethod)?.name || selectedMethod.toUpperCase()}</strong>
+                    </span>
+                    <button
+                        onClick={() => setShowLibraryOptions(true)}
+                        className="change-method-button"
+                        disabled={loading}
+                    >
+                        Change Method
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {loading && (
+            <div className="progress-container-wrapper">
+                <ProgressBar loading={loading} />
+            </div>
+        )}
+
+        {error && (
+            <div className="error-message">
+                Error: {error}
+            </div>
+        )}
+
+        {analysisDone && (
+            <CreativeKeynessResults
+                results={comparisonResults}
+                uploadedText={uploadedText}
+                method={selectedMethod}
+                stats={stats}
+                genre={genre}
+                onWordDetail={onWordDetail}
+                onChangeMethod={handleChangeMethod}
+                loading={loading}
+            />
+        )}
+    </div>
+);
 };
 
 export default KeynessAnalyser;

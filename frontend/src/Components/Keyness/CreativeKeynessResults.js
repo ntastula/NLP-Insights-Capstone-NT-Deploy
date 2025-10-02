@@ -15,7 +15,7 @@ const posColors = {
   OTHER: "other",
 };
 
-const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, onWordDetail }) => {
+const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, onWordDetail, onChangeMethod, loading }) => {
   const [activeView, setActiveView] = useState("keywords");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -215,7 +215,21 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   };
 
   return (
+    
     <div className="results-container">
+      <div className="results-header flex justify-between items-center mb-4">
+  <span className="current-analysis-text text-gray-700">
+    Analysing with <strong>{method?.toUpperCase()}</strong>
+  </span>
+  <button
+    onClick={() => onChangeMethod && onChangeMethod()}
+    className="change-method-button"
+    disabled={loading}
+  >
+    Change Method
+  </button>
+</div>
+
       <ResultsSummary 
         stats={stats} 
         selectedMethod={method} 
@@ -358,7 +372,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
                 {chartSummaries[activeChart].loading ? (
                   <div className="flex items-center space-x-2 text-blue-600">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <p>Analyzing chart data...</p>
+                    <p>Analysing chart data...</p>
                   </div>
                 ) : chartSummaries[activeChart].error ? (
                   <div className="bg-red-50 border border-red-200 rounded-md p-4">

@@ -42,14 +42,11 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
                     title: `Clustering Analysis - ${selectedCluster === 'all' ? 'All Clusters' : `Cluster ${selectedCluster}`}`
                 })
             });
-            
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
             const data = await response.json();
             setChartSummaryData(data);
-            
         } catch (error) {
             console.error('Error generating summary:', error);
             setChartSummaryError(error.message);
@@ -67,7 +64,6 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
 
     // Function for general summary (placeholder for later)
     const generateGeneralSummary = async () => {
-       
     };
 
     const generateThemeAnalysis = async () => {
@@ -88,14 +84,11 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
                 title: 'Document Collection Theme Analysis'
             })
         });
-        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
         const data = await response.json();
         setThemeAnalysisData(data);
-        
     } catch (error) {
         console.error('Error generating theme analysis:', error);
         setThemeAnalysisError(error.message);
@@ -129,14 +122,11 @@ useEffect(() => {
                     title: 'Thematic Flow Analysis'
                 })
             });
-            
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
             const data = await response.json();
             setThematicFlowData(data);
-            
         } catch (error) {
             console.error('Error generating thematic flow:', error);
             setThematicFlowError(error.message);
@@ -171,14 +161,11 @@ useEffect(() => {
                     title: 'Overused/Underused Analysis'
                 })
             });
-            
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
             const data = await response.json();
             setOverusedThemesData(data);
-            
         } catch (error) {
             console.error('Error generating overused themes analysis:', error);
             setOverusedThemesError(error.message);
@@ -308,7 +295,7 @@ useEffect(() => {
                         {isLoadingChartSummary && (
                             <div className="chart-summary-loading">
                                 <div className="loading-spinner"></div>
-                                <p>Analyzing clustering results...</p>
+                                <p>Analysing clustering results...</p>
                             </div>
                         )}
                         
@@ -387,14 +374,14 @@ useEffect(() => {
                             onClick={generateThemeAnalysis}
                             disabled={isLoadingThemeAnalysis}
                         >
-                            {isLoadingThemeAnalysis ? 'Analyzing...' : 'Regenerate'}
+                            {isLoadingThemeAnalysis ? 'Analysing...' : 'Regenerate'}
                         </button>
                     </div>
                     
                     {isLoadingThemeAnalysis && (
                         <div className="themes-loading">
                             <div className="loading-spinner"></div>
-                            <p>Analyzing themes and topics in your document collection...</p>
+                            <p>Analysing themes and topics in your document collection...</p>
                         </div>
                     )}
                     
@@ -412,7 +399,7 @@ useEffect(() => {
                             <div className="themes-meta">
                                 <span>Data Source: {themeAnalysisData.data_source}</span>
                                 <span>Total Documents: {themeAnalysisData.total_documents}</span>
-                                <span>Analyzed: {themeAnalysisData.documents_analyzed}</span>
+                                <span>Analysed: {themeAnalysisData.documents_analysed}</span>
                                 {themeAnalysisData.has_clustering_context && (
                                     <span>Clustering Context: Available</span>
                                 )}
@@ -442,14 +429,14 @@ useEffect(() => {
                         onClick={generateThematicFlow}
                         disabled={isLoadingThematicFlow}
                     >
-                        {isLoadingThematicFlow ? 'Analyzing...' : 'Regenerate'}
+                        {isLoadingThematicFlow ? 'Analysing...' : 'Regenerate'}
                     </button>
                 </div>
                 
                 {isLoadingThematicFlow && (
                     <div className="flow-loading">
                         <div className="loading-spinner"></div>
-                        <p>Analyzing thematic relationships and flow patterns...</p>
+                        <p>Analysing thematic relationships and flow patterns...</p>
                     </div>
                 )}
                 
@@ -467,7 +454,7 @@ useEffect(() => {
                         <div className="flow-meta">
                             <span>Data Source: {thematicFlowData.data_source}</span>
                             <span>Total Documents: {thematicFlowData.total_documents}</span>
-                            <span>Analyzed: {thematicFlowData.documents_analyzed}</span>
+                            <span>Analysed: {thematicFlowData.documents_analysed}</span>
                             {thematicFlowData.has_clustering_context && (
                                 <span>Clustering Context: Available</span>
                             )}
@@ -497,14 +484,14 @@ useEffect(() => {
                         onClick={generateOverusedThemes}
                         disabled={isLoadingOverusedThemes}
                     >
-                        {isLoadingOverusedThemes ? 'Analyzing...' : 'Regenerate'}
+                        {isLoadingOverusedThemes ? 'Analysing...' : 'Regenerate'}
                     </button>
                 </div>
                 
                 {isLoadingOverusedThemes && (
                     <div className="overused-loading">
                         <div className="loading-spinner"></div>
-                        <p>Analyzing patterns of overuse and underuse...</p>
+                        <p>Analysing patterns of overuse and underuse...</p>
                     </div>
                 )}
                 
@@ -522,7 +509,7 @@ useEffect(() => {
                         <div className="overused-meta">
                             <span>Data Source: {overusedThemesData.data_source}</span>
                             <span>Total Documents: {overusedThemesData.total_documents}</span>
-                            <span>Analyzed: {overusedThemesData.documents_analyzed}</span>
+                            <span>Analysed: {overusedThemesData.documents_analysed}</span>
                             {overusedThemesData.has_clustering_context && (
                                 <span>Clustering Context: Available</span>
                             )}
@@ -532,7 +519,7 @@ useEffect(() => {
                         </div>
                     </div>
                 )}
-                
+
                 {!overusedThemesData && !overusedThemesError && !isLoadingOverusedThemes && (
                     <div className="overused-placeholder">
                         <p>Overused/underused analysis will automatically generate when you first view this tab.</p>
