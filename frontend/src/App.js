@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import HomePage from "./Components/HomePage";
 import KeynessLanding from "./Components/Keyness/KeynessLanding";
+import KeynessAnalyser from "./Components/Keyness/KeynessAnalyser";
 import ClusteringLanding from "./Components/Clustering/ClusteringLanding";
 import SentimentLanding from "./Components/Sentiment/SentimentLanding";
 import SensorimotorLanding from "./Components/Sensorimotor/SensorimotorLanding";
@@ -16,6 +17,7 @@ function App() {
     const [creativeKeynessData, setCreativeKeynessData] = useState(null);
     const [method, setMethod] = useState(""); 
     const [uploadedText, setUploadedText] = useState("");
+    const [referenceText, setReferenceText] = useState("");
     const [chartData, setChartData] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(false);
     const [summary, setSummary] = useState("");
@@ -49,6 +51,7 @@ function App() {
     setCreativeKeynessData(resultsData.results);
     setMethod(resultsData.method);
     setUploadedText(resultsData.uploadedText);
+    setReferenceText(resultsData.referenceText || "");
     setStats(resultsData.stats);
     setActivePage("keyness-results");
     console.log("Parent passing to KeynessLanding:", {
@@ -75,6 +78,10 @@ function App() {
         setTimeout(() => setWordDetailData(null), 0);
     };
     
+    const handleChangeMethod = () => {
+        setActivePage("keyness-analyser");
+    };
+    
     useUnloadCleanup();
 
     return (
@@ -97,6 +104,19 @@ function App() {
                     comparisonMode={comparisonMode} 
                 />   
             )}
+            {activePage === "keyness-analyser" && (
+                <KeynessAnalyser
+                    uploadedText={uploadedText}
+                    uploadedPreview={""}
+                    corpusPreview={""}
+                    onBack={() => setActivePage("keyness-results")}
+                    genre={selectedGenre}
+                    onWordDetail={handleWordDetail}
+                    onResults={handleKeynessResults}
+                    comparisonMode={comparisonMode}
+                    referenceText={referenceText}
+                />
+            )}
             {activePage === "keyness-results" && (
                 <CreativeKeynessResults 
                     onBackFromWordDetail={handleBackFromWordDetail}
@@ -111,6 +131,7 @@ function App() {
                     summary={summary}
                     posGroups={posGroups}
                     stats={stats}
+                    onChangeMethod={handleChangeMethod}
                 />   
             )}
             {activePage === "keyness-word-detail" && wordDetailData && (

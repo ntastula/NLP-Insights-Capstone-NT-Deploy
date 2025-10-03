@@ -24,7 +24,6 @@ const TextInputSection = ({
   const [draggedFileName, setDraggedFileName] = useState("");
   const dropzoneRef = useRef(null);
 
-  // Upload user_text files
   const uploadUserTextFiles = async (files) => {
     if (files.length !== 2) {
       setUploadErrors(["Please select exactly two files."]);
@@ -296,12 +295,11 @@ const TextInputSection = ({
         {pastedText && <div className="word-count">Word count: {pastedWordCount}</div>}
       </div>
 
-            {/* Drag & drop upload */}
+      {/* Drag & drop upload */}
       <div
         ref={dropzoneRef}
-        className={`keyness-dropzone ${hover ? "hover" : ""} ${
-          uploading ? "uploading" : ""
-        }`}
+        className={`keyness-dropzone ${hover ? "hover" : ""} ${uploading ? "uploading" : ""
+          }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -391,48 +389,46 @@ const TextInputSection = ({
       )}
 
       {/* Uploaded Text Preview */}
-{comparisonMode === "user_text" && selectedFiles.length > 1 && (
-  <div className="preview-box">
-    <h3 className="preview-title">Uploaded Text Preview:</h3>
-    <div className="preview-content">
-      {selectedFiles.slice(1).map((file, index) => {
-        const previewText = file.textContent
-          ? file.textContent.split("\n").slice(0, 4).join("\n")
-          : "";
-        return (
-          <div key={index} className="file-preview">
-            <strong>{file.name}</strong>
-            {"\n"}
-            {previewText}
-            {index < selectedFiles.slice(1).length - 1 && "\n---\n"}
+      {comparisonMode === "user_text" && selectedFiles.length > 1 && (
+        <div className="preview-box">
+          <h3 className="preview-title">Uploaded Text Preview:</h3>
+          <div className="preview-content">
+            {selectedFiles.slice(1).map((file, index) => {
+              const previewText = file.textContent
+                ? file.textContent.split("\n").slice(0, 4).join("\n")
+                : "";
+              return (
+                <div key={index} className="file-preview">
+                  <strong>{file.name}</strong>
+                  {"\n"}
+                  {previewText}
+                  {index < selectedFiles.slice(1).length - 1 && "\n---\n"}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-  </div>
-)}
+        </div>
+      )}
 
-{comparisonMode === "corpus" && selectedFiles.length > 0 && (
-  <div className="preview-box">
-    <h3 className="preview-title">Uploaded Text Preview:</h3>
-    <div className="preview-content">
-      {selectedFiles.map((file, index) => {
-        const previewText = file.textContent
-          ? file.textContent.split("\n").slice(0, 4).join("\n")
-          : "";
-        return (
-          <div key={index} className="file-preview">
-            <strong>{file.name}</strong>
-            {"\n"}
-            {previewText}
+      {comparisonMode === "corpus" && selectedFiles.length > 0 && (
+        <div className="preview-box">
+          <h3 className="preview-title">Uploaded Text Preview:</h3>
+          <div className="preview-content">
+            {selectedFiles.map((file, index) => {
+              const previewText = file.textContent
+                ? file.textContent.split("\n").slice(0, 4).join("\n")
+                : "";
+              return (
+                <div key={index} className="file-preview">
+                  <strong>{file.name}</strong>
+                  {"\n"}
+                  {previewText}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
-  </div>
-)}
-
-
+        </div>
+      )}
 
       {/* Corpus / Reference Preview */}
       {corpusPreview && (

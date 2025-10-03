@@ -52,7 +52,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
   const [embedding, setEmbedding] = useState("conceptnet");
   const [showEmbeddingOptions, setShowEmbeddingOptions] = useState(true);
 
-  // Toggles
   const [showTopTerms, setShowTopTerms] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
 
@@ -72,23 +71,17 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
     }
   ];
 
-  // Parse uploaded text into document array
   const parseTextDocuments = (text) => {
     if (!text) return [];
-    
-    // Split by double line breaks (common document separator)
     let documents = text.split(/\n\s*\n/).filter(doc => doc.trim());
-    
-    // If no double line breaks, split by single line breaks
     if (documents.length === 1) {
       documents = text.split(/\n/).filter(doc => doc.trim());
     }
-    
+
     // If still just one document, split by sentences (for very long text)
     if (documents.length === 1 && text.length > 1000) {
       documents = text.match(/[^.!?]+[.!?]+/g) || [text];
     }
-    
     return documents.map(doc => doc.trim()).filter(doc => doc.length > 0);
   };
 
@@ -110,10 +103,9 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const data = await response.json();
 
-      // Add PCA coordinates to clusters for plotting
       const clustersWithCoords = data.clusters.map((c, idx) => ({
         ...c,
-        x: c.pca_x ?? idx, // fallback in case pca_x not returned
+        x: c.pca_x ?? idx, 
         y: c.pca_y ?? idx,
       }));
 
@@ -122,8 +114,8 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       setThemes(data.suggested_themes || {});
       setNumClusters(data.num_clusters || null);
       setNumDocs(data.num_docs || null);
-      setSelectedCluster("all"); // reset filter
-      setShowEmbeddingOptions(false); // Hide embedding options when results are displayed
+      setSelectedCluster("all"); 
+      setShowEmbeddingOptions(false); 
 
     } catch (err) {
       setError(err.message);
@@ -247,12 +239,12 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
         {/* Results */}
         {!loading && !error && clusters.length > 0 && (
           <div className="results-section">
-          <CreativeClusteringAnalysis
-            clusters={clusters}
-            topTerms={topTerms}
-            themes={themes}
-            textDocuments={textDocuments}
-          />
+            <CreativeClusteringAnalysis
+              clusters={clusters}
+              topTerms={topTerms}
+              themes={themes}
+              textDocuments={textDocuments}
+            />
           </div>
         )}
       </div>

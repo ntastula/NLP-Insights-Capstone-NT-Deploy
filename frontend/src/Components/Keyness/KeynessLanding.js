@@ -3,17 +3,17 @@ import TextInputSection from "../TextInputSection";
 import KeynessAnalyser from "./KeynessAnalyser";
 import "./KeynessLanding.css";
 
-const KeynessLanding = ({ 
-    onBack, 
-    genre, 
-    onWordDetail, 
+const KeynessLanding = ({
+    onBack,
+    genre,
+    onWordDetail,
     onResults,
-    comparisonMode = "corpus"         
+    comparisonMode = "corpus"
 }) => {
     const [pastedText, setPastedText] = useState("");
     const [uploadedText, setUploadedText] = useState("");
     const [uploadedPreview, setUploadedPreview] = useState("");
-    const [activeInput, setActiveInput] = useState(""); 
+    const [activeInput, setActiveInput] = useState("");
     const [error, setError] = useState("");
     const [analysisStarted, setAnalysisStarted] = useState(false);
     const [corpusPreview, setCorpusPreview] = useState("");
@@ -30,7 +30,7 @@ const KeynessLanding = ({
             try {
                 if (comparisonMode === "corpus") {
                     if (!genre) return;
-                    
+
                     const url = `http://localhost:8000/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`;
                     const response = await fetch(url, { credentials: "include" });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -65,93 +65,91 @@ const KeynessLanding = ({
     };
 
     const handleFilesUploaded = (combinedText, files) => {
-  const text = combinedText || "";
+        const text = combinedText || "";
 
-  if (comparisonMode === "user_text") {
-    if (!files || files.length === 0) {
-      setError("Please upload at least one file.");
-      return;
-    }
+        if (comparisonMode === "user_text") {
+            if (!files || files.length === 0) {
+                setError("Please upload at least one file.");
+                return;
+            }
 
-    // Accumulate files one by one
-    setSelectedFiles(prevFiles => {
-      let updatedFiles = [...prevFiles, ...files];
+            // Accumulate files one by one
+            setSelectedFiles(prevFiles => {
+                let updatedFiles = [...prevFiles, ...files];
 
-      // Keep only first 2 files
-      if (updatedFiles.length > 2) {
-        updatedFiles = updatedFiles.slice(0, 2);
-      }
+                // Keep only first 2 files
+                if (updatedFiles.length > 2) {
+                    updatedFiles = updatedFiles.slice(0, 2);
+                }
 
-      // Combine the text of both files
-      const combinedText = updatedFiles
-        .map(f => f.textContent || "")
-        .join("\n\n--- Next File ---\n\n");
+                // Combine the text of both files
+                const combinedText = updatedFiles
+                    .map(f => f.textContent || "")
+                    .join("\n\n--- Next File ---\n\n");
 
-      setUploadedText(combinedText);
-      setUploadedPreview(
-        updatedFiles[1]
-          ? (updatedFiles[1].textContent || "").split("\n").slice(0, 4).join("\n")
-          : ""
-      );
+                setUploadedText(combinedText);
+                setUploadedPreview(
+                    updatedFiles[1]
+                        ? (updatedFiles[1].textContent || "").split("\n").slice(0, 4).join("\n")
+                        : ""
+                );
 
-      // Set reference preview from first file
-      if (updatedFiles[0]) {
-        const refFile = updatedFiles[0];
-        setReferenceText(refFile.textContent || "");
-        setReferencePreview(
-          (refFile.textContent || "").split("\n").slice(0, 4).join("\n")
-        );
-        setCorpusPreview(
-          (refFile.textContent || "").split("\n").slice(0, 4).join("\n")
-        );
-      }
+                // Set reference preview from first file
+                if (updatedFiles[0]) {
+                    const refFile = updatedFiles[0];
+                    setReferenceText(refFile.textContent || "");
+                    setReferencePreview(
+                        (refFile.textContent || "").split("\n").slice(0, 4).join("\n")
+                    );
+                    setCorpusPreview(
+                        (refFile.textContent || "").split("\n").slice(0, 4).join("\n")
+                    );
+                }
 
-      // Clear error if we have exactly 2 files
-      setError(updatedFiles.length === 2 ? "" : "Please upload both reference and target texts.");
+                // Clear error if we have exactly 2 files
+                setError(updatedFiles.length === 2 ? "" : "Please upload both reference and target texts.");
 
-      return updatedFiles;
-    });
+                return updatedFiles;
+            });
 
-  } else {
-    // CORPUS MODE
-    setSelectedFiles(files || []);
-    setUploadedText(text);
-    setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
-    setError("");
-  }
+        } else {
+            // CORPUS MODE
+            setSelectedFiles(files || []);
+            setUploadedText(text);
+            setUploadedPreview(text.split("\n").slice(0, 4).join("\n"));
+            setError("");
+        }
 
-  setActiveInput("file");
-};
-
-
+        setActiveInput("file");
+    };
 
     const handleContinue = () => {
         if (!uploadedText.trim()) {
             setError("Please enter or upload some text before continuing.");
             return;
         }
-        
+
         if (comparisonMode === "user_text" && !referenceText.trim()) {
             setError("Please upload both reference and target texts.");
             return;
         }
-        
+
         setAnalysisStarted(true);
     };
 
     if (analysisStarted) {
         console.log("KeynessLanding passing to KeynessAnalyser:", {
-        genre,
-        comparisonMode,
-        referenceText: referenceText?.substring(0, 50) + "..."
-    });
+            genre,
+            comparisonMode,
+            referenceText: referenceText?.substring(0, 50) + "..."
+        });
         return (
             <KeynessAnalyser
                 uploadedText={uploadedText}
                 uploadedPreview={uploadedPreview}
                 corpusPreview={corpusPreview}
                 onBack={() => setAnalysisStarted(false)}
-                genre={genre} 
+                genre={genre}
                 onWordDetail={onWordDetail}
                 onResults={onResults}
                 comparisonMode={comparisonMode}
@@ -172,11 +170,11 @@ const KeynessLanding = ({
             <div className="keyness-header">
                 <h1 className="keyness-title">Keyness Analysis</h1>
                 <p className="keyness-subtitle">
-                    {comparisonMode === "user_text" 
+                    {comparisonMode === "user_text"
                         ? "Compare two texts to find distinctive words and phrases."
                         : "Find the words that stand out most in your writing, showing what makes your voice and style different from other texts."
                     }
-                        </p>
+                </p>
             </div>
 
             <div className="keyness-container">
@@ -200,16 +198,16 @@ const KeynessLanding = ({
 
                     <div className="keyness-continue-section">
                         <button
-    onClick={handleContinue}
-    className="keyness-continue-button"
-    disabled={
-        comparisonMode === "user_text"
-            ? selectedFiles.length !== 2
-            : !uploadedText.trim() 
-    }
->
-    Continue to Analysis →
-</button>
+                            onClick={handleContinue}
+                            className="keyness-continue-button"
+                            disabled={
+                                comparisonMode === "user_text"
+                                    ? selectedFiles.length !== 2
+                                    : !uploadedText.trim()
+                            }
+                        >
+                            Continue to Analysis →
+                        </button>
 
                     </div>
                 </div>

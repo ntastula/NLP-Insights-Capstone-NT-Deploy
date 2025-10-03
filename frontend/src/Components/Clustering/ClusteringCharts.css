@@ -1,11 +1,12 @@
 /* ClusteringCharts.css */
 
 .clustering-charts-container {
+  position: relative; /* Ensure pseudo elements and children are scoped */
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   padding: 2rem;
   border-radius: 1.5rem;
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   width: 100%;
@@ -84,10 +85,12 @@
   border-radius: 1rem;
   overflow: hidden;
   background: white;
-  box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(226, 232, 240, 0.5);
+  width: 100%;
+  height: 70vh; /* Explicit height so Plotly can size itself */
 }
 
 .plot-container::before {
@@ -100,6 +103,14 @@
   background: linear-gradient(45deg, rgba(59, 130, 246, 0.02), rgba(168, 85, 247, 0.02));
   pointer-events: none;
   z-index: 1;
+}
+
+/* Ensure Plotly wrappers fill the container */
+.plot-container > div,
+.plot-container .js-plotly-plot,
+.plot-container .plotly {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* Enhanced color palette for clusters */
@@ -124,13 +135,13 @@
     padding: 1rem;
     margin-bottom: 1rem;
   }
-  
+
   .controls-section {
     flex-direction: column;
     align-items: stretch;
     gap: 1rem;
   }
-  
+
   .control-group {
     justify-content: space-between;
   }
@@ -141,7 +152,7 @@
     border-radius: 1rem;
     padding: 0.75rem;
   }
-  
+
   .controls-section {
     padding: 0.75rem;
     border-radius: 0.75rem;
@@ -194,8 +205,12 @@
     box-shadow: none;
     border: 1px solid #ccc;
   }
-  
+
   .controls-section {
     display: none;
+  }
+
+  .plot-container {
+    height: 60vh; /* Reasonable height for print */
   }
 }

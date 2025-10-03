@@ -53,7 +53,7 @@ const ResultsTable = ({ results = [], method = "nltk" }) => {
       <div className="statistics-explanation">
         <h3 className="explanation-title">Understanding Your Results</h3>
         <p className="explanation-intro">
-          This table shows words that are statistically distinctive in your text compared to a reference sample. 
+          This table shows words that are statistically distinctive in your text compared to a reference sample.
           Here's what each column means:
         </p>
         <div className="statistics-grid">

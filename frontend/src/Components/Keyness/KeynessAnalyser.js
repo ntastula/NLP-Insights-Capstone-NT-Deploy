@@ -6,6 +6,8 @@ import CreativeKeynessResults from "./CreativeKeynessResults";
 import '../ProgressBar.css';
 import './KeynessAnalyser.css';
 
+console.log("KeynessAnalyser file loaded");
+
 /**
  * Progress Bar
  */
@@ -53,13 +55,26 @@ const KeynessAnalyser = ({
     const [error, setError] = useState("");
     const [analysisDone, setAnalysisDone] = useState(false);
     const [selectedMethod, setSelectedMethod] = useState(method || "nltk");
-    const [filterMode, setFilterMode] = useState("content"); // "content" | "all"
+    const [filterMode, setFilterMode] = useState("content");
     const [showLibraryOptions, setShowLibraryOptions] = useState(true);
+    const [showResults, setShowResults] = useState(false);
+
+    const handleChangeMethod = () => {
+        console.log("handleChangeMethod called!");
+        setAnalysisDone(false);
+        setSelectedMethod("");
+        setShowLibraryOptions(true);
+        setComparisonResults([]);
+        setShowResults(false);
+    };
+
+    console.log("KeynessAnalyser component rendered");
+    console.log("handleChangeMethod exists:", typeof handleChangeMethod);
+    console.log("handleChangeMethod defined:", handleChangeMethod);
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
-
 
     // Library descriptions and configurations
     const libraries = [
@@ -89,13 +104,6 @@ const KeynessAnalyser = ({
         }
     ];
 
-    const handleChangeMethod = () => {
-                setAnalysisDone(false);      
-                setSelectedMethod("");     
-                setShowLibraryOptions(true); 
-                setComparisonResults([]);
-            };
-
     const performAnalysis = async (methodName) => {
         if (!uploadedText) {
             setError("No text to analyse");
@@ -123,12 +131,12 @@ const KeynessAnalyser = ({
         try {
             const payload = {
                 comparison_mode: comparisonMode,
-                uploaded_text: uploadedText,   // string
+                uploaded_text: uploadedText,   
                 reference_text: comparisonMode === "user_text" ? referenceText : undefined,
                 method: methodName.toLowerCase(),
                 filter_mode: filterMode,
                 corpus_name: comparisonMode === "corpus" ? genre : undefined
-};
+            };
 
             if (comparisonMode === "user_text") {
                 payload.comparison_mode = "user_text";
@@ -176,6 +184,7 @@ const KeynessAnalyser = ({
                     method: methodName,
                     comparisonMode: comparisonMode,
                     uploadedText: uploadedText,
+                    referenceText: comparisonMode === "user_text" ? referenceText : undefined,
                     stats: {
                         uploadedTotal: json.uploaded_total ?? uploadedText.split(/\s+/).filter(Boolean).length,
                         corpusTotal: json.corpus_total ?? 0,
@@ -193,122 +202,122 @@ const KeynessAnalyser = ({
         } finally {
             setLoading(false);
         }
-};
+    };
 
-return (
-    <div className="mb-6">
-        <button
-            onClick={onBack}
-            className="keyness-back-button"
-        >
-            ← Back
-        </button>
+    return (
+        <div className="mb-6">
+            <button
+                onClick={onBack}
+                className="keyness-back-button"
+            >
+                ← Back
+            </button>
 
-        {/* Word Filtering Options */}
-        <div className="filter-section">
-            <p className="filter-title">
-                What words in your text would you like analysed:
-            </p>
-            <div className="filter-options">
-                <label className="filter-option">
-                    <input
-                        type="radio"
-                        name="filterMode"
-                        value="content"
-                        checked={filterMode === "content"}
-                        onChange={(e) => setFilterMode(e.target.value)}
-                    />
-                    <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
-                </label>
-                <label className="filter-option">
-                    <input
-                        type="radio"
-                        name="filterMode"
-                        value="all"
-                        checked={filterMode === "all"}
-                        onChange={(e) => setFilterMode(e.target.value)}
-                    />
-                    <span>All words</span>
-                </label>
-            </div>
-        </div>
-
-{/* Library Selection Section */}
-{showLibraryOptions ? (
-  <div className="library-selection">
-    <h2 className="library-selection-title">Choose Your Analysis Method</h2>
-    <div className="library-container">
-      {libraries.map((library) => (
-        <div key={library.id} className="library-card">
-          <div className="library-card-content">
-            {/* Left side - Description */}
-            <div className="library-description">
-              <h3 className="library-title">
-                {library.name}: {library.title}
-              </h3>
-              <p className="library-text">
-                {library.description}
-              </p>
-            </div>
-
-            {/* Right side - Button */}
-            <div className="library-button-container">
-              <button
-                onClick={() => performAnalysis(library.id)}
-                disabled={loading || !uploadedText}
-                className="analysis-button"
-              >
-                Analyse with {library.name}
-              </button>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-        ) : (
-            <div className="collapsed-library-selection">
-                <div className="current-analysis-info">
-                    <span className="current-analysis-text">
-                        Analysing with <strong>{libraries.find(lib => lib.id === selectedMethod)?.name || selectedMethod.toUpperCase()}</strong>
-                    </span>
-                    <button
-                        onClick={() => setShowLibraryOptions(true)}
-                        className="change-method-button"
-                        disabled={loading}
-                    >
-                        Change Method
-                    </button>
+            {/* Word Filtering Options */}
+            <div className="filter-section">
+                <p className="filter-title">
+                    What words in your text would you like analysed:
+                </p>
+                <div className="filter-options">
+                    <label className="filter-option">
+                        <input
+                            type="radio"
+                            name="filterMode"
+                            value="content"
+                            checked={filterMode === "content"}
+                            onChange={(e) => setFilterMode(e.target.value)}
+                        />
+                        <span>Only content words (nouns, verbs, adjectives, adverbs)</span>
+                    </label>
+                    <label className="filter-option">
+                        <input
+                            type="radio"
+                            name="filterMode"
+                            value="all"
+                            checked={filterMode === "all"}
+                            onChange={(e) => setFilterMode(e.target.value)}
+                        />
+                        <span>All words</span>
+                    </label>
                 </div>
             </div>
-        )}
 
-        {loading && (
-            <div className="progress-container-wrapper">
-                <ProgressBar loading={loading} />
-            </div>
-        )}
+            {/* Library Selection Section */}
+            {showLibraryOptions ? (
+                <div className="library-selection">
+                    <h2 className="library-selection-title">Choose Your Analysis Method</h2>
+                    <div className="library-container">
+                        {libraries.map((library) => (
+                            <div key={library.id} className="library-card">
+                                <div className="library-card-content">
+                                    {/* Left side - Description */}
+                                    <div className="library-description">
+                                        <h3 className="library-title">
+                                            {library.name}: {library.title}
+                                        </h3>
+                                        <p className="library-text">
+                                            {library.description}
+                                        </p>
+                                    </div>
 
-        {error && (
-            <div className="error-message">
-                Error: {error}
-            </div>
-        )}
+                                    {/* Right side - Button */}
+                                    <div className="library-button-container">
+                                        <button
+                                            onClick={() => performAnalysis(library.id)}
+                                            disabled={loading || !uploadedText}
+                                            className="analysis-button"
+                                        >
+                                            Analyse with {library.name}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="collapsed-library-selection">
+                    <div className="current-analysis-info">
+                        <span className="current-analysis-text">
+                            Analysing with <strong>{libraries.find(lib => lib.id === selectedMethod)?.name || selectedMethod.toUpperCase()}</strong>
+                        </span>
+                        <button
+                            onClick={handleChangeMethod}
+                            className="change-method-button"
+                            disabled={loading}
+                        >
+                            Change Method
+                        </button>
+                    </div>
+                </div>
+            )}
 
-        {analysisDone && (
-            <CreativeKeynessResults
-                results={comparisonResults}
-                uploadedText={uploadedText}
-                method={selectedMethod}
-                stats={stats}
-                genre={genre}
-                onWordDetail={onWordDetail}
-                onChangeMethod={handleChangeMethod}
-                loading={loading}
-            />
-        )}
-    </div>
-);
+            {loading && (
+                <div className="progress-container-wrapper">
+                    <ProgressBar loading={loading} />
+                </div>
+            )}
+
+            {error && (
+                <div className="error-message">
+                    Error: {error}
+                </div>
+            )}
+
+            {analysisDone && (
+                <CreativeKeynessResults
+                    results={comparisonResults}
+                    uploadedText={uploadedText}
+                    method={selectedMethod}
+                    stats={stats}
+                    genre={genre}
+                    onWordDetail={onWordDetail}
+                    onChangeMethod={handleChangeMethod}
+                    loading={loading}
+                />
+            )}
+        </div>
+    );
 };
 
 export default KeynessAnalyser;

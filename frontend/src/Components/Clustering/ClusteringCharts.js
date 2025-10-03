@@ -6,7 +6,6 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
   const [maxWords, setMaxWords] = useState(5);
   const [showWordsOnChart, setShowWordsOnChart] = useState(false);
 
-  // Enhanced color palette for better visual distinction
   const clusterColors = [
     '#ef4444', // Red
     '#3b82f6', // Blue
@@ -39,7 +38,7 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
       ? clusters
       : clusters.filter((c) => c.label === Number(selectedCluster));
 
-      useEffect(() => {
+  useEffect(() => {
     console.log("Displayed clusters after filter:", displayedClusters.slice(0, 3));
   }, [displayedClusters]);
 
@@ -57,7 +56,7 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
     console.log("Grouped clusters:", grouped);
   }, [grouped]);
 
-  // Prepare Plotly traces with enhanced styling
+  // Prepare Plotly traces
   const traceData = useMemo(() => {
     const grouped = {};
     displayedClusters.forEach((c) => {
@@ -66,9 +65,8 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
     });
 
     return Object.entries(grouped).map(([label, points], index) => {
-      // Use predefined colors or generate distinct HSL colors
       const clusterColor = clusterColors[index % clusterColors.length] ||
-                          `hsl(${(label * 137.5) % 360}, 70%, 55%)`;
+        `hsl(${(label * 137.5) % 360}, 70%, 55%)`;
 
       return {
         x: points.map((p) => p.x),
@@ -117,7 +115,7 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
       ? "Cluster Scatterplot (All Clusters)"
       : `Cluster Scatterplot (Cluster ${selectedCluster})`;
 
-  // Enhanced layout configuration
+  // Layout configuration
   const plotLayout = {
     title: {
       text: chartTitle,
@@ -150,7 +148,8 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
     showlegend: true,
     legend: {
       orientation: "v",
-      x: 1.02,
+      x: 1,
+      xanchor: "right",
       y: 1,
       bgcolor: "rgba(255, 255, 255, 0.9)",
       bordercolor: "rgba(226, 232, 240, 0.8)",
@@ -159,7 +158,8 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
     },
     plot_bgcolor: "rgba(248, 250, 252, 0.5)",
     paper_bgcolor: "white",
-    margin: { l: 80, r: 120, t: 80, b: 80 },
+    margin: { l: 80, r: 80, t: 80, b: 80 },
+    autosize: true,
     hovermode: "closest"
   };
 
@@ -192,11 +192,11 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
       </div>
 
       {/* Plot */}
-      <div className="plot-container">
+      <div className="plot-container" style={{ width: "100%", height: "70vh" }}>
         <Plot
           data={traceData}
           layout={plotLayout}
-          style={{ width: "100%", height: "70vh" }}
+          style={{ width: "100%", height: "100%" }}
           useResizeHandler={true}
           config={{
             displayModeBar: true,
