@@ -233,24 +233,6 @@ return (
             </div>
         </div>
 
-        <div className="method-header">
-  <span className="current-analysis-text">
-    {showLibraryOptions
-      ? "Choose an analysis method below"
-      : `Analysing with ${
-          libraries.find(lib => lib.id === selectedMethod)?.name ||
-          selectedMethod?.toUpperCase()
-        }`}
-  </span>
-  <button
-    onClick={() => setShowLibraryOptions(!showLibraryOptions)}
-    className="change-method-button"
-    disabled={loading}
-  >
-    {showLibraryOptions ? "Cancel" : "Change Method"}
-  </button>
-</div>
-
 {/* Library Selection Section */}
 {showLibraryOptions ? (
   <div className="library-selection">

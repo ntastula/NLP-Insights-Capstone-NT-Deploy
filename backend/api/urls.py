@@ -3,8 +3,8 @@ from . import views
 from .clustering.clustering_analyser import clustering_analysis
 
 urlpatterns = [
-    path("corpora/", views.list_corpora, name="list_corpora"),                   # NEW
-    path("corpus-preview/", views.get_corpus_preview, name="corpus_preview"),    # UPDATED (accepts ?name=)
+    path("corpora/", views.list_corpora, name="list_corpora"),
+    path("corpus-preview/", views.get_corpus_preview, name="corpus_preview"),
     path("analyse-keyness/", views.analyse_keyness, name="keyness_view"),
     path('upload-files/', views.upload_files, name='upload_files'),
     path("analyse-sentiment/", views.analyse_sentiment, name="analyse-sentiment"),
