@@ -217,8 +217,8 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   return (
     
     <div className="results-container">
-      <div className="results-header flex justify-between items-center mb-4">
-  <span className="current-analysis-text text-gray-700">
+      <div className="current-analysis-info">
+  <span className="current-analysis-text">
     Analysing with <strong>{method?.toUpperCase()}</strong>
   </span>
   <button

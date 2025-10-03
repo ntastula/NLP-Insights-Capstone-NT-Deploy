@@ -452,3 +452,21 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.current-analysis-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    margin: 0 auto;
+    max-width: 32rem;
+}
+
+.current-analysis-text {
+    color: #374151;
+    font-size: 1rem;
+}
