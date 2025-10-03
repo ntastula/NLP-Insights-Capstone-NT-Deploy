@@ -5,6 +5,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.http import require_GET
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from backend.utils.session_utils import ensure_session_exists, schedule_session_cleanup
 import json
 import os
 import re
@@ -269,6 +270,7 @@ def upload_files(request):
                 'char_count': len(tgt_text),
             }
         })
+    ensure_session_exists(request)
     if not request.FILES:
         logger.warning("Upload attempt with no files")
         return JsonResponse({'error': 'No files uploaded'}, status=400)
@@ -633,6 +635,21 @@ def analyse_keyness(request):
                 "corpus_total": corpus_total,
                 "total_significant": total_significant
             })
+        logger.info(
+            f"Keyness analysis completed: method={method}, "
+            f"filter_mode={filter_mode}, results_count={len(results_list)}, "
+            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
+        )
+        schedule_session_cleanup(request, delay_minutes=15)
+        return JsonResponse({
+            "id": keyness_obj.id,
+            "method": method,
+            "filter_mode": filter_mode,
+            "results": results_list,
+            "uploaded_total": uploaded_total,
+            "corpus_total": corpus_total,
+            "total_significant": total_significant
+        })
 
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
@@ -714,6 +731,7 @@ def analyse_sentiment(request):
         result = analyze_text(text)
 
         # Return the result as JSON to the client
+        schedule_session_cleanup(request, delay_minutes=15)
         return JsonResponse(result)
 
     # If the CSV lexicon file is missing, give a clear hint to the user
@@ -1388,6 +1406,7 @@ Additional Context from Clustering Analysis:
 
         analysis = analysis.strip()
 
+        schedule_session_cleanup(request, delay_minutes=15)
         return Response({
             "analysis_title": analysis_title,
             "data_source": data_source,
@@ -1535,6 +1554,7 @@ Provide insights that reveal the dynamic, interconnected nature of themes and ho
 
         analysis = analysis.strip()
 
+        schedule_session_cleanup(request, delay_minutes=15)
         return Response({
             "analysis_title": analysis_title,
             "data_source": data_source,
@@ -1689,7 +1709,8 @@ Be specific with examples and constructive in your critique. Focus on patterns t
             return Response({'error': 'No response from model.'}, status=500)
 
         analysis = analysis.strip()
-
+        
+        schedule_session_cleanup(request, delay_minutes=15)
         return Response({
             "analysis_title": analysis_title,
             "data_source": data_source,
