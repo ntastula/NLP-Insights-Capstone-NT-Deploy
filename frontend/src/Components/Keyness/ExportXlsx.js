@@ -70,35 +70,35 @@ export function exportKeynessToXlsx(
 
   // --- Word Data Tab ---
   const wordDataRows = [
-  [
-    "Word",
-    "Your Text Count",
-    "Corpus Count",
-    "Chi²",
-    "p-value",
-    "Log-Likelihood",
-    "Effect Size",
-    "Keyness",
-    "POS"
-  ]
-];
+    [
+      "Word",
+      "Your Text Count",
+      "Corpus Count",
+      "Chi²",
+      "p-value",
+      "Log-Likelihood",
+      "Effect Size",
+      "Keyness",
+      "POS"
+    ]
+  ];
 
-results.forEach((w) => {
-  wordDataRows.push([
-    w.word ?? "-",
-    w.uploaded_count ?? w.count_a ?? 0,
-    w.sample_count ?? w.count_b ?? 0,
-    formatNumber(w.chi2),
-    formatNumber(w.p_value, 2),
-    formatNumber(w.log_likelihood),
-    formatNumber(w.effect_size),
-    w.keyness ?? "-",
-    w.pos ?? "N/A"
-  ]);
-});
+  results.forEach((w) => {
+    wordDataRows.push([
+      w.word ?? "-",
+      w.uploaded_count ?? w.count_a ?? 0,
+      w.sample_count ?? w.count_b ?? 0,
+      formatNumber(w.chi2),
+      formatNumber(w.p_value, 2),
+      formatNumber(w.log_likelihood),
+      formatNumber(w.effect_size),
+      w.keyness ?? "-",
+      w.pos ?? "N/A"
+    ]);
+  });
 
-const wordDataWS = XLSX.utils.aoa_to_sheet(wordDataRows);
-XLSX.utils.book_append_sheet(workbook, wordDataWS, "Word Data");
+  const wordDataWS = XLSX.utils.aoa_to_sheet(wordDataRows);
+  XLSX.utils.book_append_sheet(workbook, wordDataWS, "Word Data");
 
   // --- Charts Tab ---
   if (chartData && chartData.length > 0) {

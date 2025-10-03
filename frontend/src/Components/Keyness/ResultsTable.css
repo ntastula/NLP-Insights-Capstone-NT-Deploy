@@ -188,29 +188,29 @@
   .statistics-explanation {
     padding: 1.5rem;
   }
-  
+
   .explanation-title {
     font-size: 1.25rem;
   }
-  
+
   .statistics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .results-table {
     font-size: 0.8rem;
   }
-  
+
   .results-table th,
   .results-table td {
     padding: 0.5rem 0.4rem;
   }
-  
+
   .table-title {
     font-size: 1.125rem;
     padding: 1rem 1rem 0;
   }
-  
+
   .table-wrapper {
     padding: 0 1rem 1rem;
   }
@@ -239,13 +239,13 @@
     box-shadow: none;
     border: 1px solid #000;
   }
-  
+
   .statistics-explanation {
     background: #f3f4f6 !important;
     color: #000 !important;
     -webkit-print-color-adjust: exact;
   }
-  
+
   .results-table tr:hover {
     background-color: transparent !important;
     transform: none !important;

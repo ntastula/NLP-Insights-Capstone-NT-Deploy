@@ -222,41 +222,41 @@
   .method-explanation {
     padding: 1.5rem;
   }
-  
+
   .method-title {
     font-size: 1.25rem;
   }
-  
+
   .results-section {
     padding: 1.5rem;
   }
-  
+
   .results-title {
     font-size: 1.25rem;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .keywords-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .keyword-card {
     padding: 1.25rem;
   }
-  
+
   .keyword-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .keyword-rank {
     align-self: flex-end;
   }
-  
+
   .keyword-word {
     font-size: 1.25rem;
   }
@@ -266,15 +266,15 @@
   .keyword-card {
     padding: 1rem;
   }
-  
+
   .keyword-word {
     font-size: 1.125rem;
   }
-  
+
   .stat-item {
     padding: 0.5rem;
   }
-  
+
   .stat-label,
   .stat-value {
     font-size: 0.8rem;
@@ -287,6 +287,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -317,19 +318,19 @@
   .keyness-results-container {
     box-shadow: none;
   }
-  
+
   .method-explanation {
     background: #f3f4f6 !important;
     color: #000 !important;
     -webkit-print-color-adjust: exact;
   }
-  
+
   .keyword-card {
     break-inside: avoid;
     box-shadow: none;
     border: 1px solid #000;
   }
-  
+
   .keyword-card:hover {
     transform: none;
     box-shadow: none;
@@ -341,11 +342,11 @@
   .keyword-card {
     border: 2px solid #000;
   }
-  
+
   .stat-item {
     border: 1px solid #000;
   }
-  
+
   .primary-stat {
     border: 3px solid #000;
   }

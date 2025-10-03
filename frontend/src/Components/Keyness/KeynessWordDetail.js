@@ -3,33 +3,33 @@ import "./KeynessWordDetail.css";
 import "../ProgressBar.css";
 
 const ProgressBar = ({ loading }) => {
-  const [progress, setProgress] = useState(0);
+    const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    let interval;
-    if (loading) {
-      setProgress(0);
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 95) return prev; 
-          return prev + Math.random() * 5;
-        });
-      }, 150);
-    } else {
-      setProgress(100); 
-      const timeout = setTimeout(() => setProgress(0), 500); 
-      return () => clearTimeout(timeout);
-    }
+    useEffect(() => {
+        let interval;
+        if (loading) {
+            setProgress(0);
+            interval = setInterval(() => {
+                setProgress((prev) => {
+                    if (prev >= 95) return prev;
+                    return prev + Math.random() * 5;
+                });
+            }, 150);
+        } else {
+            setProgress(100);
+            const timeout = setTimeout(() => setProgress(0), 500);
+            return () => clearTimeout(timeout);
+        }
 
-    return () => clearInterval(interval);
-  }, [loading]);
+        return () => clearInterval(interval);
+    }, [loading]);
 
-  return (
-    <div className="progress-container" style={{ width: "100%", maxWidth: "100%" }}>
-      <div className="progress-fill" style={{ width: `${progress}%` }}></div>
-      <div className="progress-text">{Math.round(progress)}%</div>
-    </div>
-  );
+    return (
+        <div className="progress-container" style={{ width: "100%", maxWidth: "100%" }}>
+            <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+            <div className="progress-text">{Math.round(progress)}%</div>
+        </div>
+    );
 };
 
 const KeynessWordDetail = ({
@@ -114,7 +114,7 @@ const KeynessWordDetail = ({
             const response = await fetch("http://localhost:8000/api/get-concepts/", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ word, uploaded_text: uploadedText }), 
+                body: JSON.stringify({ word, uploaded_text: uploadedText }),
             });
             const data = await response.json();
             setConceptsAnalysis(data.analysis || "No analysis available");
@@ -134,31 +134,22 @@ const KeynessWordDetail = ({
     };
 
     const highlightWord = (sentence, targetWord) => {
-    if (!targetWord) return sentence;
-    
-    // Escape special regex characters
-    const escapedWord = targetWord.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-    
-    // Use negative lookahead/lookbehind to avoid matching within contractions
-    // This ensures we don't match "won" in "won't"
-    const regex = new RegExp(
-        `\\b(${escapedWord})(?!')\\b`, 
-        "gi"
-    );
-    
-    const parts = [];
-    let lastIndex = 0;
-    
-    sentence.replace(regex, (match, _, offset) => {
-        if (offset > lastIndex) parts.push(sentence.slice(lastIndex, offset));
-        parts.push(<mark key={offset}>{match}</mark>);
-        lastIndex = offset + match.length;
-    });
-    
-    if (lastIndex < sentence.length) parts.push(sentence.slice(lastIndex));
-    
-    return parts;
-};
+        if (!targetWord) return sentence;
+        const escapedWord = targetWord.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(
+            `\\b(${escapedWord})(?!')\\b`,
+            "gi"
+        );
+        const parts = [];
+        let lastIndex = 0;
+        sentence.replace(regex, (match, _, offset) => {
+            if (offset > lastIndex) parts.push(sentence.slice(lastIndex, offset));
+            parts.push(<mark key={offset}>{match}</mark>);
+            lastIndex = offset + match.length;
+        });
+        if (lastIndex < sentence.length) parts.push(sentence.slice(lastIndex));
+        return parts;
+    };
 
     // Determine method explanation
     const getMethodExplanation = () => {
@@ -187,18 +178,17 @@ const KeynessWordDetail = ({
             icon: "📊"
         };
     };
-    
+
     const methodInfo = getMethodExplanation();
 
     const viewLabels = {
         wordData: "📊 Word Data",
         sentences: "📝 Sentences",
         alternateWords: "🔄 Alternate Words",
-        // overusedWords: "⚠️ Overused Words",
         concepts: "💡 Concepts"
     };
 
-    // Enhanced placeholder tab content
+    // Placeholder tab content
     const renderPlaceholder = (tabName) => (
         <div className="tab-content">
             <h3>{tabName}</h3>
@@ -217,7 +207,7 @@ const KeynessWordDetail = ({
         </div>
     );
 
-    // Enhanced empty state for sentences
+    // Empty state for sentences
     const renderEmptyState = (type, icon = "🔍") => (
         <div style={{
             padding: "3rem",
@@ -435,8 +425,8 @@ const KeynessWordDetail = ({
                             </div>
                         ) : sentences.length > 0 ? (
                             <div>
-                                <p style={{ 
-                                    color: "#64748b", 
+                                <p style={{
+                                    color: "#64748b",
                                     marginBottom: "1.5rem",
                                     padding: "1rem",
                                     background: "#f8fafc",

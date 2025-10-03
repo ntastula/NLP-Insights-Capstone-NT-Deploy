@@ -52,47 +52,47 @@ const ClusteringLanding = ({ onBack }) => {
     <div className="Clustering-landing-wrapper">
       <button
         onClick={onBack}
-                className="Clustering-back-button"
+        className="Clustering-back-button"
       >
         ← Back
       </button>
 
-            <div className="Clustering-header">
-                <h1 className="Clustering-title">Clustering Analysis</h1>
-                <p className="Clustering-subtitle">
-                    See how your words naturally group together into clusters, highlighting the themes, styles, and repeated ideas that shape your writing.
-                </p>
+      <div className="Clustering-header">
+        <h1 className="Clustering-title">Clustering Analysis</h1>
+        <p className="Clustering-subtitle">
+          See how your words naturally group together into clusters, highlighting the themes, styles, and repeated ideas that shape your writing.
+        </p>
+      </div>
+
+      <div className="Clustering-container">
+        <div className="Clustering-content-card">
+          <TextInputSection
+            pastedText={pastedText}
+            handleTextPaste={handleTextPaste}
+            pastedWordCount={pastedWordCount}
+            uploadedPreview={uploadedPreview}
+            error={error}
+            onFilesUploaded={handleFilesUploaded}
+          />
+
+          {error && (
+            <div className="Clustering-error-message">
+              {error}
             </div>
+          )}
 
-            <div className="Clustering-container">
-                <div className="Clustering-content-card">
-        <TextInputSection
-          pastedText={pastedText}
-          handleTextPaste={handleTextPaste}
-          pastedWordCount={pastedWordCount}
-          uploadedPreview={uploadedPreview}
-          error={error}
-          onFilesUploaded={handleFilesUploaded}
-        />
-
-                    {error && (
-                        <div className="Clustering-error-message">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="Clustering-continue-section">
-  <button
-    onClick={handleContinue}
-                            className="Clustering-continue-button"
-                            disabled={!uploadedText.trim()}
-  >
-    Continue to Analysis →
-  </button>
-</div>
+          <div className="Clustering-continue-section">
+            <button
+              onClick={handleContinue}
+              className="Clustering-continue-button"
+              disabled={!uploadedText.trim()}
+            >
+              Continue to Analysis →
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-        </div>
   );
 };
 

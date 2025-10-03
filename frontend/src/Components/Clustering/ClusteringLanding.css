@@ -208,7 +208,8 @@
 .upload-section {
     display: flex;
     flex-direction: column;
-    min-height: 240px; /* Ensure both sections have same minimum height */
+    min-height: 240px;
+    /* Ensure both sections have same minimum height */
 }
 
 .paste-section {
@@ -224,7 +225,8 @@
 /* Make textarea fill available space to match dropzone */
 .Clustering-textarea {
     flex: 1;
-    min-height: 180px; /* Match dropzone min-height */
+    min-height: 180px;
+    /* Match dropzone min-height */
     width: 100%;
     padding: 1rem;
     border: 2px solid #d1d5db;
@@ -260,7 +262,8 @@
     font-size: 0.875rem;
     color: #6b7280;
     margin-top: 0.5rem;
-    min-height: 1.25rem; /* Reserve space even when empty */
+    min-height: 1.25rem;
+    /* Reserve space even when empty */
 }
 
 /* Dropzone specific styles - matching textarea dimensions */
@@ -577,12 +580,12 @@
         grid-template-columns: 1fr;
         gap: 1.5rem;
     }
-    
+
     .paste-section,
     .upload-section {
         min-height: auto;
     }
-    
+
     .Clustering-textarea,
     .Clustering-dropzone {
         min-height: 140px;
@@ -600,27 +603,28 @@
         width: 100%;
         padding: 1rem;
     }
-    
+
     .files-header {
         flex-direction: column;
         gap: 0.5rem;
         align-items: flex-start;
     }
-    
+
     .file-item {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
     }
-    
+
     .remove-file-button {
         align-self: flex-end;
     }
-    
+
     .Clustering-content-card {
         padding: 1rem;
     }
 }
+
 @media (max-width: 1024px) {
     .Clustering-content-card {
         margin: 0 1rem;
@@ -631,20 +635,20 @@
     .Clustering-landing-wrapper {
         padding: 0 0.5rem;
     }
-    
+
     .Clustering-title {
         font-size: 1.875rem;
     }
-    
+
     .Clustering-subtitle {
         font-size: 1rem;
     }
-    
+
     .Clustering-content-card {
         padding: 1.5rem;
         margin: 0 0.5rem;
     }
-    
+
     .Clustering-dropzone {
         padding: 2rem 1rem;
     }
@@ -655,12 +659,12 @@
         padding: 1rem;
         margin: 0;
     }
-    
+
     .Clustering-continue-button {
         width: 100%;
         padding: 1rem;
     }
-    
+
     .Clustering-dropzone {
         padding: 1.5rem 0.75rem;
         font-size: 0.875rem;

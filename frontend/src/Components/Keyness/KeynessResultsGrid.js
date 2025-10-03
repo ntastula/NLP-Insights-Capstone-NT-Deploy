@@ -1,7 +1,7 @@
 import React from "react";
 import "./KeynessResultsGrid.css";
 
-const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
+const KeynessResultsGrid = ({ results = [], method, onWordDetail, word }) => {
   if (!results || results.length === 0) return <p>No results available.</p>;
 
   const methodUpper = method.toUpperCase();
@@ -19,7 +19,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
         focus: "Look for words with high Chi² values and low p-values (< 0.05) for the most significant keywords."
       };
     }
-    
+
     if (isGensim) {
       return {
         title: "TF-IDF Analysis Results",
@@ -27,7 +27,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
         focus: "Higher TF-IDF scores indicate words that are frequent in your text but rare in the comparison sample."
       };
     }
-    
+
     if (isSpacy) {
       return {
         title: "Multi-Method Analysis Results",
@@ -35,7 +35,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
         focus: "Consider words with high keyness scores and significant statistical values across multiple measures."
       };
     }
-    
+
     return {
       title: "Log-Likelihood Analysis Results",
       description: "These keywords show the strongest statistical distinctiveness using log-likelihood testing.",
@@ -50,7 +50,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
 
   return (
     <div className="keyness-results-container">
-      {/* Method Explanation Section (always visible) */}
+      {/* Method Explanation Section */}
       <div className="method-explanation">
         <h3 className="method-title">{methodInfo.title}</h3>
         <p className="method-description">{methodInfo.description}</p>
@@ -81,7 +81,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
                   word: r.word,
                   wordData: r,
                   method,
-                  results, // pass full list for navigation
+                  results, 
                 })
               }
             >
@@ -91,7 +91,7 @@ const KeynessResultsGrid = ({ results = [], method, onWordDetail, word}) => {
               </div>
 
               <div className="keyword-stats">
-                {/* Method-specific sections unchanged */}
+                {/* Method-specific section */}
                 {isSklearn && (
                   <>
                     <div className="stat-item frequency-stat">

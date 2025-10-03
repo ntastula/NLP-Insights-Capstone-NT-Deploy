@@ -203,11 +203,11 @@
         align-items: flex-start;
         gap: 1rem;
     }
-    
+
     .library-button-container {
         align-self: stretch;
     }
-    
+
     .analysis-button {
         width: 100%;
     }
@@ -219,15 +219,15 @@
         gap: 1rem;
         align-items: center;
     }
-    
+
     .library-container {
         margin: 0 1rem;
     }
-    
+
     .library-card-content {
         padding: 1rem;
     }
-    
+
     .current-analysis-info {
         flex-direction: column;
         gap: 0.75rem;

@@ -10,31 +10,31 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
 
   const openCorpusModal = async () => {
 
-  if (!genre) {
-    setError("No genre specified");
-    setShowCorpusModal(true);
-    return;
-  }
+    if (!genre) {
+      setError("No genre specified");
+      setShowCorpusModal(true);
+      return;
+    }
 
-  setLoading(true);
-  setError(null);
+    setLoading(true);
+    setError(null);
 
-  try {
-    const url = `http://localhost:8000/api/corpus-meta-keyness/?name=${encodeURIComponent(genre)}`;
+    try {
+      const url = `http://localhost:8000/api/corpus-meta-keyness/?name=${encodeURIComponent(genre)}`;
 
-    const response = await fetch(url, { credentials: "include" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
 
-    setCorpusData(data);
-    setShowCorpusModal(true);
-  } catch (err) {
-    setError(err.message);
-    setShowCorpusModal(true);
-  } finally {
-    setLoading(false);
-  }
-};
+      setCorpusData(data);
+      setShowCorpusModal(true);
+    } catch (err) {
+      setError(err.message);
+      setShowCorpusModal(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   const closeModal = () => {
@@ -54,41 +54,41 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
             {selectedMethod ? `${selectedMethod} Keyness Analysis Results` : "Keyness Analysis Results"}
           </h3>
         </div>
-        
+
         <div className="stats-grid">
-  <div className="stat-card user-text-card">
-    <div className="stat-number user-text-number">
-      {stats.uploadedTotal?.toLocaleString()}
-    </div>
-    <div className="stat-label">Words in your text</div>
-  </div>
-  
-  <div className="stat-card corpus-card">
-    <div className="stat-number corpus-number">
-      {stats.corpusTotal?.toLocaleString()}
-    </div>
-    <div className="stat-label">
-      Words in sample{" "}
-      <button 
-        className="corpus-button"
-        onClick={openCorpusModal}
-        disabled={loading}
-        title="Click to see corpus details"
-      >
-        <BookOpen className="corpus-icon" />
-        {loading ? "Loading..." : "Corpus"}
-      </button>
-    </div>
-  </div>
-  
-  <div className="stat-card keywords-card">
-    <div className="stat-number keywords-number">
-      {(stats.totalSignificant || 0).toLocaleString()}
-    </div>
-    <div className="stat-label">Significant keywords</div>
-  </div>
-</div>
-</div>
+          <div className="stat-card user-text-card">
+            <div className="stat-number user-text-number">
+              {stats.uploadedTotal?.toLocaleString()}
+            </div>
+            <div className="stat-label">Words in your text</div>
+          </div>
+
+          <div className="stat-card corpus-card">
+            <div className="stat-number corpus-number">
+              {stats.corpusTotal?.toLocaleString()}
+            </div>
+            <div className="stat-label">
+              Words in sample{" "}
+              <button
+                className="corpus-button"
+                onClick={openCorpusModal}
+                disabled={loading}
+                title="Click to see corpus details"
+              >
+                <BookOpen className="corpus-icon" />
+                {loading ? "Loading..." : "Corpus"}
+              </button>
+            </div>
+          </div>
+
+          <div className="stat-card keywords-card">
+            <div className="stat-number keywords-number">
+              {(stats.totalSignificant || 0).toLocaleString()}
+            </div>
+            <div className="stat-label">Significant keywords</div>
+          </div>
+        </div>
+      </div>
 
       {/* Corpus Modal */}
       {showCorpusModal && (
@@ -103,7 +103,7 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
                 <X />
               </button>
             </div>
-            
+
             <div className="modal-content">
               {error ? (
                 <div className="error-message">
@@ -113,17 +113,17 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
               ) : corpusData ? (
                 <>
                   <div className="corpus-info">
-  <p className="corpus-genre">
-    <strong>Genre:</strong>{" "}
-    {corpusData.genre
-      ? corpusData.genre
-          .replace(/_keyness$/, "")       
-          .replace(/_/g, " ")             
-          .replace(/\b\w/g, (c) => c.toUpperCase()) 
-      : "General"}
-  </p>
-</div>
-                  
+                    <p className="corpus-genre">
+                      <strong>Genre:</strong>{" "}
+                      {corpusData.genre
+                        ? corpusData.genre
+                          .replace(/_keyness$/, "")
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase())
+                        : "General"}
+                    </p>
+                  </div>
+
                   <div className="books-list">
                     <h5 className="books-title">Books in this corpus:</h5>
                     <div className="books-grid">

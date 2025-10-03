@@ -7,13 +7,11 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
   const [corpora, setCorpora] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-
   const [localGenre, setLocalGenre] = useState("");
   const [analysisType, setAnalysisType] = useState("");
   const [analysisDone, setAnalysisDone] = useState(false);
-
-  // Comparison mode state
   const [comparisonMode, setComparisonMode] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState("");
 
   // Fetch corpora list from backend (only for corpus mode)
   useEffect(() => {
@@ -75,7 +73,7 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
   const handleComparisonModeChange = (e) => {
     const mode = e.target.value;
     setComparisonMode(mode);
-    setLocalGenre(""); 
+    setLocalGenre("");
   };
 
   const handleGenreChange = (e) => {
@@ -84,14 +82,14 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
   };
 
   const filteredCorpora = useMemo(() => {
-  if (!Array.isArray(corpora)) return [];
+    if (!Array.isArray(corpora)) return [];
 
-  return corpora.filter((file) => {
-    if (analysisType === "keyness" && comparisonMode === "corpus") return true;
-    if (analysisType === "sentiment" || analysisType === "sensorimotor") return true;
-    return false; // clustering or user_text: no dropdown
-  });
-}, [analysisType, comparisonMode, corpora]);
+    return corpora.filter((file) => {
+      if (analysisType === "keyness" && comparisonMode === "corpus") return true;
+      if (analysisType === "sentiment" || analysisType === "sensorimotor") return true;
+      return false; // clustering or user_text: no dropdown
+    });
+  }, [analysisType, comparisonMode, corpora]);
 
 
   const formatDisplayName = (file) => {
@@ -102,12 +100,11 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
   };
 
   const handleUploadedFiles = (combinedText, files, tempGenre = null) => {
-  if (tempGenre) {
-    setLocalGenre(tempGenre);
-    onSelectGenre(tempGenre);
-  }
-  // Optionally store the combinedText in state if needed
-};
+    if (tempGenre) {
+      setLocalGenre(tempGenre);
+      onSelectGenre(tempGenre);
+    }
+  };
 
 
   return (
@@ -179,51 +176,51 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
           analysisType === "sentiment" ||
           analysisType === "sensorimotor"
         ) && (
-          <>
-            <GenreCorpusSelector
-              loading={loading}
-              err={err}
-              localGenre={localGenre}
-              onGenreChange={handleGenreChange}
-              filteredCorpora={filteredCorpora}
-              formatDisplayName={formatDisplayName}
-            />
+            <>
+              <GenreCorpusSelector
+                loading={loading}
+                err={err}
+                localGenre={localGenre}
+                onGenreChange={handleGenreChange}
+                filteredCorpora={filteredCorpora}
+                formatDisplayName={formatDisplayName}
+              />
 
-            <button
-              onClick={() => {
-                onProceed({
-                  analysisType,
-                  genre: localGenre,
-                  comparisonMode,
-                });
-                setAnalysisDone(true);
-              }}
-              className="homepage-button"
-              disabled={!localGenre || loading || !!err}
-            >
-              Go to{" "}
-              {analysisType.charAt(0).toUpperCase() + analysisType.slice(1)}{" "}
-              Analysis
-            </button>
-          </>
-        )}
+              <button
+                onClick={() => {
+                  onProceed({
+                    analysisType,
+                    genre: localGenre,
+                    comparisonMode,
+                  });
+                  setAnalysisDone(true);
+                }}
+                className="homepage-button"
+                disabled={!localGenre || loading || !!err}
+              >
+                Go to{" "}
+                {analysisType.charAt(0).toUpperCase() + analysisType.slice(1)}{" "}
+                Analysis
+              </button>
+            </>
+          )}
 
         {/* Special case: Keyness with user_text (no genre needed) */}
         {analysisType === "keyness" && comparisonMode === "user_text" && (
-  <button
-    onClick={() => {
-      onProceed({
-        analysisType: "keyness",
-        genre: null,           // No genre for user_text
-        comparisonMode: comparisonMode
-      });
-    }}
-    className="homepage-button"
-    disabled={loading || !!err} // no need to check localGenre
-  >
-    Go to Keyness Analysis
-  </button>
-)}
+          <button
+            onClick={() => {
+              onProceed({
+                analysisType: "keyness",
+                genre: null,           
+                comparisonMode: comparisonMode
+              });
+            }}
+            className="homepage-button"
+            disabled={loading || !!err} 
+          >
+            Go to Keyness Analysis
+          </button>
+        )}
 
         {/* Clustering button */}
         {analysisType === "clustering" && (

@@ -380,7 +380,7 @@
 }
 
 /* Analysis Content Styling */
-.tab-content > div[style*="whiteSpace"] {
+.tab-content>div[style*="whiteSpace"] {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -389,7 +389,7 @@
   color: #374151;
 }
 
-.tab-content > div[style*="whiteSpace"]::before {
+.tab-content>div[style*="whiteSpace"]::before {
   content: '';
   position: absolute;
   top: 0;
@@ -469,16 +469,14 @@
   left: 0;
   bottom: 0;
   right: 0;
-  background-image: linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.2) 25%,
-    transparent 25%,
-    transparent 50%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.2) 75%,
-    transparent 75%,
-    transparent
-  );
+  background-image: linear-gradient(-45deg,
+      rgba(255, 255, 255, 0.2) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.2) 75%,
+      transparent 75%,
+      transparent);
   background-size: 20px 20px;
   animation: move 2s linear infinite;
 }
@@ -487,6 +485,7 @@
   0% {
     background-position: 0 0;
   }
+
   100% {
     background-position: 20px 20px;
   }
@@ -509,6 +508,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -520,6 +520,7 @@
     opacity: 0;
     transform: translateY(30px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -531,40 +532,40 @@
   .keyness-word-detail-container {
     padding: 1rem;
   }
-  
+
   .page-heading {
     font-size: 1.75rem;
   }
-  
+
   .view-controls {
     flex-direction: column;
   }
-  
+
   .view-controls .btn {
     min-width: auto;
   }
-  
+
   .keyword-stats {
     grid-template-columns: 1fr;
   }
-  
+
   .tab-content {
     padding: 1.5rem;
   }
-  
+
   .keyword-card {
     margin: 0 1rem 2rem;
     padding: 1.5rem;
   }
-  
+
   .back-button {
     margin: 2rem 1rem;
   }
-  
+
   .results-title {
     padding: 1.5rem;
   }
-  
+
   .keyword-header {
     flex-direction: column;
     align-items: flex-start;
@@ -578,12 +579,12 @@
     background: white;
     box-shadow: none;
   }
-  
+
   .view-controls,
   .back-button {
     display: none;
   }
-  
+
   .keyword-card {
     break-inside: avoid;
     box-shadow: none;

@@ -34,7 +34,6 @@
   opacity: 0.8;
 }
 
-
 /* ==========================================================================
    2. Header & Title
    ========================================================================== */
@@ -66,7 +65,6 @@
   color: #10b981;
   stroke-width: 2.5;
 }
-
 
 /* ==========================================================================
    3. Toggle Buttons
@@ -148,7 +146,6 @@
 .toggle-button:hover .toggle-indicator {
   transform: scale(1.2) rotate(5deg);
 }
-
 
 /* ==========================================================================
    4. Descriptions
@@ -292,7 +289,6 @@
   text-align: center;
 }
 
-
 /* ==========================================================================
    6. Chart Wrapper & Footer
    ========================================================================== */
@@ -341,7 +337,6 @@
   color: #64748b;
   text-align: center;
 }
-
 
 /* ==========================================================================
    7. States: No Data, Loading, Skeleton
@@ -408,7 +403,6 @@
   animation: shimmer 2s infinite;
 }
 
-
 /* ==========================================================================
    8. Animations & Transitions
    ========================================================================== */
@@ -436,20 +430,36 @@
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
+  0% {
+    transform: translateX(-100%);
+  }
 
+  100% {
+    transform: translateX(100%);
+  }
+}
 
 /* ==========================================================================
    9. Accessibility & High Contrast
@@ -461,14 +471,28 @@
 }
 
 @media (prefers-contrast: high) {
-  .charts-container { border-color: #000; }
-  .chart-title { color: #000; }
-  .toggle-button { border-color: #000; color: #000; }
-  .slider { background: #000; }
-  .slider::-webkit-slider-thumb,
-  .slider::-moz-range-thumb { background: #000; }
-}
+  .charts-container {
+    border-color: #000;
+  }
 
+  .chart-title {
+    color: #000;
+  }
+
+  .toggle-button {
+    border-color: #000;
+    color: #000;
+  }
+
+  .slider {
+    background: #000;
+  }
+
+  .slider::-webkit-slider-thumb,
+  .slider::-moz-range-thumb {
+    background: #000;
+  }
+}
 
 /* ==========================================================================
    10. Print Styles
@@ -479,15 +503,21 @@
     box-shadow: none;
     border: 1px solid #ccc;
   }
+
   .toggle-button,
-  .chart-controls { display: none; }
-  .chart-header { border-bottom-color: #ccc; }
+  .chart-controls {
+    display: none;
+  }
+
+  .chart-header {
+    border-bottom-color: #ccc;
+  }
+
   .chart-wrapper {
     box-shadow: none;
     border: 1px solid #ccc;
   }
 }
-
 
 /* ==========================================================================
    11. Dark Mode
@@ -499,22 +529,28 @@
     border-color: rgba(71, 85, 105, 0.8);
     color: #e2e8f0;
   }
-  .chart-title { color: #f1f5f9; }
+
+  .chart-title {
+    color: #f1f5f9;
+  }
+
   .chart-wrapper {
     background: #1e293b;
     border-color: rgba(71, 85, 105, 0.6);
   }
+
   .chart-description {
-    background: rgba(241, 245, 249, 0.95); /* slate-100 style */
+    background: rgba(241, 245, 249, 0.95);
+    /* slate-100 style */
     border-left-color: #60a5fa;
     color: #1e293b;
   }
+
   .chart-controls {
     background: rgba(30, 41, 59, 0.8);
     border-color: rgba(71, 85, 105, 0.6);
   }
 }
-
 
 /* ==========================================================================
    12. Responsive Design
@@ -526,25 +562,62 @@
     gap: 1rem;
     align-items: flex-start;
   }
-  .toggle-button { align-self: center; width: auto; }
-  .chart-slider { flex-direction: column; align-items: stretch; gap: 0.75rem; }
-  .chart-slider label { min-width: auto; text-align: center; }
+
+  .toggle-button {
+    align-self: center;
+    width: auto;
+  }
+
+  .chart-slider {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .chart-slider label {
+    min-width: auto;
+    text-align: center;
+  }
 }
 
 @media (max-width: 768px) {
-  .charts-container { padding: 1.5rem; border-radius: 1rem; }
-  .chart-title { font-size: 1.25rem; }
-  .chart-icon { width: 1.5rem; height: 1.5rem; }
-  .toggle-button { padding: 0.6rem 1rem; font-size: 0.85rem; }
-  .chart-description { padding: 1rem; font-size: 0.9rem; }
-  .chart-controls { padding: 1rem; }
-  .chart-wrapper { padding: 1rem; }
-  .method-info { font-size: 0.85rem; padding: 0.6rem 1rem; }
+  .charts-container {
+    padding: 1.5rem;
+    border-radius: 1rem;
+  }
+
+  .chart-title {
+    font-size: 1.25rem;
+  }
+
+  .chart-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .toggle-button {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .chart-description {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+
+  .chart-controls {
+    padding: 1rem;
+  }
+
+  .chart-wrapper {
+    padding: 1rem;
+  }
+
+  .method-info {
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+  }
 }
-
-
-
-
 
 /* Chart Summary Styling */
 .charts-container {
@@ -585,6 +658,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -643,6 +717,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -676,7 +751,7 @@
   white-space: pre-line;
   font-size: 0.95rem;
   line-height: 1.7;
-  color: #1a1a1a !important; 
+  color: #1a1a1a !important;
   font-weight: 500;
 }
 
@@ -693,15 +768,15 @@
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .chart-summary-section {
     margin: 1rem 0;
   }
-  
+
   .chart-summary-section .bg-gradient-to-r {
     padding: 1rem;
   }
-  
+
   .chart-summary-section h4 {
     font-size: 1.1rem;
   }

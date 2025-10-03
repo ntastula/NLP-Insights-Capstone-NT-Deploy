@@ -1,10 +1,10 @@
 import Papa from "papaparse";
 
-export const exportAnalysisToCSV = ({ 
-  comparisonResults, 
-  stats, 
-  posGroups, 
-  chartData 
+export const exportAnalysisToCSV = ({
+  comparisonResults,
+  stats,
+  posGroups,
+  chartData
 }) => {
   const rows = [];
 

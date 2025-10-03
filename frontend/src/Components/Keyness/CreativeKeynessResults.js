@@ -16,29 +16,29 @@ const posColors = {
 };
 
 const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, onWordDetail, onChangeMethod, loading }) => {
+  console.log("onChangeMethod prop:", onChangeMethod);
+  console.log("onChangeMethod type:", typeof onChangeMethod);
   const [activeView, setActiveView] = useState("keywords");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
-  
-  // Enhanced chart summary state - now handles multiple chart types
+
   const [chartSummaries, setChartSummaries] = useState({
     primary: { summary: "", loading: false, error: null },
     secondary: { summary: "", loading: false, error: null }
   });
-  const [activeChart, setActiveChart] = useState("primary"); // Track which chart is currently active
+  const [activeChartType, setActiveChartType] = useState("primary"); 
 
   const safeResults = Array.isArray(results) ? results : [];
 
-  // ✅ Compute chart data for both primary and secondary charts
+  // Compute chart data for both primary and secondary charts
   const chartData = useMemo(() => {
     if (!safeResults || safeResults.length === 0) return { primary: [], secondary: [] };
-    
+
     const primaryData = safeResults.slice(0, 20).map((r) => ({
       label: r.word,
       value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
     }));
 
-    // Secondary chart could be frequency vs keyness scatter plot
     const secondaryData = safeResults.slice(0, 30).map((r) => ({
       label: r.word,
       x: r.frequency || r.count || 0,
@@ -48,28 +48,26 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
     return { primary: primaryData, secondary: secondaryData };
   }, [safeResults]);
 
-  // ✅ Enhanced function to fetch chart summaries
   const fetchChartSummary = async (chartType, data, forceRefresh = false) => {
-    // Don't fetch if already loaded and not forcing refresh
     if (chartSummaries[chartType].summary && !forceRefresh) return;
-    
+
     setChartSummaries(prev => ({
       ...prev,
       [chartType]: { ...prev[chartType], loading: true, error: null }
     }));
 
     try {
-      const payload = chartType === "primary" 
+      const payload = chartType === "primary"
         ? {
-            title: `${method.toUpperCase()} Keyness Analysis - Top Keywords`,
-            chart_type: "bar",
-            chart_data: data,
-          }
+          title: `${method.toUpperCase()} Keyness Analysis - Top Keywords`,
+          chart_type: "bar",
+          chart_data: data,
+        }
         : {
-            title: `${method.toUpperCase()} Keyness Analysis - Frequency vs Keyness`,
-            chart_type: "scatter",
-            chart_data: data,
-          };
+          title: `${method.toUpperCase()} Keyness Analysis - Frequency vs Keyness`,
+          chart_type: "scatter",
+          chart_data: data,
+        };
 
       const response = await fetch("http://localhost:8000/api/summarise-keyness-chart/", {
         method: "POST",
@@ -82,7 +80,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
       }
 
       const responseData = await response.json();
-      
+
       setChartSummaries(prev => ({
         ...prev,
         [chartType]: {
@@ -110,7 +108,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
 
     // Fetch primary chart summary immediately
     fetchChartSummary("primary", chartData.primary);
-    
+
     // Pre-fetch secondary chart summary in background (optional)
     if (chartData.secondary.length > 0) {
       setTimeout(() => {
@@ -181,10 +179,10 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
     }
   };
 
-  // Handle chart toggle
-  const handleChartToggle = (chartType) => {
-    setActiveChart(chartType);
-    
+  // Handle chart type change
+  const handleChartTypeChange = (chartType) => {
+    setActiveChartType(chartType);
+
     // Fetch summary for the newly active chart if not already loaded
     const currentChartData = chartType === "primary" ? chartData.primary : chartData.secondary;
     if (!chartSummaries[chartType].summary && !chartSummaries[chartType].loading && currentChartData.length > 0) {
@@ -206,6 +204,8 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
     label: r.word,
     value: r.keyness ?? r.log_likelihood ?? r.chi2 ?? r.tfidf_score ?? 0,
   }));
+  console.log("onChangeMethod prop:", onChangeMethod);
+
 
   const viewLabels = {
     keywords: "Keywords",
@@ -215,26 +215,25 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   };
 
   return (
-    
     <div className="results-container">
       <div className="current-analysis-info">
-  <span className="current-analysis-text">
-    Analysing with <strong>{method?.toUpperCase()}</strong>
-  </span>
-  <button
-    onClick={() => onChangeMethod && onChangeMethod()}
-    className="change-method-button"
-    disabled={loading}
-  >
-    Change Method
-  </button>
-</div>
+        <span className="current-analysis-text">
+          Analysing with <strong>{method?.toUpperCase()}</strong>
+        </span>
+        <button
+          onClick={() => onChangeMethod && onChangeMethod()}
+          className="change-method-button"
+          disabled={loading}
+        >
+          Change Method
+        </button>
+      </div>
 
-      <ResultsSummary 
-        stats={stats} 
-        selectedMethod={method} 
-        comparisonResults={safeResults} 
-        genre={genre} 
+      <ResultsSummary
+        stats={stats}
+        selectedMethod={method}
+        comparisonResults={safeResults}
+        genre={genre}
       />
 
       {/* Main View Toggle Buttons */}
@@ -273,8 +272,8 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
           {summaryLoading
             ? "Loading summary..."
             : summary.split(/\n{2,}|(?<=\.)\s+/).map((p, i) => (
-                <p key={i}>{p.trim()}</p>
-              ))}
+              <p key={i}>{p.trim()}</p>
+            ))}
         </div>
       )}
 
@@ -335,27 +334,11 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
       {/* Charts View */}
       {activeView === "charts" && (
         <div className="charts-container">
-          {/* Chart Toggle Buttons */}
-          <div className="chart-controls mb-4">
-            <button
-              className={`btn mr-2 ${activeChart === "primary" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
-              onClick={() => handleChartToggle("primary")}
-            >
-              Top Keywords
-            </button>
-            <button
-              className={`btn ${activeChart === "secondary" ? "bg-blue-500 text-white" : "bg-gray-200"}`}
-              onClick={() => handleChartToggle("secondary")}
-            >
-              Frequency vs Keyness
-            </button>
-          </div>
-
-          {/* Charts Component with active chart prop */}
-          <Charts 
-            results={safeResults} 
-            method={method} 
-            activeChart={activeChart}
+          {/* Charts Component with callback for chart type changes */}
+          <Charts
+            results={safeResults}
+            method={method}
+            onChartTypeChange={handleChartTypeChange}
           />
 
           {/* Enhanced AI Summary Section */}
@@ -364,30 +347,30 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
               <div className="flex items-center mb-4">
                 <div className="w-2 h-6 bg-blue-500 rounded-full mr-3"></div>
                 <h4 className="font-semibold text-xl text-gray-800">
-                  What this chart shows: {activeChart === "primary" ? "Top Keywords Chart" : "Frequency vs Keyness Chart"}
+                  What this chart shows: {activeChartType === "primary" ? "Top Keywords Chart" : "Frequency vs Keyness Chart"}
                 </h4>
               </div>
-              
+
               <div className="chart-summary-content">
-                {chartSummaries[activeChart].loading ? (
+                {chartSummaries[activeChartType].loading ? (
                   <div className="flex items-center space-x-2 text-blue-600">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                     <p>Analysing chart data...</p>
                   </div>
-                ) : chartSummaries[activeChart].error ? (
+                ) : chartSummaries[activeChartType].error ? (
                   <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <p className="text-red-700">{chartSummaries[activeChart].error}</p>
-                    <button 
+                    <p className="text-red-700">{chartSummaries[activeChartType].error}</p>
+                    <button
                       className="mt-2 text-sm bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded"
-                      onClick={() => fetchChartSummary(activeChart, activeChart === "primary" ? chartData.primary : chartData.secondary, true)}
+                      onClick={() => fetchChartSummary(activeChartType, activeChartType === "primary" ? chartData.primary : chartData.secondary, true)}
                     >
                       Retry Analysis
                     </button>
                   </div>
-                ) : chartSummaries[activeChart].summary ? (
+                ) : chartSummaries[activeChartType].summary ? (
                   <div className="prose prose-sm max-w-none">
                     <div className="text-gray-700 leading-relaxed whitespace-pre-line">
-                      {chartSummaries[activeChart].summary}
+                      {chartSummaries[activeChartType].summary}
                     </div>
                   </div>
                 ) : (
@@ -396,11 +379,11 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
               </div>
 
               {/* Refresh button */}
-              {chartSummaries[activeChart].summary && !chartSummaries[activeChart].loading && (
+              {chartSummaries[activeChartType].summary && !chartSummaries[activeChartType].loading && (
                 <div className="mt-4 pt-4 border-t border-blue-100">
-                  <button 
+                  <button
                     className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-md transition-colors"
-                    onClick={() => fetchChartSummary(activeChart, activeChart === "primary" ? chartData.primary : chartData.secondary, true)}
+                    onClick={() => fetchChartSummary(activeChartType, activeChartType === "primary" ? chartData.primary : chartData.secondary, true)}
                   >
                     Refresh Analysis
                   </button>

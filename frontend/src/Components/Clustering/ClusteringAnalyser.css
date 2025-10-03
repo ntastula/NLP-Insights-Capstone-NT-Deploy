@@ -210,7 +210,7 @@
         align-items: flex-start;
         gap: 1rem;
     }
-    
+
     .embedding-radio-container {
         align-self: stretch;
         display: flex;
@@ -222,19 +222,19 @@
     .clustering-container {
         padding: 1rem;
     }
-    
+
     .clustering-card {
         padding: 1.5rem;
     }
-    
+
     .clustering-title {
         font-size: 1.5rem;
     }
-    
+
     .embedding-container {
         margin: 0 1rem;
     }
-    
+
     .embedding-card-content {
         padding: 1rem;
     }
@@ -244,15 +244,15 @@
     .clustering-card {
         padding: 1rem;
     }
-    
+
     .embedding-title {
         font-size: 1rem;
     }
-    
+
     .embedding-text {
         font-size: 0.875rem;
     }
-    
+
     .analysis-button {
         width: 100%;
         padding: 1rem;
