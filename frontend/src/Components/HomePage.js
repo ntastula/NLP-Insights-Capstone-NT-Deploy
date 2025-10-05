@@ -154,12 +154,12 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
               <div className="info-message">
                 ℹ️ You'll upload two texts in the next step:
                 <ul>
-                  <li>
-                    <strong>Reference text</strong>: The text to compare against
-                  </li>
-                  <li>
-                    <strong>Target text</strong>: The text being analysed
-                  </li>
+                  <div>
+                    A <strong>Reference text</strong>: The text to compare against; and
+                  </div>
+                  <div>
+                    A <strong>Target text</strong>: The text being analysed
+                  </div>
                 </ul>
                 <em>
                   Note: Texts are not stored and will be lost when you close the
