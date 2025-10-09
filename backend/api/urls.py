@@ -1,8 +1,10 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from .clustering.clustering_analyser import clustering_analysis
+from django.http import HttpResponse
 
 urlpatterns = [
+    path('', lambda request: HttpResponse("✅ Django backend is running!"), name='home'),
     path("corpora/", views.list_corpora, name="list_corpora"),
     path("corpus-preview/", views.get_corpus_preview, name="corpus_preview"),
     path("analyse-keyness/", views.analyse_keyness, name="keyness_view"),

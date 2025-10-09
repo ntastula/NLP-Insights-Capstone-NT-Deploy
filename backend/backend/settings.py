@@ -12,71 +12,21 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import nltk
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-key')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-
-# === HTTPS, CORS/CSRF, Sessions, and Logging (consolidated) ===
-import os
-
-# Toggle via env: DJANGO_DEBUG=1 for local dev
-DEBUG = os.environ.get("DJANGO_DEBUG", "") == "1"
-
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "your.production.domain"]
-
-# HTTPS and cookies
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = not DEBUG
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_HTTPONLY = True
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_AGE = 7 * 24 * 60 * 60
-SESSION_SAVE_EVERY_REQUEST = True
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-
-# HSTS (only when not in DEBUG)
-SECURE_HSTS_SECONDS = 63072000 if not DEBUG else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
-SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
-
-# CSRF/CORS
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://your.production.domain",
-]
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://your.production.domain",
-]
-CORS_ALLOW_CREDENTIALS = True
-
-# Conservative logging: no request bodies / file contents
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "simple": {"format": "%(levelname)s %(name)s: %(message)s"},
-    },
-    "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
-    },
-    "loggers": {
-        "django": {"handlers": ["console"], "level": "INFO"},
-        "django.server": {"handlers": ["console"], "level": "INFO"},
-        # your app logger(s) — rename 'api' to your actual module path if needed
-        "api": {"handlers": ["console"], "level": "INFO", "propagate": False},
-    },
-}
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-@!dq1k%%v2-1v2hr_w_tev7e&xjlet1a=e4%*8kijxpj$6yi%('
@@ -84,7 +34,7 @@ SECRET_KEY = 'django-insecure-@!dq1k%%v2-1v2hr_w_tev7e&xjlet1a=e4%*8kijxpj$6yi%(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
 try:
     nltk.data.find("taggers/averaged_perceptron_tagger_eng")
@@ -198,8 +148,11 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://your-frontend-name.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Session configuration
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database sessions

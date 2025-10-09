@@ -10,6 +10,7 @@ __pycache__/
 env/
 venv/
 NLP-Insights-Capstone-env-312/
+.env
 
 # ConceptNet embeddings/data folder
 backend/backend/data/*
