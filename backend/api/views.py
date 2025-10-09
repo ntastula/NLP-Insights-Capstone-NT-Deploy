@@ -35,6 +35,66 @@ import logging
 from pathlib import Path  # <-- ADDED (minimal import required)
 import math               # <-- used by compute_keyness_from_counts
 
+# ---- LLM generation helper (Ollama or Hugging Face) ----
+
+def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
+    """
+    Generate text using either a local model (default) or Hugging Face Inference API,
+    based on environment variables:
+      - LLM_PROVIDER: 'ollama' (default) or 'huggingface'
+      - OLLAMA_URL: base URL for local model (default http://localhost:11434/api/generate)
+      - OLLAMA_MODEL: model name for local model (default 'llama3')
+      - HUGGINGFACE_API_TOKEN: required when LLM_PROVIDER='huggingface'
+      - HUGGINGFACE_MODEL: HF repo id, e.g. 'meta-llama/Meta-Llama-3.1-8B-Instruct'
+    """
+    provider = (os.environ.get("LLM_PROVIDER") or "ollama").strip().lower()
+    if provider == "huggingface":
+        hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
+        model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+        if not hf_token:
+            raise ValueError("HUGGINGFACE_API_TOKEN is not set")
+        url = f"https://api-inference.huggingface.co/models/{model}"
+        headers = {
+            "Authorization": f"Bearer {hf_token}",
+            "Accept": "application/json"
+        }
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": num_predict,
+                "temperature": temperature,
+                "return_full_text": False
+            }
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=180)
+        resp.raise_for_status()
+        data = resp.json()
+        if isinstance(data, list) and data:
+            text = data[0].get("generated_text") if isinstance(data[0], dict) else None
+            if text:
+                return text
+        if isinstance(data, dict):
+            text = data.get("generated_text") or data.get("summary_text")
+            if text:
+                return text
+        return json.dumps(data)[:2000]
+    else:
+        base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
+        model = os.environ.get("OLLAMA_MODEL") or "llama3"
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "top_p": 0.9,
+                "num_predict": num_predict,
+            }
+        }
+        resp = requests.post(base_url, json=payload, timeout=180)
+        resp.raise_for_status()
+        return (resp.json() or {}).get("response", "")
+
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
 SAMPLE_FILE = os.path.join(CORPUS_DIR, "sample1.txt")
@@ -373,7 +433,7 @@ def compute_keyness_from_counts(
     Log-likelihood (G^2) keyness from counts.
     Returns {"results": [...], "total_significant": int}
     """
-    def safe(x): 
+    def safe(x):
         return x if x > 0 else 1e-12
 
     results = []
@@ -793,24 +853,10 @@ def get_keyness_summary(request):
         "Write a summary (2-3 paragraphs) about what these results reveal about the word choices in the text. "
         "Do not explain statistical columns; instead, interpret the meaning and possible implications of these words in the context of the document."
     )
-    ollama_url = "http://localhost:11434/api/generate"
-    payload = {
-        "model": "llama3",
-        "prompt": prompt
-    }
-    ollama_response = requests.post(ollama_url, json=payload, stream=True)
-    summary_parts = []
-    for line in ollama_response.iter_lines():
-        if line:
-            try:
-                data = line.decode("utf-8")
-                json_obj = json.loads(data)  # <-- fixed!
-                if "response" in json_obj:
-                    summary_parts.append(json_obj["response"])
-            except Exception as e:
-                continue
-    summary_text = "".join(summary_parts)
-    return Response({"summary": summary_text})
+    analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.6)
+    if not analysis:
+        return Response({"error": "No response from model."}, status=500)
+    return Response({"summary": analysis})
 
 @require_http_methods(["GET"])
 def corpus_meta_keyness(request):
@@ -906,31 +952,24 @@ Requirements:
 - Consider connotation, formality level, and context appropriateness"""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=60)
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.7)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
-
         return Response({
             "word": word,
             "analysis": analysis,
             "success": True
         })
 
-    except requests.exceptions.Timeout as e:
+    except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -984,18 +1023,7 @@ Summary:
 """
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=60)
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.7)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
@@ -1008,8 +1036,13 @@ Summary:
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -1083,27 +1116,10 @@ Highlight 3-4 specific words that occupy interesting positions in the frequency-
 Focus on what the frequency-keyness relationship reveals about the text's linguistic characteristics."""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.7,  # Slightly creative but focused
-                "top_p": 0.9,
-                "num_predict": 500,  # Limit response length
-            }
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=90)  # Increased timeout
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=500, temperature=0.7)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
-        # Clean up the response a bit
         analysis = analysis.strip()
 
         return Response({
@@ -1116,8 +1132,13 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -1237,23 +1258,7 @@ Suggest potential next steps for analysis or ways to improve the clustering resu
 Focus on actionable insights about what these clusters reveal about the document collection's structure and content themes."""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "num_predict": 600,  # Slightly longer for comprehensive analysis
-            }
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=120)  # Longer timeout for complex analysis
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=600, temperature=0.7)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
@@ -1272,8 +1277,13 @@ Focus on actionable insights about what these clusters reveal about the document
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. The clustering analysis is taking too long to process.'},
                         status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -1384,23 +1394,7 @@ Additional Context from Clustering Analysis:
     Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritize themes that appear across multiple documents rather than isolated topics."""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.6,  # Balanced creativity for theme identification
-                "top_p": 0.9,
-                "num_predict": 700,  # Longer response for comprehensive analysis
-            }
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=150)  # Longer timeout for complex analysis
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=700, temperature=0.6)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
@@ -1419,8 +1413,13 @@ Additional Context from Clustering Analysis:
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out. Theme analysis is taking too long to process.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -1532,23 +1531,7 @@ Please provide your analysis in the following structured format:
 Provide insights that reveal the dynamic, interconnected nature of themes and how they create meaning through their relationships and flow."""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.6,
-                "top_p": 0.9,
-                "num_predict": 700,
-            }
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=150)
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=700, temperature=0.6)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
@@ -1567,8 +1550,13 @@ Provide insights that reveal the dynamic, interconnected nature of themes and ho
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
@@ -1688,28 +1676,12 @@ Provide 3-5 concrete suggestions for reducing overuse and improving stylistic ba
 Be specific with examples and constructive in your critique. Focus on patterns that meaningfully impact the text's quality and reader experience."""
 
     try:
-        ollama_url = "http://localhost:11434/api/generate"
-        payload = {
-            "model": "llama3",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.6,
-                "top_p": 0.9,
-                "num_predict": 800,  # Longer for detailed recommendations
-            }
-        }
-
-        response = requests.post(ollama_url, json=payload, timeout=150)
-        response.raise_for_status()
-
-        analysis = response.json().get("response", "")
-
+        analysis = generate_text_with_fallback(prompt, num_predict=800, temperature=0.6)
         if not analysis:
             return Response({'error': 'No response from model.'}, status=500)
 
         analysis = analysis.strip()
-        
+
         schedule_session_cleanup(request, delay_minutes=15)
         return Response({
             "analysis_title": analysis_title,
@@ -1723,8 +1695,13 @@ Be specific with examples and constructive in your critique. Focus on patterns t
 
     except requests.exceptions.Timeout:
         return Response({'error': 'Request timed out.'}, status=504)
+    except requests.exceptions.HTTPError as e:
+        status_code = getattr(e.response, "status_code", 500)
+        if status_code == 404:
+            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to Ollama failed: {str(e)}'}, status=500)
+        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
     except Exception as e:
         return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
