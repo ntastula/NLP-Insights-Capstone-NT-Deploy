@@ -15,12 +15,12 @@ FINAL_PATH = DATA_DIR / "numberbatch-en.txt"
 
 def download_embeddings():
     if FINAL_PATH.exists():
-        print("✅ Embeddings already available.")
+        print("✅ Embeddings already available at:", FINAL_PATH)
         return FINAL_PATH
 
     print("⬇️ Downloading ConceptNet Numberbatch embeddings...")
     r = requests.get(EMBEDDINGS_URL, stream=True)
-    r.raise_for_status()  # fail if download fails
+    r.raise_for_status()
     with open(DEST_PATH, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
             f.write(chunk)
