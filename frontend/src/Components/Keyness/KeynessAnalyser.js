@@ -157,7 +157,7 @@ const KeynessAnalyser = ({
                 });
             }
 
-            const res = await fetch("http://localhost:8000/api/analyse-keyness/", {
+            const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyse-keyness/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)

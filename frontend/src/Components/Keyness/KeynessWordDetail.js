@@ -71,7 +71,7 @@ const KeynessWordDetail = ({
         if (sentences.length > 0) return;
         setLoadingSentences(true);
         try {
-            const response = await fetch("http://localhost:8000/api/get-sentences/", {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/get-sentences/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ uploaded_text: uploadedText, word }),
@@ -91,7 +91,7 @@ const KeynessWordDetail = ({
         if (synonymsAnalysis) return;
         setLoadingSynonyms(true);
         try {
-            const response = await fetch("http://localhost:8000/api/get-synonyms/", {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/get-synonyms/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ word }),
@@ -111,7 +111,7 @@ const KeynessWordDetail = ({
         if (conceptsAnalysis) return;
         setLoadingConcepts(true);
         try {
-            const response = await fetch("http://localhost:8000/api/get-concepts/", {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/get-concepts/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ word, uploaded_text: uploadedText }),

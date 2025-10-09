@@ -15,21 +15,32 @@ const SentimentLanding = ({ onBack, genre }) => {
     const [pastedWordCount, setPastedWordCount] = useState(0);
 
     useEffect(() => {
-        const fetchCorpusPreview = async () => {
-            try {
-                const url = genre
-                    ? `http://localhost:8000/api/corpus-preview/?name=${encodeURIComponent(genre)}`
-                    : "http://localhost:8000/api/corpus-preview/";
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-                setCorpusPreview((data.preview || "").split("\n").slice(0, 4).join("\n"));
-            } catch (err) {
-                console.error(err);
-            }
-        };
-        fetchCorpusPreview();
-    }, [genre]);
+    const fetchCorpusPreview = async () => {
+        try {
+            const backendURL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+
+            const url = genre
+                ? `${backendURL}/api/corpus-preview/?name=${encodeURIComponent(genre)}`
+                : `${backendURL}/api/corpus-preview/`;
+
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const data = await response.json();
+            setCorpusPreview(
+                (data.preview || "")
+                    .split("\n")
+                    .slice(0, 4)
+                    .join("\n")
+            );
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    fetchCorpusPreview();
+}, [genre]);
+
 
     const handleTextPaste = (e) => {
         const text = e.target.value;

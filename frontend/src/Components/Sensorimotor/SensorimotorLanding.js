@@ -16,7 +16,7 @@ const SensorimotorLanding = ({ onBack }) => {
   useEffect(() => {
     const fetchCorpusPreview = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/corpus-preview/");
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/corpus-preview/`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         setCorpusPreview(data.preview.split("\n").slice(0, 4).join("\n"));

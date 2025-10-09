@@ -41,7 +41,7 @@ const TextInputSection = ({
     formData.append("comparison_mode", "user_text");
 
     try {
-      const res = await fetch("http://localhost:8000/api/upload-files/", {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload-files/`, {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -149,7 +149,7 @@ const TextInputSection = ({
     files.forEach((f) => formData.append("files", f));
 
     try {
-      const res = await fetch("http://localhost:8000/api/upload-files/", {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/upload-files/`, {
         method: "POST",
         body: formData,
         credentials: "include",

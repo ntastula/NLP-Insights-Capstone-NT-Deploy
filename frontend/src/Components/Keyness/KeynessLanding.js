@@ -31,8 +31,12 @@ const KeynessLanding = ({
                 if (comparisonMode === "corpus") {
                     if (!genre) return;
 
-                    const url = `http://localhost:8000/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`;
+                    const backendURL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+
+                    const url = `${backendURL}/api/corpus-preview-keyness/?name=${encodeURIComponent(genre)}`;
+
                     const response = await fetch(url, { credentials: "include" });
+
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const data = await response.json();
                     if (!cancelled) {

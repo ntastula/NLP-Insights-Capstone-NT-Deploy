@@ -94,11 +94,12 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
     try {
       setLoading(true);
       setError("");
-      const response = await fetch("http://localhost:8000/api/clustering-analysis/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: uploadedText, embedding }),
-      });
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/clustering-analysis/`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: uploadedText, embedding }),
+});
+
 
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const data = await response.json();

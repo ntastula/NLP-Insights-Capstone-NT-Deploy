@@ -69,7 +69,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
           chart_data: data,
         };
 
-      const response = await fetch("http://localhost:8000/api/summarise-keyness-chart/", {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-keyness-chart/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -144,7 +144,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   const fetchSummary = async () => {
     setSummaryLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/get-keyness-summary/", {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/get-keyness-summary/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ keyness_results: results }),

@@ -20,7 +20,9 @@ const ResultsSummary = ({ stats, selectedMethod, comparisonResults, genre }) => 
     setError(null);
 
     try {
-      const url = `http://localhost:8000/api/corpus-meta-keyness/?name=${encodeURIComponent(genre)}`;
+      const backendURL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+
+      const url = `${backendURL}/api/corpus-meta-keyness/?name=${encodeURIComponent(genre)}`;
 
       const response = await fetch(url, { credentials: "include" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

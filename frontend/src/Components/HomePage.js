@@ -27,8 +27,7 @@ const HomePage = ({ onSelect, selectedGenre, onSelectGenre, onProceed }) => {
       try {
         setLoading(true);
         setErr("");
-        const r = await fetch(
-          `http://localhost:8000/api/corpora/?analysis=${analysisType}`,
+        const r = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/corpora/?analysis=${analysisType}`,
           { credentials: "include" }
         );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

@@ -28,7 +28,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         setChartSummaryError(null);
 
         try {
-            const response = await fetch("http://localhost:8000/api/summarise-clustering-chart/", {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-clustering-chart/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -70,7 +70,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         setThemeAnalysisError(null);
 
         try {
-            const response = await fetch("http://localhost:8000/api/analyse-themes/", {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyse-themes/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         setThematicFlowError(null);
 
         try {
-            const response = await fetch('http://localhost:8000/api/analyse-thematic-flow/', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyse-thematic-flow/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         setOverusedThemesError(null);
 
         try {
-            const response = await fetch('http://localhost:8000/api/analyse-overused-themes/', {
+            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/analyse-overused-themes/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
