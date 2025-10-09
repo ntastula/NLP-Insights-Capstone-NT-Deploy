@@ -3,7 +3,7 @@ import gzip
 import shutil
 from pathlib import Path
 
-# Make data folder right next to this file
+# Base directory: backend folder
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -20,17 +20,20 @@ def download_embeddings():
 
     print("⬇️ Downloading ConceptNet Numberbatch embeddings...")
     r = requests.get(EMBEDDINGS_URL, stream=True)
+    r.raise_for_status()  # fail if download fails
     with open(DEST_PATH, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
             f.write(chunk)
 
-    print("📦 Unzipping...")
+    print("📦 Unzipping embeddings...")
     with gzip.open(DEST_PATH, "rb") as f_in:
         with open(FINAL_PATH, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
-    # Delete the original .gz file
     DEST_PATH.unlink(missing_ok=True)
-
     print(f"✅ Download complete! Embeddings saved to {FINAL_PATH}")
     return FINAL_PATH
+
+if __name__ == "__main__":
+    download_embeddings()
+

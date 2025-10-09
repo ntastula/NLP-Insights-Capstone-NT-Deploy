@@ -1,5 +1,6 @@
 numpy
 scipy
+gensim
 scikit-learn
 nltk
 spacy>=3.0.0
@@ -7,7 +8,6 @@ python-docx
 django
 djangorestframework
 django-cors-headers
-gensim
 num2words
 requests
 mammoth

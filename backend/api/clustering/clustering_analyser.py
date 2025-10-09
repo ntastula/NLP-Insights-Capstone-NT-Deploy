@@ -50,7 +50,7 @@ else:
     from pathlib import Path
 
     DATA_DIR = Path(__file__).resolve().parents[2] / "backend" / "data"
-    EMBEDDINGS_PATH = DATA_DIR / "numberbatch-en.txt"
+    EMBEDDINGS_PATH = Path(__file__).resolve().parent / "data" / "numberbatch-en.txt"
     print("Looking for embeddings at:", EMBEDDINGS_PATH)
     print("Exists?", EMBEDDINGS_PATH.exists())
     if EMBEDDINGS_PATH.exists():
