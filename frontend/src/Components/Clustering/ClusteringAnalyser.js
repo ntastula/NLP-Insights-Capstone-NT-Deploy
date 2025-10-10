@@ -49,27 +49,9 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedCluster, setSelectedCluster] = useState("all");
-  const [embedding, setEmbedding] = useState("conceptnet");
-  const [showEmbeddingOptions, setShowEmbeddingOptions] = useState(true);
 
   const [showTopTerms, setShowTopTerms] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
-
-  // Embedding options with descriptions
-  const embeddingOptions = [
-    {
-      id: "conceptnet",
-      name: "ConceptNet",
-      title: "Discover thematic and conceptual connections",
-      description: "Choose ConceptNet when you want to uncover deeper thematic relationships and conceptual connections in your writing. This method groups text based on semantic meaning and common-sense knowledge, helping you identify how different parts of your work connect on a conceptual level. Perfect for understanding the underlying themes, motifs, and conceptual threads that run through your creative work."
-    },
-    {
-      id: "spacy",
-      name: "spaCy",
-      title: "Find linguistic patterns and structural similarities",
-      description: "Choose spaCy when you want to discover patterns based on linguistic structure, grammar, and word relationships. This method focuses on how you actually use language - sentence structure, grammatical patterns, and word choice similarities. Ideal for understanding your writing style, identifying recurring linguistic habits, and seeing how different sections of your work share similar structural approaches."
-    }
-  ];
 
   const parseTextDocuments = (text) => {
     if (!text) return [];
@@ -95,11 +77,10 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       setLoading(true);
       setError("");
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/clustering-analysis/`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ text: uploadedText, embedding }),
-});
-
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: uploadedText }),
+      });
 
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const data = await response.json();
@@ -116,7 +97,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
       setNumClusters(data.num_clusters || null);
       setNumDocs(data.num_docs || null);
       setSelectedCluster("all"); 
-      setShowEmbeddingOptions(false); 
 
     } catch (err) {
       setError(err.message);
@@ -136,10 +116,6 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
     link.click();
   };
 
-  const handleEmbeddingChange = (embeddingId) => {
-    setEmbedding(embeddingId);
-  };
-
   return (
     <div className="clustering-container">
       <button
@@ -154,60 +130,13 @@ const ClusteringAnalyser = ({ uploadedText, onBack }) => {
           Clustering Analysis
         </h1>
 
-        {/* Embedding Selection Section or Collapsed State */}
-        {showEmbeddingOptions ? (
-          <div className="embedding-selection">
-            <h2 className="embedding-selection-title">Choose Your Analysis Method</h2>
-            <div className="embedding-container">
-              {embeddingOptions.map((option) => (
-                <div
-                  key={option.id}
-                  className={`embedding-card ${embedding === option.id ? 'selected' : ''}`}
-                  onClick={() => handleEmbeddingChange(option.id)}
-                >
-                  <div className="embedding-card-content">
-                    {/* Left side - Description */}
-                    <div className="embedding-description">
-                      <h3 className="embedding-title">
-                        {option.name}: {option.title}
-                      </h3>
-                      <p className="embedding-text">
-                        {option.description}
-                      </p>
-                    </div>
-
-                    {/* Right side - Radio button */}
-                    <div className="embedding-radio-container">
-                      <input
-                        type="radio"
-                        name="embedding"
-                        value={option.id}
-                        checked={embedding === option.id}
-                        onChange={(e) => handleEmbeddingChange(e.target.value)}
-                        className="embedding-radio"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="collapsed-embedding-selection">
-            <div className="current-embedding-info">
-              <span className="current-embedding-text">
-                Using <strong>{embeddingOptions.find(opt => opt.id === embedding)?.name || embedding}</strong> embeddings
-              </span>
-              <button
-                onClick={() => setShowEmbeddingOptions(true)}
-                className="change-embedding-button"
-                disabled={loading}
-              >
-                Change Method
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="analysis-description">
+          <p className="description-text">
+            This analysis uses ConceptNet embeddings to discover thematic and conceptual connections in your writing. 
+            Text segments will be grouped based on semantic meaning and common-sense knowledge, helping you identify 
+            how different parts of your work connect on a conceptual level.
+          </p>
+        </div>
 
         {/* Run Analysis button */}
         <div className="text-center">

@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-import nltk
 import os
 from dotenv import load_dotenv
 
@@ -32,14 +31,13 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 SECRET_KEY = 'django-insecure-@!dq1k%%v2-1v2hr_w_tev7e&xjlet1a=e4%*8kijxpj$6yi%('
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Allow overriding via environment; default to False for Render stability
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 
-try:
-    nltk.data.find("taggers/averaged_perceptron_tagger_eng")
-except LookupError:
-    nltk.download("averaged_perceptron_tagger_eng")
+# Avoid downloading NLTK data at import time to keep startup fast on Render.
+# If specific models are required, load them lazily inside the view that needs them.
 
 # Application definition
 

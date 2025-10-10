@@ -115,52 +115,70 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
       ? "Cluster Scatterplot (All Clusters)"
       : `Cluster Scatterplot (Cluster ${selectedCluster})`;
 
-  // Layout configuration
+  // Layout configuration with fixed legend positioning
   const plotLayout = {
     title: {
       text: chartTitle,
       font: {
-        size: 28,
+        size: 24,
         family: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
         color: "#1e293b"
       },
       x: 0.5,
-      y: 0.95
+      xanchor: "center",
+      y: 0.98,
+      yanchor: "top"
     },
     xaxis: {
       title: {
         text: "PCA Component 1",
-        font: { size: 16, color: "#475569" }
+        font: { size: 14, color: "#475569" }
       },
       gridcolor: "rgba(226, 232, 240, 0.6)",
       zerolinecolor: "rgba(148, 163, 184, 0.8)",
-      tickfont: { color: "#64748b" }
+      tickfont: { color: "#64748b", size: 11 }
     },
     yaxis: {
       title: {
         text: "PCA Component 2",
-        font: { size: 16, color: "#475569" }
+        font: { size: 14, color: "#475569" }
       },
       gridcolor: "rgba(226, 232, 240, 0.6)",
       zerolinecolor: "rgba(148, 163, 184, 0.8)",
-      tickfont: { color: "#64748b" }
+      tickfont: { color: "#64748b", size: 11 }
     },
     showlegend: true,
     legend: {
       orientation: "v",
-      x: 1,
-      xanchor: "right",
+      x: 1.02,
+      xanchor: "left",
       y: 1,
-      bgcolor: "rgba(255, 255, 255, 0.9)",
+      yanchor: "top",
+      bgcolor: "rgba(255, 255, 255, 0.95)",
       bordercolor: "rgba(226, 232, 240, 0.8)",
       borderwidth: 1,
-      font: { size: 12, color: "#475569" }
+      font: { size: 11, color: "#475569" }
     },
     plot_bgcolor: "rgba(248, 250, 252, 0.5)",
     paper_bgcolor: "white",
-    margin: { l: 80, r: 80, t: 80, b: 80 },
+    margin: { l: 70, r: 150, t: 80, b: 70 },
     autosize: true,
     hovermode: "closest"
+  };
+
+  // Responsive config that adjusts margins based on container
+  const plotConfig = {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+    displaylogo: false,
+    responsive: true,
+    toImageButtonOptions: {
+      format: 'png',
+      filename: 'cluster_scatterplot',
+      height: 800,
+      width: 1200,
+      scale: 2
+    }
   };
 
   return (
@@ -192,24 +210,13 @@ const ClusteringCharts = ({ clusters, selectedCluster = "all" }) => {
       </div>
 
       {/* Plot */}
-      <div className="plot-container" style={{ width: "100%", height: "70vh" }}>
+      <div className="plot-container">
         <Plot
           data={traceData}
           layout={plotLayout}
+          config={plotConfig}
           style={{ width: "100%", height: "100%" }}
           useResizeHandler={true}
-          config={{
-            displayModeBar: true,
-            modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
-            displaylogo: false,
-            toImageButtonOptions: {
-              format: 'png',
-              filename: 'cluster_scatterplot',
-              height: 800,
-              width: 1200,
-              scale: 2
-            }
-          }}
         />
       </div>
     </div>

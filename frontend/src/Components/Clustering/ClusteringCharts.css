@@ -1,7 +1,7 @@
 /* ClusteringCharts.css */
 
 .clustering-charts-container {
-  position: relative; /* Ensure pseudo elements and children are scoped */
+  position: relative;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   padding: 2rem;
   border-radius: 1.5rem;
@@ -90,7 +90,8 @@
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(226, 232, 240, 0.5);
   width: 100%;
-  height: 70vh; /* Explicit height so Plotly can size itself */
+  min-height: 600px;
+  height: 70vh;
 }
 
 .plot-container::before {
@@ -102,15 +103,43 @@
   bottom: 0;
   background: linear-gradient(45deg, rgba(59, 130, 246, 0.02), rgba(168, 85, 247, 0.02));
   pointer-events: none;
+  z-index: 0;
+}
+
+/* Fix Plotly container sizing and positioning */
+.plot-container > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
   z-index: 1;
 }
 
-/* Ensure Plotly wrappers fill the container */
-.plot-container > div,
-.plot-container .js-plotly-plot,
+.plot-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .plot-container .plotly {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Fix Plotly SVG container to prevent overflow */
+.plot-container svg.main-svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure legend stays inside plot area */
+.plot-container .legend {
+  max-width: 200px !important;
+}
+
+/* Force Plotly to respect container bounds */
+.plot-container .plot-container {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
 /* Enhanced color palette for clusters */
@@ -130,6 +159,13 @@
 }
 
 /* Responsive design */
+@media (max-width: 1024px) {
+  .plot-container {
+    min-height: 500px;
+    height: 60vh;
+  }
+}
+
 @media (max-width: 768px) {
   .clustering-charts-container {
     padding: 1rem;
@@ -145,6 +181,11 @@
   .control-group {
     justify-content: space-between;
   }
+
+  .plot-container {
+    min-height: 400px;
+    height: 50vh;
+  }
 }
 
 @media (max-width: 480px) {
@@ -156,6 +197,11 @@
   .controls-section {
     padding: 0.75rem;
     border-radius: 0.75rem;
+  }
+
+  .plot-container {
+    min-height: 350px;
+    height: 45vh;
   }
 }
 
@@ -211,6 +257,6 @@
   }
 
   .plot-container {
-    height: 60vh; /* Reasonable height for print */
+    height: 60vh;
   }
 }

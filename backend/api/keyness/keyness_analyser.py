@@ -8,24 +8,44 @@ import numpy as np
 from scipy.stats import chi2_contingency
 from gensim.models import TfidfModel
 from gensim.corpora import Dictionary
-import spacy
-from sklearn.feature_extraction.text import CountVectorizer
-from nltk.stem import WordNetLemmatizer
-from nltk import word_tokenize, pos_tag, FreqDist
-from math import log
-
-nltk.download("punkt", quiet=True)
-
-lemmatizer = WordNetLemmatizer()
 
 try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    from spacy.cli import download
-    download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
+    import spacy  # optional
+except Exception:
+    spacy = None
+from sklearn.feature_extraction.text import CountVectorizer
+from nltk.stem import WordNetLemmatizer
+from math import log
+
+
+# Avoid heavy downloads or model loads at import time in production.
+# Provide lightweight tokenizers and lazy spaCy loading.
+def _safe_word_tokens(text):
+    return re.findall(r"[A-Za-z]+(?:n't|'t|'re|'ve|'ll|'d|'m|'s)?", text)
+
+
+def _safe_sentences(text):
+    return [s for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+
+
+nlp = None
+
+
+def get_nlp():
+    global nlp, spacy
+    if nlp is not None:
+        return nlp
+    if spacy is None:
+        return None
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        return nlp
+    except Exception:
+        return None
+
 
 ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
+
 
 # ---------------------------
 # Filtering functions
@@ -33,127 +53,155 @@ ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
 def filter_content_words(text):
     """
-    Tokenize, POS-tag, and keep only content words:
-    nouns, verbs, adjectives, adverbs.
-    Returns list of {word, pos}.
+    Tokenize and assign POS, prioritizing lightweight runtime:
+    - spaCy (en_core_web_sm) if installed
+    - NLTK averaged_perceptron tagger if available (no downloads performed)
+    - Fallback: simple tokenizer with POS=OTHER
+    Returns content words only (NOUN, VERB, ADJ, ADV).
     """
-
-    POS_MAP_NLTK = {
-        'NN': 'NOUN', 'NNS': 'NOUN',
-        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-    }
-
-    # Tokenize words
-    tokens = word_tokenize(text)
-
-    # Merge split contractions - handle both 't and n't variants
-    merged_tokens = []
-    i = 0
-    while i < len(tokens):
-        if i + 1 < len(tokens) and tokens[i + 1] in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-            merged_tokens.append(tokens[i] + tokens[i + 1])
-            i += 2
-        else:
-            merged_tokens.append(tokens[i])
+    # Try spaCy first
+    nlp_local = get_nlp()
+    if nlp_local:
+        POS_MAP_SPACY = {
+            "NOUN": "NOUN",
+            "VERB": "VERB",
+            "ADJ": "ADJ",
+            "ADV": "ADV",
+        }
+        filtered = []
+        doc = nlp_local(text)
+        tokens = list(doc)
+        i = 0
+        while i < len(tokens):
+            tok = tokens[i]
+            # Merge contractions like wo + n't
+            if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+                combined = tok.text + tokens[i + 1].text
+                pos = POS_MAP_SPACY.get(tok.pos_, "OTHER")
+                if len(combined) > 2 and re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", combined):
+                    if pos in ALLOWED_POS:
+                        filtered.append({"word": combined.lower(), "pos": pos})
+                i += 2
+                continue
+            # Skip standalone contraction parts
+            if tok.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+                i += 1
+                continue
+            if len(tok.text) > 2 and re.match(r"^[A-Za-z]+$", tok.text):
+                pos = POS_MAP_SPACY.get(tok.pos_, "OTHER")
+                if pos in ALLOWED_POS:
+                    filtered.append({"word": tok.text.lower(), "pos": pos})
             i += 1
+        return filtered
 
-    # POS tagging
-    tagged = nltk.pos_tag(merged_tokens)
+    # Try NLTK pos_tagger if resources are available
+    try:
+        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+        tagged = nltk.pos_tag(tokens)
+        POS_MAP_NLTK = {
+            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
+        }
+        filtered = []
+        for word, pos in tagged:
+            if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
+                mapped = POS_MAP_NLTK.get(pos, "OTHER")
+                if mapped in ALLOWED_POS:
+                    filtered.append({"word": word.lower(), "pos": mapped})
+        return filtered
+    except LookupError:
+        # NLTK tagger not available
+        pass
+    except Exception:
+        pass
 
+    # Fallback: simple tokenizer with POS=OTHER (filter to alphabetic)
+    tokens = _safe_word_tokens(text)
     filtered = []
-    for word, pos in tagged:
-        # Skip standalone contraction parts that weren't merged
-        if word.lower() in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-            continue
-
-        # Only accept words that are:
-        # 1. Pure alphabetic (no apostrophes), OR
-        # 2. Valid contractions (word + 't/n't/etc at the end)
-        if re.match(r"^[a-zA-Z]+$", word) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$", word):
-            if len(word) > 2:
-                mapped_pos = POS_MAP_NLTK.get(pos, "OTHER")
-                if mapped_pos in ALLOWED_POS:
-                    filtered.append({"word": word.lower(), "pos": mapped_pos})
+    for word in tokens:
+        if len(word) > 2 and re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
+            filtered.append({"word": word.lower(), "pos": "OTHER"})
     return filtered
 
 
 def filter_all_words(text):
     """
-    Keep all alphabetic tokens > 2 chars, lemmatized + lowercased.
-    Also returns POS so that words can be coloured and grouped.
+    Keep all alphabetic tokens > 2 chars with POS if possible.
+    Priority: spaCy -> NLTK -> fallback POS=OTHER.
     """
-    POS_MAP_SPACY = {
-        "NOUN": "NOUN",
-        "PROPN": "NOUN",
-        "VERB": "VERB",
-        "ADJ": "ADJ",
-        "ADV": "ADV",
-    }
-
-    doc = nlp(text)
-    filtered = []
-
-    i = 0
-    tokens = list(doc)
-
-    while i < len(tokens):
-        token = tokens[i]
-
-        # Check if next token is a contraction part - handle both 't and n't variants
-        if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-            combined_text = token.text + tokens[i + 1].text
-            if len(combined_text) > 2:
+    nlp_local = get_nlp()
+    if nlp_local:
+        POS_MAP_SPACY = {
+            "NOUN": "NOUN",
+            "VERB": "VERB",
+            "ADJ": "ADJ",
+            "ADV": "ADV",
+        }
+        doc = nlp_local(text)
+        filtered = []
+        i = 0
+        tokens = list(doc)
+        while i < len(tokens):
+            token = tokens[i]
+            if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+                combined_text = token.text + tokens[i + 1].text
+                if len(combined_text) > 2:
+                    pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
+                    filtered.append({"word": combined_text.lower(), "pos": pos})
+                i += 2
+            elif token.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
+                i += 1
+            elif (re.match(r"^[a-zA-Z]+$", token.text) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$",
+                                                                   token.text)) and len(token.text) > 2:
                 pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
-                filtered.append({"word": combined_text.lower(), "pos": pos})
-            i += 2
-        # Skip standalone contraction parts
-        elif token.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-            i += 1
-        # Only accept pure alphabetic or valid contractions
-        elif (re.match(r"^[a-zA-Z]+$", token.text) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$",
-                                                               token.text)) and len(token.text) > 2:
-            pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
-            filtered.append({"word": token.text.lower(), "pos": pos})
-            i += 1
-        else:
-            i += 1
+                filtered.append({"word": token.text.lower(), "pos": pos})
+                i += 1
+            else:
+                i += 1
+        return filtered
 
-    return filtered
+    # Try NLTK as second option
+    try:
+        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+        tagged = nltk.pos_tag(tokens)
+        POS_MAP_NLTK = {
+            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
+        }
+        return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
+    except LookupError:
+        pass
+    except Exception:
+        pass
+
+    # Fallback
+    tokens = _safe_word_tokens(text)
+    return [{"word": w.lower(), "pos": "OTHER"} for w in tokens if len(w) > 2]
 
 
 def extract_sentences(text, word):
     """
     Return all sentences from text containing the exact word (case-insensitive).
-    Handles contractions properly - won't match "won" in "won't".
+    Handles contractions properly - won't match partials.
     """
     if not text or not word:
         return []
 
     word_lower = word.lower()
-    sentences = sent_tokenize(text)
+    sentences = _safe_sentences(text)
 
     matched = []
     for s in sentences:
-        tokens = word_tokenize(s)
-
-        # Merge contractions
-        merged_tokens = []
-        i = 0
-        while i < len(tokens):
-            if i + 1 < len(tokens) and tokens[i + 1] in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-                merged_tokens.append(tokens[i] + tokens[i + 1])
-                i += 2
-            else:
-                merged_tokens.append(tokens[i])
-                i += 1
-
-        # Check for exact match (case-insensitive)
-        if any(t.lower() == word_lower for t in merged_tokens):
+        tokens = _safe_word_tokens(s)
+        if any(t.lower() == word_lower for t in tokens):
             matched.append(s)
 
     return matched
+
 
 # ---------------------------
 # Keyness Functions
@@ -175,7 +223,7 @@ def compute_keyness(uploaded_text, corpus_counts_map, top_n=50, filter_func=filt
     uploaded_total = sum(uploaded_counts.values())
 
     # Use provided corpus counts
-    corpus_counts = corpus_counts_map.copy()
+    corpus_counts = corpus_counts_map
     corpus_total = sum(corpus_counts.values())
 
     results = []
@@ -262,7 +310,6 @@ def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
-
 def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """Gensim-style TF-IDF + chi2 keyness using counts-based corpus from _keyness.json"""
     if filter_func is None:
@@ -330,14 +377,13 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
     }
 
 
-
 def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
     tokens_uploaded = filter_func(uploaded_text)
     uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
-    corpus_counts = corpus_counts_map.copy()
+    corpus_counts = corpus_counts_map
 
     uploaded_total = sum(uploaded_counts.values())
     corpus_total = sum(corpus_counts.values())
@@ -367,7 +413,7 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
             "p_value": float(p),
             "log_likelihood": float(chi2),  # keep for compatibility
             "effect_size": float(effect_size),
-            "keyness_score": float(chi2),   # numeric, consistent across methods
+            "keyness_score": float(chi2),  # numeric, consistent across methods
             "direction": "Positive" if a > b else "Negative",  # keep for filtering
             "pos": pos
         })
@@ -376,14 +422,13 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
-
 def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None):
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
     tokens_uploaded = filter_func(uploaded_text)
     uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
-    corpus_counts = corpus_counts_map.copy()
+    corpus_counts = corpus_counts_map
 
     uploaded_total = sum(uploaded_counts.values())
     corpus_total = sum(corpus_counts.values())
@@ -417,4 +462,3 @@ def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None
 
     sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
-
