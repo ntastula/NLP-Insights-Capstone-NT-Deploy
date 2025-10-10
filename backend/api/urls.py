@@ -3,9 +3,6 @@ from . import views
 from .clustering.clustering_analyser import clustering_analysis
 from django.http import HttpResponse, JsonResponse
 
-def health_check(request):
-    return JsonResponse({"status": "ok"})
-
 urlpatterns = [
     path('', lambda request: HttpResponse("✅ Django backend is running!"), name='home'),
     path("corpora/", views.list_corpora, name="list_corpora"),
@@ -26,7 +23,7 @@ urlpatterns = [
     path('analyse-thematic-flow/', views.analyse_thematic_flow, name='analyse_thematic_flow'),
     path('analyse-overused-themes/', views.analyse_overused_themes, name='analyse_overused_themes'),
     path('create-temp-corpus/', views.create_temp_corpus, name='create_temp_corpus'),
-    path("health/", health_check),
+    path("health/", views.health, name="health"),
 
 ]
 

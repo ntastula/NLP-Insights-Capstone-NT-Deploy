@@ -1788,3 +1788,6 @@ def create_temp_corpus(request):
         return JsonResponse({"success": True, "filename": str(temp_file)})
 
     return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)
+
+def health(request):
+    return JsonResponse({"status": "ok"})
