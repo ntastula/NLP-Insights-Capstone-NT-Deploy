@@ -139,7 +139,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://nlp-insights-capstone-nt-deploy.vercel.app',
 ]
+
 
 CORS_ALLOW_ALL_ORIGINS = False
 
@@ -157,7 +159,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database sessions
 SESSION_COOKIE_AGE = 7 * 24 * 60 * 60  # 7 days
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True  # Set to True in production with HTTPS
+SESSION_COOKIE_SECURE = not DEBUG
 SESSION_SAVE_EVERY_REQUEST = True  # Update session on every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
