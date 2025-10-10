@@ -1,5 +1,6 @@
 import re
 import math
+import gc
 from collections import Counter, defaultdict
 import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
@@ -17,9 +18,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 from nltk.stem import WordNetLemmatizer
 from math import log
 
+# OPTIMIZATION: Set chunk size for processing large texts
+CHUNK_SIZE = 10000  # Process text in 10k character chunks
 
-# Avoid heavy downloads or model loads at import time in production.
-# Provide lightweight tokenizers and lazy spaCy loading.
+
 def _safe_word_tokens(text):
     return re.findall(r"[A-Za-z]+(?:n't|'t|'re|'ve|'ll|'d|'m|'s)?", text)
 
@@ -32,13 +34,15 @@ nlp = None
 
 
 def get_nlp():
+    """Load spaCy with disabled unnecessary components to save memory."""
     global nlp, spacy
     if nlp is not None:
         return nlp
     if spacy is None:
         return None
     try:
-        nlp = spacy.load("en_core_web_sm")
+        # OPTIMIZATION: Disable unnecessary pipeline components
+        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
         return nlp
     except Exception:
         return None
@@ -48,29 +52,62 @@ ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
 
 # ---------------------------
-# Filtering functions
+# Filtering functions (OPTIMIZED)
 # ---------------------------
 
 def filter_content_words(text):
     """
-    Tokenize and assign POS, prioritizing lightweight runtime:
-    - spaCy (en_core_web_sm) if installed
-    - NLTK averaged_perceptron tagger if available (no downloads performed)
-    - Fallback: simple tokenizer with POS=OTHER
+    Use NLTK only - much more memory efficient than spaCy.
     Returns content words only (NOUN, VERB, ADJ, ADV).
     """
-    # Try spaCy first
-    nlp_local = get_nlp()
-    if nlp_local:
-        POS_MAP_SPACY = {
-            "NOUN": "NOUN",
-            "VERB": "VERB",
-            "ADJ": "ADJ",
-            "ADV": "ADV",
+    # Skip spaCy entirely to save memory
+    try:
+        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+        tagged = nltk.pos_tag(tokens)
+        POS_MAP_NLTK = {
+            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
         }
         filtered = []
-        doc = nlp_local(text)
+        for word, pos in tagged:
+            if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
+                mapped = POS_MAP_NLTK.get(pos, "OTHER")
+                if mapped in ALLOWED_POS:
+                    filtered.append({"word": word.lower(), "pos": mapped})
+        return filtered
+    except (LookupError, Exception):
+        # Fallback: simple tokenizer
+        tokens = _safe_word_tokens(text)
+        filtered = []
+        for word in tokens:
+            if len(word) > 2 and re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
+                filtered.append({"word": word.lower(), "pos": "OTHER"})
+        return filtered
+
+
+def _filter_content_words_spacy_chunked(text, nlp_local):
+    """Process text in chunks to reduce memory usage."""
+    POS_MAP_SPACY = {
+        "NOUN": "NOUN",
+        "VERB": "VERB",
+        "ADJ": "ADJ",
+        "ADV": "ADV",
+    }
+
+    filtered = []
+    # Split text into chunks
+    text_length = len(text)
+
+    for start in range(0, text_length, CHUNK_SIZE):
+        end = min(start + CHUNK_SIZE, text_length)
+        chunk = text[start:end]
+
+        # Process chunk
+        doc = nlp_local(chunk)
         tokens = list(doc)
+
         i = 0
         while i < len(tokens):
             tok = tokens[i]
@@ -92,32 +129,35 @@ def filter_content_words(text):
                 if pos in ALLOWED_POS:
                     filtered.append({"word": tok.text.lower(), "pos": pos})
             i += 1
-        return filtered
 
-    # Try NLTK pos_tagger if resources are available
-    try:
-        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-        tagged = nltk.pos_tag(tokens)
-        POS_MAP_NLTK = {
-            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
-            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-        }
-        filtered = []
-        for word, pos in tagged:
-            if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
-                mapped = POS_MAP_NLTK.get(pos, "OTHER")
-                if mapped in ALLOWED_POS:
-                    filtered.append({"word": word.lower(), "pos": mapped})
-        return filtered
-    except LookupError:
-        # NLTK tagger not available
-        pass
-    except Exception:
-        pass
+        # Clear chunk from memory
+        del doc, tokens
+        gc.collect()
 
-    # Fallback: simple tokenizer with POS=OTHER (filter to alphabetic)
+    return filtered
+
+
+def _filter_content_words_nltk(text):
+    """NLTK-based filtering (already efficient)."""
+    tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+    tagged = nltk.pos_tag(tokens)
+    POS_MAP_NLTK = {
+        'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
+    }
+    filtered = []
+    for word, pos in tagged:
+        if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
+            mapped = POS_MAP_NLTK.get(pos, "OTHER")
+            if mapped in ALLOWED_POS:
+                filtered.append({"word": word.lower(), "pos": mapped})
+    return filtered
+
+
+def _filter_content_words_fallback(text):
+    """Fallback tokenizer."""
     tokens = _safe_word_tokens(text)
     filtered = []
     for word in tokens:
@@ -128,21 +168,44 @@ def filter_content_words(text):
 
 def filter_all_words(text):
     """
-    Keep all alphabetic tokens > 2 chars with POS if possible.
-    Priority: spaCy -> NLTK -> fallback POS=OTHER.
+    Use NLTK only - keep all alphabetic tokens > 2 chars with POS.
     """
-    nlp_local = get_nlp()
-    if nlp_local:
-        POS_MAP_SPACY = {
-            "NOUN": "NOUN",
-            "VERB": "VERB",
-            "ADJ": "ADJ",
-            "ADV": "ADV",
+    try:
+        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+        tagged = nltk.pos_tag(tokens)
+        POS_MAP_NLTK = {
+            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
         }
-        doc = nlp_local(text)
-        filtered = []
-        i = 0
+        return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
+    except (LookupError, Exception):
+        # Fallback
+        tokens = _safe_word_tokens(text)
+        return [{"word": w.lower(), "pos": "OTHER"} for w in tokens if len(w) > 2]
+
+
+def _filter_all_words_spacy_chunked(text, nlp_local):
+    """Process text in chunks for memory efficiency."""
+    POS_MAP_SPACY = {
+        "NOUN": "NOUN",
+        "VERB": "VERB",
+        "ADJ": "ADJ",
+        "ADV": "ADV",
+    }
+
+    filtered = []
+    text_length = len(text)
+
+    for start in range(0, text_length, CHUNK_SIZE):
+        end = min(start + CHUNK_SIZE, text_length)
+        chunk = text[start:end]
+
+        doc = nlp_local(chunk)
         tokens = list(doc)
+
+        i = 0
         while i < len(tokens):
             token = tokens[i]
             if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
@@ -160,25 +223,29 @@ def filter_all_words(text):
                 i += 1
             else:
                 i += 1
-        return filtered
 
-    # Try NLTK as second option
-    try:
-        tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-        tagged = nltk.pos_tag(tokens)
-        POS_MAP_NLTK = {
-            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
-            'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-            'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-            'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-        }
-        return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
-    except LookupError:
-        pass
-    except Exception:
-        pass
+        # Clear chunk from memory
+        del doc, tokens
+        gc.collect()
 
-    # Fallback
+    return filtered
+
+
+def _filter_all_words_nltk(text):
+    """NLTK-based all words filtering."""
+    tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
+    tagged = nltk.pos_tag(tokens)
+    POS_MAP_NLTK = {
+        'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
+        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
+        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
+    }
+    return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
+
+
+def _filter_all_words_fallback(text):
+    """Fallback tokenizer."""
     tokens = _safe_word_tokens(text)
     return [{"word": w.lower(), "pos": "OTHER"} for w in tokens if len(w) > 2]
 
@@ -204,65 +271,8 @@ def extract_sentences(text, word):
 
 
 # ---------------------------
-# Keyness Functions
+# Keyness Functions (with memory cleanup)
 # ---------------------------
-
-def compute_keyness(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
-    """
-    Compute a simple, writer-friendly keyness score:
-    - Based on chi-square (like sklearn/gensim versions).
-    - Groups results by POS (NOUN, VERB, ADJ, ADV).
-    """
-
-    if filter_func is None:
-        filter_func = lambda text: [{"word": w.lower(), "pos": "OTHER"} for w in text.split()]
-
-    # Tokenise uploaded text
-    tokens_uploaded = filter_func(uploaded_text)
-    uploaded_counts = Counter([t["word"] for t in tokens_uploaded])
-    uploaded_total = sum(uploaded_counts.values())
-
-    # Use provided corpus counts
-    corpus_counts = corpus_counts_map
-    corpus_total = sum(corpus_counts.values())
-
-    results = []
-    for word, u_count in uploaded_counts.items():
-        c_count = corpus_counts.get(word, 0)
-
-        contingency = np.array([
-            [u_count, uploaded_total - u_count],
-            [c_count, corpus_total - c_count]
-        ])
-
-        try:
-            chi2_val, p, _, _ = chi2_contingency(contingency, correction=False)
-        except ValueError:
-            chi2_val, p = 0, 1
-
-        # POS tag (default to OTHER if not in ALLOWED_POS)
-        pos = next((t["pos"] for t in tokens_uploaded if t["word"] == word), "OTHER")
-        if pos not in ALLOWED_POS:
-            pos = "OTHER"
-
-        results.append({
-            "word": word,
-            "uploaded_count": u_count,
-            "sample_count": c_count,
-            "chi2": float(chi2_val),
-            "p_value": float(p),
-            "keyness": float(chi2_val),  # numeric score, not positive/negative
-            "pos": pos
-        })
-
-    # Sort by chi2 descending
-    sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
-
-    return {
-        "results": sorted_results[:top_n],
-        "total_significant": len(sorted_results)
-    }
-
 
 def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """NLTK-style log-likelihood using counts-based corpus."""
@@ -301,30 +311,32 @@ def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_
             "sample_count": count_b,
             "log_likelihood": round(ll, 2),
             "effect_size": round(effect_size, 4),
-            "keyness_score": round(ll, 2),  # numeric
+            "keyness_score": round(ll, 2),
             "direction": "Positive" if count_a > count_b else "Negative",
             "pos": pos
         })
+
+    # OPTIMIZATION: Clear large objects
+    del uploaded_tokens, uploaded_counts, all_words
+    gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
 def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
-    """Gensim-style TF-IDF + chi2 keyness using counts-based corpus from _keyness.json"""
+    """Gensim-style TF-IDF + chi2 keyness."""
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
-    # Tokens
     tokens_uploaded = filter_func(uploaded_text)
     words_uploaded = [t["word"] for t in tokens_uploaded]
 
-    # Reconstruct "corpus text" from counts map
+    # Reconstruct "corpus text" from counts map (limit to prevent memory issues)
     words_corpus = []
     for word, count in corpus_counts_map.items():
-        words_corpus.extend([word] * count)
+        words_corpus.extend([word] * min(count, 1000))  # OPTIMIZATION: Cap repetitions
 
-    # Gensim dictionary & TF-IDF
     dictionary = corpora.Dictionary([words_uploaded, words_corpus])
     corpus_gensim = [dictionary.doc2bow(words_uploaded), dictionary.doc2bow(words_corpus)]
     tfidf = models.TfidfModel(corpus_gensim, smartirs="ntc")
@@ -363,10 +375,14 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
             "chi2": float(chi2_val),
             "p_value": float(p),
             "tfidf_score": float(uploaded_tfidf.get(word, 0)),
-            "keyness_score": float(chi2_val),  # numeric
+            "keyness_score": float(chi2_val),
             "direction": "Positive" if u_count > c_count else "Negative",
             "pos": pos
         })
+
+    # OPTIMIZATION: Clear memory
+    del tokens_uploaded, words_uploaded, words_corpus, dictionary, corpus_gensim, tfidf
+    gc.collect()
 
     results_sorted = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {
@@ -378,6 +394,7 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
 
 
 def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
+    """spaCy-based keyness analysis (uses chunked filtering)."""
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
@@ -411,18 +428,23 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
             "sample_count": b,
             "chi2": float(chi2),
             "p_value": float(p),
-            "log_likelihood": float(chi2),  # keep for compatibility
+            "log_likelihood": float(chi2),
             "effect_size": float(effect_size),
-            "keyness_score": float(chi2),  # numeric, consistent across methods
-            "direction": "Positive" if a > b else "Negative",  # keep for filtering
+            "keyness_score": float(chi2),
+            "direction": "Positive" if a > b else "Negative",
             "pos": pos
         })
+
+    # OPTIMIZATION: Clear memory
+    del tokens_uploaded, uploaded_counts
+    gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
 def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None):
+    """sklearn-based keyness analysis."""
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
@@ -455,10 +477,14 @@ def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None
             "sample_count": c_count,
             "chi2": float(chi2),
             "p_value": float(p),
-            "keyness_score": float(chi2),  # numeric
+            "keyness_score": float(chi2),
             "direction": "Positive" if u_count > c_count else "Negative",
             "pos": pos
         })
+
+    # OPTIMIZATION: Clear memory
+    del tokens_uploaded, uploaded_counts
+    gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}

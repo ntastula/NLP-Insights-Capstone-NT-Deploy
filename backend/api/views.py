@@ -1,3 +1,5 @@
+import gc
+
 from django.http import JsonResponse, HttpResponseNotFound
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -18,7 +20,6 @@ from scipy.stats import chi2_contingency, chi2  # <-- added chi2 for p-values
 from gensim import corpora, models
 from collections import defaultdict, Counter      # <-- added Counter
 from api.keyness.keyness_analyser import (
-    compute_keyness,
     keyness_gensim,
     keyness_spacy,
     keyness_sklearn,
@@ -34,6 +35,9 @@ from .models import KeynessResult
 import logging
 from pathlib import Path  # <-- ADDED (minimal import required)
 import math               # <-- used by compute_keyness_from_counts
+
+MAX_TEXT_LENGTH = 100000
+logger = logging.getLogger(__name__)
 
 # ---- LLM generation helper (Ollama or Hugging Face) ----
 
@@ -506,13 +510,18 @@ def analyse_keyness(request):
             logger.warning("Analysis request with empty uploaded_text")
             return JsonResponse({"error": "No uploaded text provided"}, status=400)
 
+        # OPTIMIZATION 1: Limit text length to prevent memory issues
+        if len(uploaded_text) > MAX_TEXT_LENGTH:
+            logger.warning(f"Text truncated from {len(uploaded_text)} to {MAX_TEXT_LENGTH} chars")
+            uploaded_text = uploaded_text[:MAX_TEXT_LENGTH]
+
         method = data.get("method", "nltk").lower()
         filter_mode = data.get("filter_mode", "content")
 
         # Choose filtering function
         filter_fn = filter_all_words if filter_mode == "all" else filter_content_words
 
-        # Tokenize/filter uploaded text
+        # OPTIMIZATION 2: Process uploaded text once and clear from memory
         filtered_uploaded = filter_fn(uploaded_text)
         uploaded_total = len(filtered_uploaded)
 
@@ -527,17 +536,25 @@ def analyse_keyness(request):
                 logger.warning("User text comparison without reference_text")
                 return JsonResponse({"error": "No reference text provided"}, status=400)
 
+            # OPTIMIZATION 3: Limit reference text as well
+            if len(reference_text) > MAX_TEXT_LENGTH:
+                reference_text = reference_text[:MAX_TEXT_LENGTH]
+
             logger.info(
                 f"User text comparison: target={len(uploaded_text.split())} words, "
                 f"reference={len(reference_text.split())} words"
             )
 
-            # Build reference counts map using the same filter function
+            # Build reference counts map
             filtered_reference = filter_fn(reference_text)
             reference_counts_map = Counter([w["word"] for w in filtered_reference])
             reference_total = sum(reference_counts_map.values())
 
-            # Call the selected method exactly as with corpus analysis
+            # OPTIMIZATION 4: Clear filtered data from memory
+            del filtered_reference
+            gc.collect()
+
+            # Call the selected method
             if method == "nltk":
                 data_out = keyness_nltk(
                     uploaded_text,
@@ -570,6 +587,10 @@ def analyse_keyness(request):
                 logger.warning(f"Unknown keyness method requested: {method}")
                 return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
 
+            # OPTIMIZATION 5: Clear large objects after use
+            del reference_counts_map
+            gc.collect()
+
             # Extract results
             results_list = data_out.get("results", [])
             total_significant = data_out.get("total_significant", len(results_list))
@@ -582,7 +603,7 @@ def analyse_keyness(request):
             # Save to DB
             keyness_obj = KeynessResult.objects.create(
                 method=method,
-                uploaded_text=uploaded_text,
+                uploaded_text=uploaded_text[:10000],  # OPTIMIZATION 6: Only save first 10k chars to DB
                 results=results_list,
                 uploaded_total=uploaded_total,
                 corpus_total=corpus_total,
@@ -630,6 +651,10 @@ def analyse_keyness(request):
             corpus_counts_map = Counter(meta.get("counts", {}))
             corpus_total = sum(corpus_counts_map.values())
 
+            # OPTIMIZATION 7: Clear meta from memory
+            del meta
+            gc.collect()
+
             # Compute keyness using chosen method
             if method == "nltk":
                 data_out = keyness_nltk(
@@ -663,6 +688,10 @@ def analyse_keyness(request):
                 logger.warning(f"Unknown keyness method requested: {method}")
                 return JsonResponse({"error": f"Unknown method: {method}"}, status=400)
 
+            # OPTIMIZATION 8: Clear corpus map after use
+            del corpus_counts_map
+            gc.collect()
+
             results_list = data_out.get("results", [])
             total_significant = data_out.get("total_significant", len(results_list))
 
@@ -673,7 +702,7 @@ def analyse_keyness(request):
             # Save to DB
             keyness_obj = KeynessResult.objects.create(
                 method=method,
-                uploaded_text=uploaded_text,
+                uploaded_text=uploaded_text[:10000],  # Only save first 10k chars
                 results=results_list,
                 uploaded_total=uploaded_total,
                 corpus_total=corpus_total,
@@ -685,6 +714,10 @@ def analyse_keyness(request):
                 f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
             )
 
+            # OPTIMIZATION 9: Final cleanup
+            del uploaded_text, filtered_uploaded, data_out
+            gc.collect()
+
             return JsonResponse({
                 "id": keyness_obj.id,
                 "method": method,
@@ -695,24 +728,11 @@ def analyse_keyness(request):
                 "corpus_total": corpus_total,
                 "total_significant": total_significant
             })
-        logger.info(
-            f"Keyness analysis completed: method={method}, "
-            f"filter_mode={filter_mode}, results_count={len(results_list)}, "
-            f"uploaded_total={uploaded_total}, corpus_total={corpus_total}, id={keyness_obj.id}"
-        )
-        schedule_session_cleanup(request, delay_minutes=15)
-        return JsonResponse({
-            "id": keyness_obj.id,
-            "method": method,
-            "filter_mode": filter_mode,
-            "results": results_list,
-            "uploaded_total": uploaded_total,
-            "corpus_total": corpus_total,
-            "total_significant": total_significant
-        })
 
     except Exception as e:
         logger.exception(f"Error during keyness analysis: {e}")
+        # OPTIMIZATION 10: Cleanup on error
+        gc.collect()
         return JsonResponse({"error": str(e)}, status=500)
 
 
