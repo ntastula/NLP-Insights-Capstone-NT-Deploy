@@ -90,14 +90,23 @@ def _generate_huggingface_gpt2(prompt: str, num_predict: int, temperature: float
     hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
     model = os.environ.get("HUGGINGFACE_MODEL") or "gpt2"
 
-    if not hf_token:
-        raise ValueError("HUGGINGFACE_API_TOKEN is not set")
+    # Log token status for debugging
+    if hf_token:
+        logger.info(f"Using HF token: {hf_token[:10]}...{hf_token[-4:]}")
+    else:
+        logger.warning("No HUGGINGFACE_API_TOKEN found")
+
+    logger.info(f"Target model: {model}")
+    logger.info(f"Full URL: https://api-inference.huggingface.co/models/{model}")
 
     url = f"https://api-inference.huggingface.co/models/{model}"
     headers = {
-        "Authorization": f"Bearer {hf_token}",
         "Content-Type": "application/json"
     }
+
+    # Only add auth if token exists
+    if hf_token:
+        headers["Authorization"] = f"Bearer {hf_token}"
 
     # GPT-2 specific: shorter prompts work better
     max_prompt_length = 1500
