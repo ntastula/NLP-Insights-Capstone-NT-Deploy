@@ -1,5 +1,4 @@
 import gc
-
 from django.http import JsonResponse, HttpResponseNotFound
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -39,65 +38,128 @@ import math               # <-- used by compute_keyness_from_counts
 MAX_TEXT_LENGTH = 100000
 logger = logging.getLogger(__name__)
 
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
+def log_memory_usage(label):
+    """Log current memory usage."""
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory at {label}: {memory_mb:.1f} MB")
+        except Exception as e:
+            logger.warning(f"Could not log memory: {e}")
+
 # ---- LLM generation helper (Ollama or Hugging Face) ----
 
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
-    Generate text using either a local model (default) or Hugging Face Inference API,
-    based on environment variables:
-      - LLM_PROVIDER: 'ollama' (default) or 'huggingface'
-      - OLLAMA_URL: base URL for local model (default http://localhost:11434/api/generate)
-      - OLLAMA_MODEL: model name for local model (default 'llama3')
-      - HUGGINGFACE_API_TOKEN: required when LLM_PROVIDER='huggingface'
-      - HUGGINGFACE_MODEL: HF repo id, e.g. 'meta-llama/Meta-Llama-3.1-8B-Instruct'
+    Generate text using either Ollama or Hugging Face Inference API.
+    Optimized for memory efficiency.
     """
+    log_memory_usage("LLM request start")
+
     provider = (os.environ.get("LLM_PROVIDER") or "ollama").strip().lower()
-    if provider == "huggingface":
-        hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
-        model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B-Instruct"
-        if not hf_token:
-            raise ValueError("HUGGINGFACE_API_TOKEN is not set")
-        url = f"https://api-inference.huggingface.co/models/{model}"
-        headers = {
-            "Authorization": f"Bearer {hf_token}",
-            "Accept": "application/json"
+
+    try:
+        if provider == "huggingface":
+            result = _generate_huggingface(prompt, num_predict, temperature)
+        else:
+            result = _generate_ollama(prompt, num_predict, temperature)
+
+        # Clear memory after generation
+        gc.collect()
+        log_memory_usage("LLM request end")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"LLM generation failed: {e}")
+        gc.collect()
+        raise
+
+
+def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
+    """Generate text using Hugging Face API."""
+    hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
+    model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+    if not hf_token:
+        raise ValueError("HUGGINGFACE_API_TOKEN is not set")
+
+    url = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {
+        "Authorization": f"Bearer {hf_token}",
+        "Accept": "application/json"
+    }
+
+    # OPTIMIZATION: Limit prompt length to avoid memory issues
+    max_prompt_length = 4000
+    if len(prompt) > max_prompt_length:
+        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
+        prompt = prompt[:max_prompt_length]
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": num_predict,
+            "temperature": temperature,
+            "return_full_text": False
         }
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": num_predict,
-                "temperature": temperature,
-                "return_full_text": False
-            }
+    }
+
+    logger.info(f"Calling Hugging Face API: {model}")
+    resp = requests.post(url, headers=headers, json=payload, timeout=180)
+    resp.raise_for_status()
+
+    data = resp.json()
+
+    # Parse response
+    if isinstance(data, list) and data:
+        text = data[0].get("generated_text") if isinstance(data[0], dict) else None
+        if text:
+            return text
+
+    if isinstance(data, dict):
+        text = data.get("generated_text") or data.get("summary_text")
+        if text:
+            return text
+
+    # Fallback: return JSON as string (truncated)
+    return json.dumps(data)[:2000]
+
+
+def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
+    """Generate text using Ollama local API."""
+    base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
+    model = os.environ.get("OLLAMA_MODEL") or "llama3"
+
+    # OPTIMIZATION: Limit prompt length
+    max_prompt_length = 4000
+    if len(prompt) > max_prompt_length:
+        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
+        prompt = prompt[:max_prompt_length]
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": temperature,
+            "top_p": 0.9,
+            "num_predict": num_predict,
         }
-        resp = requests.post(url, headers=headers, json=payload, timeout=180)
-        resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, list) and data:
-            text = data[0].get("generated_text") if isinstance(data[0], dict) else None
-            if text:
-                return text
-        if isinstance(data, dict):
-            text = data.get("generated_text") or data.get("summary_text")
-            if text:
-                return text
-        return json.dumps(data)[:2000]
-    else:
-        base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
-        model = os.environ.get("OLLAMA_MODEL") or "llama3"
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "top_p": 0.9,
-                "num_predict": num_predict,
-            }
-        }
-        resp = requests.post(base_url, json=payload, timeout=180)
-        resp.raise_for_status()
-        return (resp.json() or {}).get("response", "")
+    }
+
+    logger.info(f"Calling Ollama API: {model}")
+    resp = requests.post(base_url, json=payload, timeout=180)
+    resp.raise_for_status()
+
+    return (resp.json() or {}).get("response", "")
 
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
@@ -187,8 +249,6 @@ ALLOWED_MIME_TYPES = {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 }
-
-logger = logging.getLogger('api')
 
 def validate_file(uploaded_file: UploadedFile) -> tuple[bool, str]:
     """
@@ -1069,25 +1129,38 @@ Summary:
 
 @api_view(['POST'])
 def summarise_keyness_chart(request):
-    chart_type = request.data.get('chart_type', 'bar')  # 'bar' or 'scatter'
+    """Generate AI summary of keyness chart with memory optimization."""
+    log_memory_usage("summarise_keyness_chart start")
+
+    chart_type = request.data.get('chart_type', 'bar')
     chart_title = request.data.get('title', 'Chart')
     chart_data = request.data.get('chart_data', [])
 
     if not chart_data:
+        logger.warning("No chart data provided for summary")
         return Response({'error': 'No chart data provided.'}, status=400)
 
-    # Enhanced prompts with better context and structure
-    if chart_type == "bar":
-        # Extract chart data for bar chart (label: value pairs)
-        chart_text = "\n".join([f"- {item['label']}: {item['value']:.3f}" for item in chart_data[:15]])
+    logger.info(f"Generating summary for {chart_type} chart with {len(chart_data)} data points")
 
-        prompt = f"""You are an expert data analyst and computational linguist.
+    # OPTIMIZATION: Limit data points to reduce prompt size
+    max_data_points = 15
+    chart_data = chart_data[:max_data_points]
+
+    try:
+        # Generate prompt based on chart type
+        if chart_type == "bar":
+            chart_text = "\n".join([
+                f"- {item['label']}: {item['value']:.3f}"
+                for item in chart_data
+            ])
+
+            prompt = f"""You are an expert data analyst and computational linguist.
 
 Task: Analyze the bar chart titled "{chart_title}" showing keyness analysis results.
 
 Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analyzed text compared to a reference corpus.
 
-Chart Data (Top 15 keywords):
+Chart Data (Top {len(chart_data)} keywords):
 {chart_text}
 
 Please provide a comprehensive analysis with the following structure:
@@ -1105,19 +1178,19 @@ Highlight 3-4 specific words that stand out and briefly explain why they're sign
 
 Keep the analysis concise but insightful, focusing on what these keywords reveal about the text's distinctive characteristics."""
 
-    else:  # scatter plot
-        # Extract chart data for scatter plot (label with x,y coordinates)
-        chart_text = "\n".join(
-            [f"- {item['label']}: Frequency={item.get('x', 0)}, Keyness={item.get('y', 0):.3f}" for item in
-             chart_data[:15]])
+        else:  # scatter plot
+            chart_text = "\n".join([
+                f"- {item['label']}: Frequency={item.get('x', 0)}, Keyness={item.get('y', 0):.3f}"
+                for item in chart_data
+            ])
 
-        prompt = f"""You are an expert data analyst and computational linguist.
+            prompt = f"""You are an expert data analyst and computational linguist.
 
 Task: Analyze the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
 
 Context: This visualization plots words based on their frequency (how often they appear) versus their keyness score (how distinctive they are). The most interesting words are often those with moderate-to-high frequency but very high keyness scores.
 
-Chart Data (Top 15 keywords):
+Chart Data (Top {len(chart_data)} keywords):
 {chart_text}
 
 Please provide a comprehensive analysis with the following structure:
@@ -1135,32 +1208,67 @@ Highlight 3-4 specific words that occupy interesting positions in the frequency-
 
 Focus on what the frequency-keyness relationship reveals about the text's linguistic characteristics."""
 
-    try:
+        # Clear chart_data from memory
+        del chart_data
+        gc.collect()
+
+        # Generate analysis
         analysis = generate_text_with_fallback(prompt, num_predict=500, temperature=0.7)
+
         if not analysis:
+            logger.error("No response from LLM model")
             return Response({'error': 'No response from model.'}, status=500)
 
         analysis = analysis.strip()
+
+        # Clear prompt from memory
+        del prompt
+        gc.collect()
+
+        logger.info(f"Summary generated successfully ({len(analysis)} chars)")
+        log_memory_usage("summarise_keyness_chart end")
 
         return Response({
             "chart_title": chart_title,
             "chart_type": chart_type,
             "analysis": analysis,
             "success": True,
-            "data_points_analyzed": len(chart_data)
+            "data_points_analyzed": min(len(request.data.get('chart_data', [])), max_data_points)
         })
 
     except requests.exceptions.Timeout:
-        return Response({'error': 'Request timed out. The model is taking too long to respond.'}, status=504)
+        logger.error("LLM request timed out")
+        gc.collect()
+        return Response({
+            'error': 'Request timed out. The model is taking too long to respond.'
+        }, status=504)
+
     except requests.exceptions.HTTPError as e:
         status_code = getattr(e.response, "status_code", 500)
+        logger.error(f"LLM HTTP error: {status_code} - {str(e)}")
+        gc.collect()
+
         if status_code == 404:
-            return Response({'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'}, status=502)
-        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
+            return Response({
+                'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'
+            }, status=502)
+        return Response({
+            'error': f'Request to language model failed: {str(e)}'
+        }, status=500)
+
     except requests.exceptions.RequestException as e:
-        return Response({'error': f'Request to language model failed: {str(e)}'}, status=500)
+        logger.error(f"LLM request failed: {str(e)}")
+        gc.collect()
+        return Response({
+            'error': f'Request to language model failed: {str(e)}'
+        }, status=500)
+
     except Exception as e:
-        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
+        logger.exception(f"Unexpected error in summarise_keyness_chart: {e}")
+        gc.collect()
+        return Response({
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
 
 
 @api_view(['POST'])

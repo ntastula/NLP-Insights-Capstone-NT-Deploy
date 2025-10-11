@@ -111,7 +111,7 @@ def filter_content_words(text):
                 gc.collect()
 
         POS_MAP_NLTK = {
-            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'NN': 'NOUN', 'NNS': 'NOUN',
             'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
             'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
             'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
@@ -164,7 +164,7 @@ def filter_all_words(text):
                 gc.collect()
 
         POS_MAP_NLTK = {
-            'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
+            'NN': 'NOUN', 'NNS': 'NOUN',
             'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
             'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
             'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',

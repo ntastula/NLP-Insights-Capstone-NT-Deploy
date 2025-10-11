@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import Charts from "./Charts";
 import ResultsTable from "./ResultsTable";
 import ResultsSummary from "./ResultsSummary";
@@ -16,8 +16,6 @@ const posColors = {
 };
 
 const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, onWordDetail, onChangeMethod, loading }) => {
-  console.log("onChangeMethod prop:", onChangeMethod);
-  console.log("onChangeMethod type:", typeof onChangeMethod);
   const [activeView, setActiveView] = useState("keywords");
   const [summary, setSummary] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -49,73 +47,95 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   }, [safeResults]);
 
   const fetchChartSummary = async (chartType, data, forceRefresh = false) => {
-    if (chartSummaries[chartType].summary && !forceRefresh) return;
+  // Check if summary already exists (unless forcing refresh)
+  if (chartSummaries[chartType].summary && !forceRefresh) return;
 
-    setChartSummaries(prev => ({
-      ...prev,
-      [chartType]: { ...prev[chartType], loading: true, error: null }
-    }));
+  setChartSummaries(prev => ({
+    ...prev,
+    [chartType]: { ...prev[chartType], loading: true, error: null }
+  }));
 
-    try {
-      const payload = chartType === "primary"
-        ? {
+  try {
+    const payload = chartType === "primary"
+      ? {
           title: `${method.toUpperCase()} Keyness Analysis - Top Keywords`,
           chart_type: "bar",
           chart_data: data,
         }
-        : {
+      : {
           title: `${method.toUpperCase()} Keyness Analysis - Frequency vs Keyness`,
           chart_type: "scatter",
           chart_data: data,
         };
 
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-keyness-chart/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-keyness-chart/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const responseData = await response.json();
+
+    setChartSummaries(prev => ({
+      ...prev,
+      [chartType]: {
+        summary: responseData.analysis || "No summary available.",
+        loading: false,
+        error: null
       }
+    }));
+  } catch (err) {
+    console.error(`Error fetching ${chartType} chart summary:`, err);
+    setChartSummaries(prev => ({
+      ...prev,
+      [chartType]: {
+        summary: "",
+        loading: false,
+        error: `Failed to fetch ${chartType} chart summary.`
+      }
+    }));
+  }
+};
 
-      const responseData = await response.json();
+// ✅ FIXED: Use useRef to track if summaries have been fetched
+const hasFetchedSummaries = useRef(false);
 
-      setChartSummaries(prev => ({
-        ...prev,
-        [chartType]: {
-          summary: responseData.analysis || "No summary available.",
-          loading: false,
-          error: null
-        }
-      }));
-    } catch (err) {
-      console.error(`Error fetching ${chartType} chart summary:`, err);
-      setChartSummaries(prev => ({
-        ...prev,
-        [chartType]: {
-          summary: "",
-          loading: false,
-          error: `Failed to fetch ${chartType} chart summary.`
-        }
-      }));
-    }
-  };
+// ✅ Effect to fetch chart summaries when Charts tab becomes active
+useEffect(() => {
+  // Exit early if not on charts tab or no data
+  if (activeView !== "charts" || chartData.primary.length === 0) {
+    return;
+  }
 
-  // ✅ Effect to fetch chart summaries when Charts tab becomes active
-  useEffect(() => {
-    if (activeView !== "charts" || chartData.primary.length === 0) return;
+  // Exit if we've already fetched summaries for this data
+  if (hasFetchedSummaries.current) {
+    return;
+  }
 
-    // Fetch primary chart summary immediately
-    fetchChartSummary("primary", chartData.primary);
+  // Mark as fetched BEFORE making requests to prevent duplicate calls
+  hasFetchedSummaries.current = true;
 
-    // Pre-fetch secondary chart summary in background (optional)
-    if (chartData.secondary.length > 0) {
-      setTimeout(() => {
-        fetchChartSummary("secondary", chartData.secondary);
-      }, 1000); // Delay to not overwhelm the API
-    }
-  }, [activeView, chartData, method]);
+  // Fetch primary chart summary immediately
+  fetchChartSummary("primary", chartData.primary);
+
+  // Pre-fetch secondary chart summary in background (optional)
+  if (chartData.secondary.length > 0) {
+    setTimeout(() => {
+      fetchChartSummary("secondary", chartData.secondary);
+    }, 1000); // Delay to not overwhelm the API
+  }
+}, [activeView]); // ✅ CRITICAL: Only depend on activeView, not chartData
+
+// ✅ Reset the fetch flag when analysis results change (new data)
+useEffect(() => {
+  if (chartData.primary.length > 0) {
+    hasFetchedSummaries.current = false;
+  }
+}, [chartData.primary.length]); // Only track the length, not the whole object
 
   // Group by POS and filter to only words from uploaded text
   const uploadedWordsSet = useMemo(() => {
@@ -400,4 +420,4 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   );
 };
 
-export default CreativeKeynessResults;
+export default React.memo(CreativeKeynessResults);
