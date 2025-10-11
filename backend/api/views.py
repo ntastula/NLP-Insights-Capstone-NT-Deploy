@@ -86,7 +86,7 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
     """Generate text using Hugging Face API."""
     hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
-    model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    model = os.environ.get("HUGGINGFACE_MODEL") or "distilgpt2"
 
     if not hf_token:
         raise ValueError("HUGGINGFACE_API_TOKEN is not set")
@@ -98,7 +98,7 @@ def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> 
     }
 
     # OPTIMIZATION: Limit prompt length to avoid memory issues
-    max_prompt_length = 4000
+    max_prompt_length = 2000  # Reduced for better compatibility
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
         prompt = prompt[:max_prompt_length]
@@ -108,28 +108,52 @@ def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> 
         "parameters": {
             "max_new_tokens": num_predict,
             "temperature": temperature,
-            "return_full_text": False
+            "return_full_text": False,
+            "do_sample": True
+        },
+        "options": {
+            "wait_for_model": True  # Wait for model to load if needed
         }
     }
 
     logger.info(f"Calling Hugging Face API: {model}")
     resp = requests.post(url, headers=headers, json=payload, timeout=180)
+
+    # Log the full response for debugging
+    logger.info(f"HF API Response Status: {resp.status_code}")
+
+    if resp.status_code == 503:
+        # Model is loading
+        logger.warning("Model is loading, retrying in 20 seconds...")
+        import time
+        time.sleep(20)
+        resp = requests.post(url, headers=headers, json=payload, timeout=180)
+
     resp.raise_for_status()
 
     data = resp.json()
+    logger.info(f"HF API Response: {json.dumps(data)[:500]}")
 
     # Parse response
     if isinstance(data, list) and data:
-        text = data[0].get("generated_text") if isinstance(data[0], dict) else None
-        if text:
-            return text
+        if isinstance(data[0], dict):
+            text = data[0].get("generated_text") or data[0].get("summary_text")
+            if text:
+                return text
+        elif isinstance(data[0], str):
+            return data[0]
 
     if isinstance(data, dict):
+        # Check for error messages
+        if "error" in data:
+            raise ValueError(f"HF API Error: {data['error']}")
+
         text = data.get("generated_text") or data.get("summary_text")
         if text:
             return text
 
     # Fallback: return JSON as string (truncated)
+    logger.warning(f"Unexpected HF response format: {type(data)}")
     return json.dumps(data)[:2000]
 
 
