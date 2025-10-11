@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from backend.utils.session_utils import ensure_session_exists, schedule_session_cleanup
+from openai import OpenAI
 import json
 import os
 import re
@@ -29,6 +30,7 @@ from api.keyness.keyness_analyser import (
 )
 import spacy
 import mimetypes
+import time
 from django.core.files.uploadedfile import UploadedFile
 from .models import KeynessResult
 import logging
@@ -59,7 +61,7 @@ def log_memory_usage(label):
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
     Generate text using either Ollama or Hugging Face Inference API.
-    Optimized for memory efficiency.
+    Optimized for GPT-2 model.
     """
     log_memory_usage("LLM request start")
 
@@ -67,7 +69,7 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 
     try:
         if provider == "huggingface":
-            result = _generate_huggingface(prompt, num_predict, temperature)
+            result = _generate_huggingface_gpt2(prompt, num_predict, temperature)
         else:
             result = _generate_ollama(prompt, num_predict, temperature)
 
@@ -83,10 +85,10 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
         raise
 
 
-def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
-    """Generate text using Hugging Face API."""
+def _generate_huggingface_gpt2(prompt: str, num_predict: int, temperature: float) -> str:
+    """Generate text using Hugging Face API with GPT-2."""
     hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
-    model = os.environ.get("HUGGINGFACE_MODEL") or "distilgpt2"
+    model = os.environ.get("HUGGINGFACE_MODEL") or "gpt2"
 
     if not hf_token:
         raise ValueError("HUGGINGFACE_API_TOKEN is not set")
@@ -94,67 +96,95 @@ def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> 
     url = f"https://api-inference.huggingface.co/models/{model}"
     headers = {
         "Authorization": f"Bearer {hf_token}",
-        "Accept": "application/json"
+        "Content-Type": "application/json"
     }
 
-    # OPTIMIZATION: Limit prompt length to avoid memory issues
-    max_prompt_length = 2000  # Reduced for better compatibility
+    # GPT-2 specific: shorter prompts work better
+    max_prompt_length = 1500
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
-        prompt = prompt[:max_prompt_length]
+        # Keep the most important parts: instruction + data
+        lines = prompt.split('\n')
+        truncated = '\n'.join(lines[:10]) + '\n...\n' + '\n'.join(lines[-10:])
+        prompt = truncated[:max_prompt_length]
 
+    # GPT-2 optimized parameters
     payload = {
         "inputs": prompt,
         "parameters": {
-            "max_new_tokens": num_predict,
+            "max_new_tokens": min(num_predict, 300),  # GPT-2 works better with shorter outputs
             "temperature": temperature,
-            "return_full_text": False,
-            "do_sample": True
+            "top_p": 0.9,
+            "do_sample": True,
+            "return_full_text": False
         },
         "options": {
-            "wait_for_model": True  # Wait for model to load if needed
+            "wait_for_model": True,
+            "use_cache": True
         }
     }
 
-    logger.info(f"Calling Hugging Face API: {model}")
-    resp = requests.post(url, headers=headers, json=payload, timeout=180)
+    logger.info(f"Calling Hugging Face API with model: {model}")
 
-    # Log the full response for debugging
-    logger.info(f"HF API Response Status: {resp.status_code}")
+    # Try with retries for model loading
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=60)
 
-    if resp.status_code == 503:
-        # Model is loading
-        logger.warning("Model is loading, retrying in 20 seconds...")
-        import time
-        time.sleep(20)
-        resp = requests.post(url, headers=headers, json=payload, timeout=180)
+            if resp.status_code == 503:
+                # Model is loading
+                wait_time = (attempt + 1) * 10
+                logger.warning(f"Model loading, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
 
-    resp.raise_for_status()
+            if resp.status_code == 200:
+                break
+
+            resp.raise_for_status()
+
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                logger.warning(f"Request timeout, retrying (attempt {attempt + 1}/{max_retries})")
+                time.sleep(5)
+                continue
+            raise
 
     data = resp.json()
-    logger.info(f"HF API Response: {json.dumps(data)[:500]}")
+    logger.info(f"HF API Response Status: {resp.status_code}")
 
-    # Parse response
-    if isinstance(data, list) and data:
+    # Parse GPT-2 response
+    if isinstance(data, list) and len(data) > 0:
         if isinstance(data[0], dict):
-            text = data[0].get("generated_text") or data[0].get("summary_text")
+            text = data[0].get("generated_text", "")
             if text:
-                return text
+                return text.strip()
         elif isinstance(data[0], str):
-            return data[0]
+            return data[0].strip()
 
     if isinstance(data, dict):
-        # Check for error messages
+        # Check for errors
         if "error" in data:
-            raise ValueError(f"HF API Error: {data['error']}")
+            error_msg = data.get("error", "Unknown error")
+            logger.error(f"HF API Error: {error_msg}")
 
-        text = data.get("generated_text") or data.get("summary_text")
+            # Provide helpful error messages
+            if "does not exist" in error_msg or "not found" in error_msg.lower():
+                raise ValueError(f"Model '{model}' not found. Try using 'gpt2' or 'distilgpt2'")
+            elif "rate limit" in error_msg.lower():
+                raise ValueError("Rate limit exceeded. Please try again in a few moments.")
+            else:
+                raise ValueError(f"Hugging Face API Error: {error_msg}")
+
+        # Try to get generated text
+        text = data.get("generated_text") or data.get("summary_text", "")
         if text:
-            return text
+            return text.strip()
 
-    # Fallback: return JSON as string (truncated)
-    logger.warning(f"Unexpected HF response format: {type(data)}")
-    return json.dumps(data)[:2000]
+    # If we got here, the response format is unexpected
+    logger.warning(f"Unexpected HF response format: {json.dumps(data)[:500]}")
+    raise ValueError("Failed to parse response from Hugging Face API")
 
 
 def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
@@ -1153,7 +1183,7 @@ Summary:
 
 @api_view(['POST'])
 def summarise_keyness_chart(request):
-    """Generate AI summary of keyness chart with memory optimization."""
+    """Generate AI summary of keyness chart optimized for GPT-2."""
     log_memory_usage("summarise_keyness_chart start")
 
     chart_type = request.data.get('chart_type', 'bar')
@@ -1167,83 +1197,61 @@ def summarise_keyness_chart(request):
     logger.info(f"Generating summary for {chart_type} chart with {len(chart_data)} data points")
 
     # OPTIMIZATION: Limit data points to reduce prompt size
-    max_data_points = 15
+    max_data_points = 10  # Reduced for GPT-2
     chart_data = chart_data[:max_data_points]
 
     try:
-        # Generate prompt based on chart type
+        # Generate shorter, more focused prompts for GPT-2
         if chart_type == "bar":
             chart_text = "\n".join([
-                f"- {item['label']}: {item['value']:.3f}"
+                f"{item['label']}: {item['value']:.2f}"
                 for item in chart_data
             ])
 
-            prompt = f"""You are an expert data analyst and computational linguist.
+            # Simplified prompt for GPT-2
+            prompt = f"""Analyze this keyness analysis showing distinctive words:
 
-Task: Analyze the bar chart titled "{chart_title}" showing keyness analysis results.
-
-Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analyzed text compared to a reference corpus.
-
-Chart Data (Top {len(chart_data)} keywords):
+Top {len(chart_data)} Keywords:
 {chart_text}
 
-Please provide a comprehensive analysis with the following structure:
-
-**Summary:**
-Provide a 2-3 sentence overview of the main patterns in the data.
-
-**Key Insights:**
-- Identify the top 3-5 most significant keywords and what they might indicate about the text
-- Comment on the distribution pattern (steep drop-off, gradual decline, clusters)
-- Note any interesting linguistic patterns (word types, themes)
-
-**Notable Keywords:**
-Highlight 3-4 specific words that stand out and briefly explain why they're significant.
-
-Keep the analysis concise but insightful, focusing on what these keywords reveal about the text's distinctive characteristics."""
+Analysis:
+The most significant keywords are"""
 
         else:  # scatter plot
             chart_text = "\n".join([
-                f"- {item['label']}: Frequency={item.get('x', 0)}, Keyness={item.get('y', 0):.3f}"
+                f"{item['label']}: Freq={item.get('x', 0)}, Key={item.get('y', 0):.2f}"
                 for item in chart_data
             ])
 
-            prompt = f"""You are an expert data analyst and computational linguist.
+            # Simplified prompt for GPT-2
+            prompt = f"""Analyze word frequency vs distinctiveness:
 
-Task: Analyze the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
-
-Context: This visualization plots words based on their frequency (how often they appear) versus their keyness score (how distinctive they are). The most interesting words are often those with moderate-to-high frequency but very high keyness scores.
-
-Chart Data (Top {len(chart_data)} keywords):
+Top {len(chart_data)} Keywords:
 {chart_text}
 
-Please provide a comprehensive analysis with the following structure:
-
-**Summary:**
-Describe the overall relationship between frequency and keyness in 2-3 sentences.
-
-**Key Insights:**
-- Identify words with high keyness but moderate frequency (these are often the most interesting)
-- Comment on any outliers or unusual patterns
-- Discuss the balance between common distinctive words vs. rare distinctive words
-
-**Notable Keywords:**
-Highlight 3-4 specific words that occupy interesting positions in the frequency-keyness space and explain their significance.
-
-Focus on what the frequency-keyness relationship reveals about the text's linguistic characteristics."""
+Analysis:
+The relationship between frequency and keyness shows"""
 
         # Clear chart_data from memory
         del chart_data
         gc.collect()
 
-        # Generate analysis
-        analysis = generate_text_with_fallback(prompt, num_predict=500, temperature=0.7)
+        # Generate analysis with GPT-2 optimized parameters
+        analysis = generate_text_with_fallback(prompt, num_predict=250, temperature=0.7)
 
         if not analysis:
             logger.error("No response from LLM model")
             return Response({'error': 'No response from model.'}, status=500)
 
+        # GPT-2 often needs the prompt removed from output
         analysis = analysis.strip()
+
+        # Add back the prompt beginning if GPT-2 completed it
+        if not analysis.startswith("The"):
+            if chart_type == "bar":
+                analysis = "The most significant keywords are " + analysis
+            else:
+                analysis = "The relationship between frequency and keyness shows " + analysis
 
         # Clear prompt from memory
         del prompt
@@ -1274,10 +1282,21 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
 
         if status_code == 404:
             return Response({
-                'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'
+                'error': 'Model not found. Please set HUGGINGFACE_MODEL=gpt2 in environment variables.'
+            }, status=502)
+        elif status_code == 401:
+            return Response({
+                'error': 'Invalid Hugging Face API token. Please check HUGGINGFACE_API_TOKEN.'
             }, status=502)
         return Response({
             'error': f'Request to language model failed: {str(e)}'
+        }, status=500)
+
+    except ValueError as e:
+        logger.error(f"LLM value error: {str(e)}")
+        gc.collect()
+        return Response({
+            'error': str(e)
         }, status=500)
 
     except requests.exceptions.RequestException as e:
@@ -1290,6 +1309,14 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
     except Exception as e:
         logger.exception(f"Unexpected error in summarise_keyness_chart: {e}")
         gc.collect()
+
+        # Check if it's a connection error to LLM service
+        if "Connection refused" in str(e) or "Max retries exceeded" in str(e):
+            return Response({
+                'error': 'LLM service is not available. Please configure LLM_PROVIDER=huggingface and HUGGINGFACE_API_TOKEN environment variables.',
+                'summary_unavailable': True
+            }, status=503)
+
         return Response({
             'error': f'An error occurred: {str(e)}'
         }, status=500)
