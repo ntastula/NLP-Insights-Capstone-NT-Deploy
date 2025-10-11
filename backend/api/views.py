@@ -1195,6 +1195,21 @@ def summarise_keyness_chart(request):
     """Generate AI summary of keyness chart optimized for GPT-2."""
     log_memory_usage("summarise_keyness_chart start")
 
+    # DEBUG: Check environment variables
+    llm_provider = os.environ.get("LLM_PROVIDER", "NOT_SET")
+    hf_token = os.environ.get("HUGGINGFACE_API_TOKEN", "NOT_SET")
+    hf_model = os.environ.get("HUGGINGFACE_MODEL", "NOT_SET")
+
+    logger.info("=" * 50)
+    logger.info("ENVIRONMENT VARIABLES CHECK:")
+    logger.info(f"LLM_PROVIDER: {llm_provider}")
+    logger.info(f"HUGGINGFACE_MODEL: {hf_model}")
+    if hf_token != "NOT_SET":
+        logger.info(f"HUGGINGFACE_API_TOKEN: {hf_token[:10]}...{hf_token[-4:]} (length: {len(hf_token)})")
+    else:
+        logger.info("HUGGINGFACE_API_TOKEN: NOT_SET")
+    logger.info("=" * 50)
+
     chart_type = request.data.get('chart_type', 'bar')
     chart_title = request.data.get('title', 'Chart')
     chart_data = request.data.get('chart_data', [])
@@ -1317,6 +1332,13 @@ The relationship between frequency and keyness shows"""
 
     except Exception as e:
         logger.exception(f"Unexpected error in summarise_keyness_chart: {e}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+
+        # Log the full traceback
+        import traceback
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
         gc.collect()
 
         # Check if it's a connection error to LLM service
