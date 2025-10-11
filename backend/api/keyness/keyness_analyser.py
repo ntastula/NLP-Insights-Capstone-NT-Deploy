@@ -1,6 +1,8 @@
 import re
 import math
 import gc
+import os
+import logging
 from collections import Counter, defaultdict
 import nltk
 from nltk.tokenize import word_tokenize, sent_tokenize
@@ -11,6 +13,12 @@ from gensim.models import TfidfModel
 from gensim.corpora import Dictionary
 
 try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
+try:
     import spacy  # optional
 except Exception:
     spacy = None
@@ -18,8 +26,49 @@ from sklearn.feature_extraction.text import CountVectorizer
 from nltk.stem import WordNetLemmatizer
 from math import log
 
+logger = logging.getLogger(__name__)
+
 # OPTIMIZATION: Set chunk size for processing large texts
 CHUNK_SIZE = 10000  # Process text in 10k character chunks
+
+
+# Download required NLTK data on startup
+def setup_nltk():
+    """Download required NLTK data if not already present."""
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        logger.info("Downloading NLTK punkt tokenizer...")
+        nltk.download('punkt', quiet=True)
+
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger')
+    except LookupError:
+        logger.info("Downloading NLTK POS tagger...")
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+    except LookupError:
+        logger.info("Downloading NLTK English POS tagger...")
+        nltk.download('averaged_perceptron_tagger_eng', quiet=True)
+
+
+# Call setup on import
+setup_nltk()
+
+
+def log_memory_usage(label):
+    """Log current memory usage."""
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process(os.getpid())
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory at {label}: {memory_mb:.1f} MB")
+        except Exception as e:
+            logger.warning(f"Could not log memory: {e}")
+    else:
+        logger.debug(f"Checkpoint: {label} (psutil not available)")
 
 
 def _safe_word_tokens(text):
@@ -30,29 +79,11 @@ def _safe_sentences(text):
     return [s for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
 
 
-nlp = None
-
-
-def get_nlp():
-    """Load spaCy with disabled unnecessary components to save memory."""
-    global nlp, spacy
-    if nlp is not None:
-        return nlp
-    if spacy is None:
-        return None
-    try:
-        # OPTIMIZATION: Disable unnecessary pipeline components
-        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-        return nlp
-    except Exception:
-        return None
-
-
 ALLOWED_POS = {"NOUN", "VERB", "ADJ", "ADV"}
 
 
 # ---------------------------
-# Filtering functions (OPTIMIZED)
+# Filtering functions (NLTK-ONLY for memory efficiency)
 # ---------------------------
 
 def filter_content_words(text):
@@ -60,25 +91,49 @@ def filter_content_words(text):
     Use NLTK only - much more memory efficient than spaCy.
     Returns content words only (NOUN, VERB, ADJ, ADV).
     """
-    # Skip spaCy entirely to save memory
+    log_memory_usage("filter_content_words start")
+
+    # Use NLTK for POS tagging
     try:
         tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-        tagged = nltk.pos_tag(tokens)
+
+        # Process in chunks to avoid memory issues with very large texts
+        chunk_size = 5000
+        all_tagged = []
+
+        for i in range(0, len(tokens), chunk_size):
+            chunk_tokens = tokens[i:i + chunk_size]
+            tagged_chunk = nltk.pos_tag(chunk_tokens)
+            all_tagged.extend(tagged_chunk)
+
+            # Clear memory after each chunk
+            if i % (chunk_size * 4) == 0:
+                gc.collect()
+
         POS_MAP_NLTK = {
             'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
             'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
             'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
             'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
         }
+
         filtered = []
-        for word, pos in tagged:
+        for word, pos in all_tagged:
             if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
                 mapped = POS_MAP_NLTK.get(pos, "OTHER")
-                if mapped in ALLOWED_POS:
+                if mapped in ALLOWED_POS:  # Only include content words
                     filtered.append({"word": word.lower(), "pos": mapped})
+
+        del tokens, all_tagged
+        gc.collect()
+
+        log_memory_usage("filter_content_words end")
+        logger.info(f"Filtered {len(filtered)} content words from text")
         return filtered
-    except (LookupError, Exception):
-        # Fallback: simple tokenizer
+
+    except Exception as e:
+        logger.error(f"Error in filter_content_words: {e}")
+        # Fallback: simple tokenizer with no filtering
         tokens = _safe_word_tokens(text)
         filtered = []
         for word in tokens:
@@ -87,167 +142,48 @@ def filter_content_words(text):
         return filtered
 
 
-def _filter_content_words_spacy_chunked(text, nlp_local):
-    """Process text in chunks to reduce memory usage."""
-    POS_MAP_SPACY = {
-        "NOUN": "NOUN",
-        "VERB": "VERB",
-        "ADJ": "ADJ",
-        "ADV": "ADV",
-    }
-
-    filtered = []
-    # Split text into chunks
-    text_length = len(text)
-
-    for start in range(0, text_length, CHUNK_SIZE):
-        end = min(start + CHUNK_SIZE, text_length)
-        chunk = text[start:end]
-
-        # Process chunk
-        doc = nlp_local(chunk)
-        tokens = list(doc)
-
-        i = 0
-        while i < len(tokens):
-            tok = tokens[i]
-            # Merge contractions like wo + n't
-            if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-                combined = tok.text + tokens[i + 1].text
-                pos = POS_MAP_SPACY.get(tok.pos_, "OTHER")
-                if len(combined) > 2 and re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", combined):
-                    if pos in ALLOWED_POS:
-                        filtered.append({"word": combined.lower(), "pos": pos})
-                i += 2
-                continue
-            # Skip standalone contraction parts
-            if tok.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-                i += 1
-                continue
-            if len(tok.text) > 2 and re.match(r"^[A-Za-z]+$", tok.text):
-                pos = POS_MAP_SPACY.get(tok.pos_, "OTHER")
-                if pos in ALLOWED_POS:
-                    filtered.append({"word": tok.text.lower(), "pos": pos})
-            i += 1
-
-        # Clear chunk from memory
-        del doc, tokens
-        gc.collect()
-
-    return filtered
-
-
-def _filter_content_words_nltk(text):
-    """NLTK-based filtering (already efficient)."""
-    tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-    tagged = nltk.pos_tag(tokens)
-    POS_MAP_NLTK = {
-        'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
-        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-    }
-    filtered = []
-    for word, pos in tagged:
-        if re.match(r"^[A-Za-z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
-            mapped = POS_MAP_NLTK.get(pos, "OTHER")
-            if mapped in ALLOWED_POS:
-                filtered.append({"word": word.lower(), "pos": mapped})
-    return filtered
-
-
-def _filter_content_words_fallback(text):
-    """Fallback tokenizer."""
-    tokens = _safe_word_tokens(text)
-    filtered = []
-    for word in tokens:
-        if len(word) > 2 and re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)?$", word):
-            filtered.append({"word": word.lower(), "pos": "OTHER"})
-    return filtered
-
-
 def filter_all_words(text):
     """
     Use NLTK only - keep all alphabetic tokens > 2 chars with POS.
     """
+    log_memory_usage("filter_all_words start")
+
     try:
         tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-        tagged = nltk.pos_tag(tokens)
+
+        # Process in chunks
+        chunk_size = 5000
+        all_tagged = []
+
+        for i in range(0, len(tokens), chunk_size):
+            chunk_tokens = tokens[i:i + chunk_size]
+            tagged_chunk = nltk.pos_tag(chunk_tokens)
+            all_tagged.extend(tagged_chunk)
+
+            if i % (chunk_size * 4) == 0:
+                gc.collect()
+
         POS_MAP_NLTK = {
             'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
             'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
             'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
             'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
         }
-        return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
-    except (LookupError, Exception):
+
+        result = [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in all_tagged]
+
+        del tokens, all_tagged
+        gc.collect()
+
+        log_memory_usage("filter_all_words end")
+        logger.info(f"Filtered {len(result)} words from text")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in filter_all_words: {e}")
         # Fallback
         tokens = _safe_word_tokens(text)
         return [{"word": w.lower(), "pos": "OTHER"} for w in tokens if len(w) > 2]
-
-
-def _filter_all_words_spacy_chunked(text, nlp_local):
-    """Process text in chunks for memory efficiency."""
-    POS_MAP_SPACY = {
-        "NOUN": "NOUN",
-        "VERB": "VERB",
-        "ADJ": "ADJ",
-        "ADV": "ADV",
-    }
-
-    filtered = []
-    text_length = len(text)
-
-    for start in range(0, text_length, CHUNK_SIZE):
-        end = min(start + CHUNK_SIZE, text_length)
-        chunk = text[start:end]
-
-        doc = nlp_local(chunk)
-        tokens = list(doc)
-
-        i = 0
-        while i < len(tokens):
-            token = tokens[i]
-            if i + 1 < len(tokens) and tokens[i + 1].text in ("'t", "n't", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-                combined_text = token.text + tokens[i + 1].text
-                if len(combined_text) > 2:
-                    pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
-                    filtered.append({"word": combined_text.lower(), "pos": pos})
-                i += 2
-            elif token.text in ("n't", "'t", "'re", "'ve", "'ll", "'d", "'m", "'s"):
-                i += 1
-            elif (re.match(r"^[a-zA-Z]+$", token.text) or re.match(r"^[a-zA-Z]+(n't|'t|'re|'ve|'ll|'d|'m|'s)$",
-                                                                   token.text)) and len(token.text) > 2:
-                pos = POS_MAP_SPACY.get(token.pos_, "OTHER")
-                filtered.append({"word": token.text.lower(), "pos": pos})
-                i += 1
-            else:
-                i += 1
-
-        # Clear chunk from memory
-        del doc, tokens
-        gc.collect()
-
-    return filtered
-
-
-def _filter_all_words_nltk(text):
-    """NLTK-based all words filtering."""
-    tokens = [w for w in _safe_word_tokens(text) if len(w) > 2]
-    tagged = nltk.pos_tag(tokens)
-    POS_MAP_NLTK = {
-        'NN': 'NOUN', 'NNS': 'NOUN', 'NNP': 'NOUN', 'NNPS': 'NOUN',
-        'VB': 'VERB', 'VBD': 'VERB', 'VBG': 'VERB', 'VBN': 'VERB', 'VBP': 'VERB', 'VBZ': 'VERB',
-        'JJ': 'ADJ', 'JJR': 'ADJ', 'JJS': 'ADJ',
-        'RB': 'ADV', 'RBR': 'ADV', 'RBS': 'ADV',
-    }
-    return [{"word": w.lower(), "pos": POS_MAP_NLTK.get(p, "OTHER")} for w, p in tagged]
-
-
-def _filter_all_words_fallback(text):
-    """Fallback tokenizer."""
-    tokens = _safe_word_tokens(text)
-    return [{"word": w.lower(), "pos": "OTHER"} for w in tokens if len(w) > 2]
 
 
 def extract_sentences(text, word):
@@ -269,13 +205,14 @@ def extract_sentences(text, word):
 
     return matched
 
-
 # ---------------------------
 # Keyness Functions (with memory cleanup)
 # ---------------------------
 
 def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """NLTK-style log-likelihood using counts-based corpus."""
+    log_memory_usage("keyness_nltk start")
+
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for w in t.split()]
 
@@ -321,11 +258,15 @@ def keyness_nltk(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_
     gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
+
+    log_memory_usage("keyness_nltk end")
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
 def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
     """Gensim-style TF-IDF + chi2 keyness."""
+    log_memory_usage("keyness_gensim start")
+
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
@@ -385,6 +326,8 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
     gc.collect()
 
     results_sorted = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
+
+    log_memory_usage("keyness_gensim end")
     return {
         "results": results_sorted[:top_n],
         "total_significant": len(results_sorted),
@@ -394,7 +337,9 @@ def keyness_gensim(uploaded_text, corpus_counts_map, top_n=50, filter_func=filte
 
 
 def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter_content_words):
-    """spaCy-based keyness analysis (uses chunked filtering)."""
+    """spaCy-based keyness analysis (uses NLTK filtering for memory efficiency)."""
+    log_memory_usage("keyness_spacy start")
+
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
@@ -440,11 +385,15 @@ def keyness_spacy(uploaded_text, corpus_counts_map, top_n=50, filter_func=filter
     gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["chi2"], reverse=True)
+
+    log_memory_usage("keyness_spacy end")
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
 
 
 def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None):
     """sklearn-based keyness analysis."""
+    log_memory_usage("keyness_sklearn start")
+
     if filter_func is None:
         filter_func = lambda t: [{"word": w.lower(), "pos": "OTHER"} for t in t.split()]
 
@@ -487,4 +436,6 @@ def keyness_sklearn(uploaded_text, corpus_counts_map, top_n=50, filter_func=None
     gc.collect()
 
     sorted_results = sorted(results, key=lambda x: x["keyness_score"], reverse=True)
+
+    log_memory_usage("keyness_sklearn end")
     return {"results": sorted_results[:top_n], "total_significant": len(sorted_results)}
