@@ -173,6 +173,59 @@ logger = logging.getLogger(__name__)
 META_DIR = Path("api/corpus_meta")
 KEYNESS_DIR = Path("api/corpus_meta_keyness")
 
+
+@api_view(['GET'])
+def test_huggingface(request):
+    """Test endpoint to debug HuggingFace API connection."""
+    import requests
+
+    hf_token = os.environ.get("HUGGINGFACE_API_TOKEN", "NOT_SET")
+    hf_model = os.environ.get("HUGGINGFACE_MODEL", "gpt2")
+
+    logger.info("Testing HuggingFace API connection...")
+    logger.info(f"Token present: {hf_token != 'NOT_SET'}")
+    logger.info(f"Token length: {len(hf_token) if hf_token != 'NOT_SET' else 0}")
+    logger.info(f"Token starts with 'hf_': {hf_token.startswith('hf_') if hf_token != 'NOT_SET' else False}")
+    logger.info(f"Model: {hf_model}")
+
+    if hf_token == "NOT_SET":
+        return Response({
+            'error': 'HUGGINGFACE_API_TOKEN not set',
+            'model': hf_model
+        }, status=500)
+
+    # Test the API
+    url = f"https://api-inference.huggingface.co/models/{hf_model}"
+    headers = {
+        "Authorization": f"Bearer {hf_token}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "inputs": "Hello, I am",
+        "parameters": {
+            "max_new_tokens": 10
+        }
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+        return Response({
+            'status_code': response.status_code,
+            'model': hf_model,
+            'url': url,
+            'token_length': len(hf_token),
+            'token_starts_correctly': hf_token.startswith('hf_'),
+            'response': response.text[:500]
+        })
+    except Exception as e:
+        return Response({
+            'error': str(e),
+            'model': hf_model,
+            'token_length': len(hf_token)
+        }, status=500)
+
 def list_corpus_files(analysis_type=None):
     if analysis_type == "keyness":
         folder = KEYNESS_DIR
