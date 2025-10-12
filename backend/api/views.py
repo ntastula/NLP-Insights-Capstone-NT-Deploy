@@ -60,17 +60,19 @@ def log_memory_usage(label):
 
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
-    Generate text using either Ollama or Hugging Face Inference API.
-    Optimized for memory efficiency.
+    Generate text using Groq, HuggingFace, or Ollama.
+    Priority: Groq > HuggingFace > Ollama
     """
     log_memory_usage("LLM request start")
 
-    provider = (os.environ.get("LLM_PROVIDER") or "ollama").strip().lower()
+    provider = (os.environ.get("LLM_PROVIDER") or "groq").strip().lower()
 
     try:
-        if provider == "huggingface":
+        if provider == "groq":
+            result = _generate_groq(prompt, num_predict, temperature)
+        elif provider == "huggingface":
             result = _generate_huggingface(prompt, num_predict, temperature)
-        else:
+        else:  # ollama
             result = _generate_ollama(prompt, num_predict, temperature)
 
         # Clear memory after generation
@@ -80,9 +82,68 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
         return result
 
     except Exception as e:
-        logger.error(f"LLM generation failed: {e}")
+        logger.error(f"LLM generation failed with {provider}: {e}")
         gc.collect()
         raise
+
+
+def _generate_groq(prompt: str, num_predict: int, temperature: float) -> str:
+    """Generate text using Groq API (fast and free)."""
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+
+    if not groq_api_key:
+        raise ValueError("GROQ_API_KEY is not set. Get one free at https://console.groq.com/keys")
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    # Groq has a context limit, so truncate if needed
+    max_prompt_length = 6000
+    if len(prompt) > max_prompt_length:
+        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
+        prompt = prompt[:max_prompt_length]
+
+    # Use Llama 3.1 8B - fast and high quality
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are an expert data analyst and computational linguist. Provide clear, concise analysis."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": min(num_predict, 1000),
+        "temperature": temperature,
+        "top_p": 0.9
+    }
+
+    logger.info("Calling Groq API with llama-3.1-8b-instant")
+
+    response = requests.post(url, headers=headers, json=payload, timeout=60)
+
+    if response.status_code == 401:
+        raise ValueError("Invalid Groq API key. Check your GROQ_API_KEY environment variable.")
+    elif response.status_code == 429:
+        raise ValueError("Groq rate limit exceeded. Please try again in a moment.")
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    # Extract the generated text
+    if "choices" in data and len(data["choices"]) > 0:
+        content = data["choices"][0].get("message", {}).get("content", "")
+        if content:
+            return content.strip()
+
+    raise ValueError("Unexpected response format from Groq API")
 
 
 def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
@@ -96,11 +157,10 @@ def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> 
     url = f"https://api-inference.huggingface.co/models/{model}"
     headers = {
         "Authorization": f"Bearer {hf_token}",
-        "Accept": "application/json"
+        "Content-Type": "application/json"
     }
 
-    # OPTIMIZATION: Limit prompt length to avoid memory issues
-    max_prompt_length = 4000
+    max_prompt_length = 1500
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
         prompt = prompt[:max_prompt_length]
@@ -108,31 +168,59 @@ def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> 
     payload = {
         "inputs": prompt,
         "parameters": {
-            "max_new_tokens": num_predict,
+            "max_new_tokens": min(num_predict, 300),
             "temperature": temperature,
+            "top_p": 0.9,
+            "do_sample": True,
             "return_full_text": False
+        },
+        "options": {
+            "wait_for_model": True,
+            "use_cache": True
         }
     }
 
-    logger.info(f"Calling Hugging Face API: {model}")
-    resp = requests.post(url, headers=headers, json=payload, timeout=180)
-    resp.raise_for_status()
+    logger.info(f"Calling Hugging Face API with model: {model}")
 
-    data = resp.json()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
 
-    # Parse response
-    if isinstance(data, list) and data:
-        text = data[0].get("generated_text") if isinstance(data[0], dict) else None
-        if text:
-            return text
+            if response.status_code == 503:
+                wait_time = (attempt + 1) * 10
+                logger.warning(f"Model loading, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+
+            if response.status_code == 200:
+                break
+
+            response.raise_for_status()
+
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                logger.warning(f"Request timeout, retrying (attempt {attempt + 1}/{max_retries})")
+                time.sleep(5)
+                continue
+            raise
+
+    data = response.json()
+
+    if isinstance(data, list) and len(data) > 0:
+        if isinstance(data[0], dict):
+            text = data[0].get("generated_text", "")
+            if text:
+                return text.strip()
 
     if isinstance(data, dict):
-        text = data.get("generated_text") or data.get("summary_text")
+        if "error" in data:
+            raise ValueError(f"Hugging Face API Error: {data['error']}")
+        text = data.get("generated_text", "")
         if text:
-            return text
+            return text.strip()
 
-    # Fallback: return JSON as string (truncated)
-    return json.dumps(data)[:2000]
+    raise ValueError("Failed to parse response from Hugging Face API")
 
 
 def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
@@ -140,7 +228,6 @@ def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
     base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
     model = os.environ.get("OLLAMA_MODEL") or "llama3"
 
-    # OPTIMIZATION: Limit prompt length
     max_prompt_length = 4000
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
@@ -158,10 +245,65 @@ def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
     }
 
     logger.info(f"Calling Ollama API: {model}")
-    resp = requests.post(base_url, json=payload, timeout=180)
-    resp.raise_for_status()
+    response = requests.post(base_url, json=payload, timeout=180)
+    response.raise_for_status()
 
-    return (resp.json() or {}).get("response", "")
+    return (response.json() or {}).get("response", "")
+
+
+@api_view(['GET'])
+def test_groq(request):
+    """Test endpoint to verify Groq API connection."""
+    groq_api_key = os.environ.get("GROQ_API_KEY", "NOT_SET")
+
+    logger.info("Testing Groq API connection...")
+
+    if groq_api_key == "NOT_SET":
+        return Response({
+            'error': 'GROQ_API_KEY not set',
+            'help': 'Get a free API key at https://console.groq.com/keys'
+        }, status=500)
+
+    # Test the API
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {"role": "user", "content": "Say 'Hello, Groq is working!' in exactly those words."}
+        ],
+        "max_tokens": 20
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+        if response.status_code == 200:
+            data = response.json()
+            message = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+            return Response({
+                'status': 'success',
+                'message': message,
+                'model': 'llama-3.1-8b-instant',
+                'groq_working': True
+            })
+        else:
+            return Response({
+                'status': 'error',
+                'status_code': response.status_code,
+                'response': response.text[:500]
+            }, status=response.status_code)
+
+    except Exception as e:
+        return Response({
+            'error': str(e),
+            'groq_working': False
+        }, status=500)
 
 
 CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
@@ -1184,7 +1326,7 @@ Summary:
 
 @api_view(['POST'])
 def summarise_keyness_chart(request):
-    """Generate AI summary of keyness chart with memory optimization."""
+    """Generate AI summary of keyness chart using Groq."""
     log_memory_usage("summarise_keyness_chart start")
 
     chart_type = request.data.get('chart_type', 'bar')
@@ -1197,12 +1339,12 @@ def summarise_keyness_chart(request):
 
     logger.info(f"Generating summary for {chart_type} chart with {len(chart_data)} data points")
 
-    # OPTIMIZATION: Limit data points to reduce prompt size
+    # Limit data points to reduce prompt size
     max_data_points = 15
     chart_data = chart_data[:max_data_points]
 
     try:
-        # Generate prompt based on chart type
+        # Generate prompts optimized for LLM understanding
         if chart_type == "bar":
             chart_text = "\n".join([
                 f"- {item['label']}: {item['value']:.3f}"
@@ -1303,12 +1445,23 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
         logger.error(f"LLM HTTP error: {status_code} - {str(e)}")
         gc.collect()
 
-        if status_code == 404:
+        if status_code == 401:
             return Response({
-                'error': 'Hugging Face model not found. Check HUGGINGFACE_MODEL name or repository visibility.'
+                'error': 'Invalid API key. Please check your LLM provider API key in environment variables.'
             }, status=502)
+        elif status_code == 429:
+            return Response({
+                'error': 'Rate limit exceeded. Please try again in a moment.'
+            }, status=429)
         return Response({
             'error': f'Request to language model failed: {str(e)}'
+        }, status=500)
+
+    except ValueError as e:
+        logger.error(f"LLM value error: {str(e)}")
+        gc.collect()
+        return Response({
+            'error': str(e)
         }, status=500)
 
     except requests.exceptions.RequestException as e:
@@ -1325,7 +1478,7 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
         # Check if it's a connection error to LLM service
         if "Connection refused" in str(e) or "Max retries exceeded" in str(e):
             return Response({
-                'error': 'LLM service is not available. Please configure LLM_PROVIDER and HUGGINGFACE_API_TOKEN environment variables.',
+                'error': 'LLM service is not available. Please configure LLM_PROVIDER and API key in environment variables.',
                 'summary_unavailable': True
             }, status=503)
 
