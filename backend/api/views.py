@@ -1492,74 +1492,42 @@ def summarise_clustering_chart(request):
     """Generate AI summary of clustering analysis - memory optimized."""
     log_memory_usage("summarise_clustering_chart start")
 
-    clusters = request.data.get('clusters', [])
+    # NEW: Accept pre-processed cluster summary from frontend
+    cluster_summary = request.data.get('cluster_summary', {})
     top_terms = request.data.get('top_terms', {})
     themes = request.data.get('themes', {})
     selected_cluster = request.data.get('selected_cluster', 'all')
     chart_title = request.data.get('title', 'Clustering Analysis')
 
-    if not clusters:
-        logger.warning("No clustering data provided")
+    if not cluster_summary:
+        logger.warning("No clustering summary provided")
         return Response({'error': 'No clustering data provided.'}, status=400)
 
-    logger.info(f"Generating clustering summary: {len(clusters)} documents, cluster: {selected_cluster}")
+    # Extract summary data (already processed on frontend)
+    total_documents = cluster_summary.get('total_documents', 0)
+    num_clusters = cluster_summary.get('num_clusters', 0)
+    clusters = cluster_summary.get('clusters', [])
 
-    # OPTIMIZATION 1: Limit cluster data to prevent memory issues
-    max_clusters = 200  # Limit total documents processed
-    if len(clusters) > max_clusters:
-        logger.warning(f"Limiting clusters from {len(clusters)} to {max_clusters}")
-        clusters = clusters[:max_clusters]
+    logger.info(f"Generating clustering summary: {total_documents} docs, {num_clusters} clusters")
 
-    # Filter clusters if specific cluster is selected
-    if selected_cluster != 'all':
-        try:
-            cluster_num = int(selected_cluster)
-            filtered_clusters = [c for c in clusters if c.get('label') == cluster_num]
-        except (ValueError, TypeError):
-            filtered_clusters = clusters
-    else:
-        filtered_clusters = clusters
+    # OPTIMIZATION: Data is already summarized, just format it
+    cluster_stats = {
+        c['label']: {
+            'count': c['count'],
+            'avg_x': c['avg_x'],
+            'avg_y': c['avg_y'],
+            'sample_docs': c.get('sample_docs', [])
+        }
+        for c in clusters
+    }
 
-    # OPTIMIZATION 2: Process cluster statistics efficiently
-    cluster_stats = {}
-    for cluster in filtered_clusters:
-        label = cluster.get('label', 'Unknown')
-        if label not in cluster_stats:
-            cluster_stats[label] = {
-                'count': 0,
-                'sample_docs': [],
-                'x_sum': 0,
-                'y_sum': 0
-            }
-
-        cluster_stats[label]['count'] += 1
-        cluster_stats[label]['x_sum'] += cluster.get('x', 0)
-        cluster_stats[label]['y_sum'] += cluster.get('y', 0)
-
-        # Add sample document (limit to 2 per cluster, keep short)
-        doc = cluster.get('doc', '')
-        if doc and len(cluster_stats[label]['sample_docs']) < 2:
-            # Truncate to 80 chars to keep prompt small
-            truncated = doc[:80] + '...' if len(doc) > 80 else doc
-            cluster_stats[label]['sample_docs'].append(truncated)
-
-    # OPTIMIZATION 3: Clear filtered_clusters from memory
-    del filtered_clusters
     gc.collect()
 
     # Generate concise cluster summary
-    cluster_summary = []
-    total_documents = len(clusters)
-    num_clusters = len(cluster_stats)
+    cluster_summary_text = []
 
-    # OPTIMIZATION 4: Limit clusters in summary to top 10
-    sorted_clusters = sorted(cluster_stats.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
-
-    for label, stats in sorted_clusters:
-        # Calculate cluster position (centroid)
-        avg_x = stats['x_sum'] / stats['count'] if stats['count'] > 0 else 0
-        avg_y = stats['y_sum'] / stats['count'] if stats['count'] > 0 else 0
-
+    # OPTIMIZATION: Data already limited to top 10 from frontend
+    for label, stats in sorted(cluster_stats.items(), key=lambda x: x[1]['count'], reverse=True):
         # Get top terms for this cluster (limit to 3)
         cluster_terms = top_terms.get(str(label), [])[:3]
         terms_text = ", ".join(cluster_terms) if cluster_terms else "No terms"
@@ -1573,15 +1541,15 @@ def summarise_clustering_chart(request):
             f"terms: {terms_text}, theme: {theme}"
         )
 
-        cluster_summary.append(cluster_info)
+        cluster_summary_text.append(cluster_info)
 
-    # OPTIMIZATION 5: Keep prompt concise
-    cluster_text = "\n".join(cluster_summary)
+    # OPTIMIZATION: Keep prompt concise
+    cluster_text = "\n".join(cluster_summary_text)
 
     # Build scope description
     scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster}"
 
-    # OPTIMIZATION 6: Shorter, more focused prompt for better performance
+    # OPTIMIZATION: Shorter, more focused prompt
     prompt = f"""Analyze this document clustering visualization:
 
 Title: {chart_title}
@@ -1604,8 +1572,8 @@ Provide a brief analysis:
 
 Keep analysis concise and actionable."""
 
-    # OPTIMIZATION 7: Clear large objects
-    del clusters, top_terms, themes, cluster_stats, sorted_clusters
+    # OPTIMIZATION: Clear large objects
+    del cluster_summary, top_terms, themes, cluster_stats
     gc.collect()
 
     try:

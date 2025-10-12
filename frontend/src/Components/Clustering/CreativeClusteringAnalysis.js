@@ -24,42 +24,89 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
     const [chartSummaryError, setChartSummaryError] = useState(null);
 
     const generateChartSummary = async () => {
-        setIsLoadingChartSummary(true);
-        setChartSummaryError(null);
+    setIsLoadingChartSummary(true);
+    setChartSummaryError(null);
 
-        try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-clustering-chart/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    clusters: clusters,
-                    top_terms: topTerms,
-                    themes: themes,
-                    selected_cluster: selectedCluster,
-                    title: `Clustering Analysis - ${selectedCluster === 'all' ? 'All Clusters' : `Cluster ${selectedCluster}`}`
-                })
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            setChartSummaryData(data);
-        } catch (error) {
-            console.error('Error generating summary:', error);
-            setChartSummaryError(error.message);
-        } finally {
-            setIsLoadingChartSummary(false);
+    try {
+        // OPTIMIZATION: Pre-process data on frontend instead of sending everything
+        const clusterSummary = prepareClusterSummary(clusters, selectedCluster);
+        
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-clustering-chart/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                cluster_summary: clusterSummary,  // Send summary instead of raw data
+                top_terms: topTerms,
+                themes: themes,
+                selected_cluster: selectedCluster,
+                title: `Clustering Analysis - ${selectedCluster === 'all' ? 'All Clusters' : `Cluster ${selectedCluster}`}`
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        setChartSummaryData(data);
+    } catch (error) {
+        console.error('Error generating summary:', error);
+        setChartSummaryError(error.message);
+    } finally {
+        setIsLoadingChartSummary(false);
+    }
+};
+
+// Helper function to prepare lightweight cluster summary
+const prepareClusterSummary = (clusters, selectedCluster) => {
+    // Filter clusters if specific cluster selected
+    const filteredClusters = selectedCluster === 'all' 
+        ? clusters 
+        : clusters.filter(c => c.label === parseInt(selectedCluster));
+    
+    // Group by cluster and calculate statistics
+    const clusterStats = {};
+    
+    filteredClusters.forEach(cluster => {
+        const label = cluster.label || 'Unknown';
+        
+        if (!clusterStats[label]) {
+            clusterStats[label] = {
+                count: 0,
+                x_sum: 0,
+                y_sum: 0,
+                sample_docs: []
+            };
+        }
+        
+        clusterStats[label].count += 1;
+        clusterStats[label].x_sum += cluster.x || 0;
+        clusterStats[label].y_sum += cluster.y || 0;
+        
+        // Only keep 2 sample docs per cluster (short version)
+        if (clusterStats[label].sample_docs.length < 2 && cluster.doc) {
+            const shortDoc = cluster.doc.substring(0, 80) + (cluster.doc.length > 80 ? '...' : '');
+            clusterStats[label].sample_docs.push(shortDoc);
+        }
+    });
+    
+    // Convert to array and calculate averages
+    const summary = Object.entries(clusterStats).map(([label, stats]) => ({
+        label: parseInt(label),
+        count: stats.count,
+        avg_x: stats.x_sum / stats.count,
+        avg_y: stats.y_sum / stats.count,
+        sample_docs: stats.sample_docs
+    }));
+    
+    return {
+        total_documents: filteredClusters.length,
+        num_clusters: Object.keys(clusterStats).length,
+        clusters: summary.slice(0, 10)  // Only send top 10 clusters by size
     };
-
-    // Auto-generate chart summary when showing chart or cluster selection changes
-    useEffect(() => {
-        if (showChart && clusters.length > 0) {
-            generateChartSummary();
-        }
-    }, [showChart, selectedCluster, clusters.length]);
+};
 
     // Function for general summary (placeholder for later)
     const generateGeneralSummary = async () => {
