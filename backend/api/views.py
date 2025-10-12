@@ -88,7 +88,7 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
     """Generate text using Hugging Face API."""
     hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
-    model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    model = os.environ.get("HUGGINGFACE_MODEL") or "meta-llama/Meta-Llama-3.1-8B"
 
     if not hf_token:
         raise ValueError("HUGGINGFACE_API_TOKEN is not set")
