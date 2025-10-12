@@ -25,7 +25,7 @@ urlpatterns = [
     path('analyse-overused-themes/', views.analyse_overused_themes, name='analyse_overused_themes'),
     path('create-temp-corpus/', views.create_temp_corpus, name='create_temp_corpus'),
     path("health/", views.health, name="health"),
-    path('api/test-huggingface/', test_huggingface, name='test_huggingface'),
+    path('test-huggingface/', test_huggingface, name='test_huggingface'),
 
 ]
 
