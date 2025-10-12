@@ -1325,166 +1325,176 @@ Summary:
 
 
 @api_view(['POST'])
-def summarise_keyness_chart(request):
-    """Generate AI summary of keyness chart using Groq."""
-    log_memory_usage("summarise_keyness_chart start")
+def summarise_clustering_chart(request):
+    """Generate AI summary of clustering analysis - memory optimized."""
+    log_memory_usage("summarise_clustering_chart start")
 
-    chart_type = request.data.get('chart_type', 'bar')
-    chart_title = request.data.get('title', 'Chart')
-    chart_data = request.data.get('chart_data', [])
+    clusters = request.data.get('clusters', [])
+    top_terms = request.data.get('top_terms', {})
+    themes = request.data.get('themes', {})
+    selected_cluster = request.data.get('selected_cluster', 'all')
+    chart_title = request.data.get('title', 'Clustering Analysis')
 
-    if not chart_data:
-        logger.warning("No chart data provided for summary")
-        return Response({'error': 'No chart data provided.'}, status=400)
+    if not clusters:
+        logger.warning("No clustering data provided")
+        return Response({'error': 'No clustering data provided.'}, status=400)
 
-    logger.info(f"Generating summary for {chart_type} chart with {len(chart_data)} data points")
+    logger.info(f"Generating clustering summary: {len(clusters)} documents, cluster: {selected_cluster}")
 
-    # Limit data points to reduce prompt size
-    max_data_points = 15
-    chart_data = chart_data[:max_data_points]
+    # OPTIMIZATION 1: Limit cluster data to prevent memory issues
+    max_clusters = 200  # Limit total documents processed
+    if len(clusters) > max_clusters:
+        logger.warning(f"Limiting clusters from {len(clusters)} to {max_clusters}")
+        clusters = clusters[:max_clusters]
+
+    # Filter clusters if specific cluster is selected
+    if selected_cluster != 'all':
+        try:
+            cluster_num = int(selected_cluster)
+            filtered_clusters = [c for c in clusters if c.get('label') == cluster_num]
+        except (ValueError, TypeError):
+            filtered_clusters = clusters
+    else:
+        filtered_clusters = clusters
+
+    # OPTIMIZATION 2: Process cluster statistics efficiently
+    cluster_stats = {}
+    for cluster in filtered_clusters:
+        label = cluster.get('label', 'Unknown')
+        if label not in cluster_stats:
+            cluster_stats[label] = {
+                'count': 0,
+                'sample_docs': [],
+                'x_sum': 0,
+                'y_sum': 0
+            }
+
+        cluster_stats[label]['count'] += 1
+        cluster_stats[label]['x_sum'] += cluster.get('x', 0)
+        cluster_stats[label]['y_sum'] += cluster.get('y', 0)
+
+        # Add sample document (limit to 2 per cluster, keep short)
+        doc = cluster.get('doc', '')
+        if doc and len(cluster_stats[label]['sample_docs']) < 2:
+            # Truncate to 80 chars to keep prompt small
+            truncated = doc[:80] + '...' if len(doc) > 80 else doc
+            cluster_stats[label]['sample_docs'].append(truncated)
+
+    # OPTIMIZATION 3: Clear filtered_clusters from memory
+    del filtered_clusters
+    gc.collect()
+
+    # Generate concise cluster summary
+    cluster_summary = []
+    total_documents = len(clusters)
+    num_clusters = len(cluster_stats)
+
+    # OPTIMIZATION 4: Limit clusters in summary to top 10
+    sorted_clusters = sorted(cluster_stats.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+
+    for label, stats in sorted_clusters:
+        # Calculate cluster position (centroid)
+        avg_x = stats['x_sum'] / stats['count'] if stats['count'] > 0 else 0
+        avg_y = stats['y_sum'] / stats['count'] if stats['count'] > 0 else 0
+
+        # Get top terms for this cluster (limit to 3)
+        cluster_terms = top_terms.get(str(label), [])[:3]
+        terms_text = ", ".join(cluster_terms) if cluster_terms else "No terms"
+
+        # Get theme if available
+        theme = themes.get(str(label), "No theme")
+
+        # Simplified cluster info
+        cluster_info = (
+            f"Cluster {label}: {stats['count']} docs, "
+            f"terms: {terms_text}, theme: {theme}"
+        )
+
+        cluster_summary.append(cluster_info)
+
+    # OPTIMIZATION 5: Keep prompt concise
+    cluster_text = "\n".join(cluster_summary)
+
+    # Build scope description
+    scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster}"
+
+    # OPTIMIZATION 6: Shorter, more focused prompt for better performance
+    prompt = f"""Analyze this document clustering visualization:
+
+Title: {chart_title}
+Scope: {scope_desc}
+Total: {total_documents} documents in {num_clusters} clusters
+
+Top Clusters:
+{cluster_text}
+
+Provide a brief analysis:
+
+1. **Summary** (2-3 sentences): Overall clustering patterns and quality
+
+2. **Key Insights** (3-4 points):
+- Cluster distribution and separation
+- Thematic patterns from top terms
+- Notable findings
+
+3. **Recommendations** (1-2 sentences): Suggested next steps
+
+Keep analysis concise and actionable."""
+
+    # OPTIMIZATION 7: Clear large objects
+    del clusters, top_terms, themes, cluster_stats, sorted_clusters
+    gc.collect()
 
     try:
-        # Generate prompts optimized for LLM understanding
-        if chart_type == "bar":
-            chart_text = "\n".join([
-                f"- {item['label']}: {item['value']:.3f}"
-                for item in chart_data
-            ])
+        log_memory_usage("before LLM call")
 
-            prompt = f"""You are an expert data analyst and computational linguist.
-
-Task: Analyze the bar chart titled "{chart_title}" showing keyness analysis results.
-
-Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analyzed text compared to a reference corpus.
-
-Chart Data (Top {len(chart_data)} keywords):
-{chart_text}
-
-Please provide a comprehensive analysis with the following structure:
-
-**Summary:**
-Provide a 2-3 sentence overview of the main patterns in the data.
-
-**Key Insights:**
-- Identify the top 3-5 most significant keywords and what they might indicate about the text
-- Comment on the distribution pattern (steep drop-off, gradual decline, clusters)
-- Note any interesting linguistic patterns (word types, themes)
-
-**Notable Keywords:**
-Highlight 3-4 specific words that stand out and briefly explain why they're significant.
-
-Keep the analysis concise but insightful, focusing on what these keywords reveal about the text's distinctive characteristics."""
-
-        else:  # scatter plot
-            chart_text = "\n".join([
-                f"- {item['label']}: Frequency={item.get('x', 0)}, Keyness={item.get('y', 0):.3f}"
-                for item in chart_data
-            ])
-
-            prompt = f"""You are an expert data analyst and computational linguist.
-
-Task: Analyze the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
-
-Context: This visualization plots words based on their frequency (how often they appear) versus their keyness score (how distinctive they are). The most interesting words are often those with moderate-to-high frequency but very high keyness scores.
-
-Chart Data (Top {len(chart_data)} keywords):
-{chart_text}
-
-Please provide a comprehensive analysis with the following structure:
-
-**Summary:**
-Describe the overall relationship between frequency and keyness in 2-3 sentences.
-
-**Key Insights:**
-- Identify words with high keyness but moderate frequency (these are often the most interesting)
-- Comment on any outliers or unusual patterns
-- Discuss the balance between common distinctive words vs. rare distinctive words
-
-**Notable Keywords:**
-Highlight 3-4 specific words that occupy interesting positions in the frequency-keyness space and explain their significance.
-
-Focus on what the frequency-keyness relationship reveals about the text's linguistic characteristics."""
-
-        # Clear chart_data from memory
-        del chart_data
-        gc.collect()
-
-        # Generate analysis
-        analysis = generate_text_with_fallback(prompt, num_predict=500, temperature=0.7)
+        # Generate analysis with reduced token count
+        analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.7)
 
         if not analysis:
-            logger.error("No response from LLM model")
+            logger.error("No response from LLM")
             return Response({'error': 'No response from model.'}, status=500)
 
         analysis = analysis.strip()
 
-        # Clear prompt from memory
+        # OPTIMIZATION 8: Clear prompt from memory
         del prompt
         gc.collect()
 
-        logger.info(f"Summary generated successfully ({len(analysis)} chars)")
-        log_memory_usage("summarise_keyness_chart end")
+        logger.info(f"Clustering summary generated: {len(analysis)} chars")
+        log_memory_usage("summarise_clustering_chart end")
 
         return Response({
             "chart_title": chart_title,
-            "chart_type": chart_type,
+            "analysis_scope": scope_desc,
+            "total_documents": total_documents,
+            "num_clusters": num_clusters,
             "analysis": analysis,
-            "success": True,
-            "data_points_analyzed": min(len(request.data.get('chart_data', [])), max_data_points)
+            "success": True
         })
 
-    except requests.exceptions.Timeout:
-        logger.error("LLM request timed out")
-        gc.collect()
-        return Response({
-            'error': 'Request timed out. The model is taking too long to respond.'
-        }, status=504)
-
-    except requests.exceptions.HTTPError as e:
-        status_code = getattr(e.response, "status_code", 500)
-        logger.error(f"LLM HTTP error: {status_code} - {str(e)}")
+    except Exception as e:
+        logger.exception(f"Error in summarise_clustering_chart: {e}")
         gc.collect()
 
-        if status_code == 401:
-            return Response({
-                'error': 'Invalid API key. Please check your LLM provider API key in environment variables.'
-            }, status=502)
-        elif status_code == 429:
+        # Provide helpful error messages
+        error_msg = str(e)
+        if "rate limit" in error_msg.lower():
             return Response({
                 'error': 'Rate limit exceeded. Please try again in a moment.'
             }, status=429)
-        return Response({
-            'error': f'Request to language model failed: {str(e)}'
-        }, status=500)
-
-    except ValueError as e:
-        logger.error(f"LLM value error: {str(e)}")
-        gc.collect()
-        return Response({
-            'error': str(e)
-        }, status=500)
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"LLM request failed: {str(e)}")
-        gc.collect()
-        return Response({
-            'error': f'Request to language model failed: {str(e)}'
-        }, status=500)
-
-    except Exception as e:
-        logger.exception(f"Unexpected error in summarise_keyness_chart: {e}")
-        gc.collect()
-
-        # Check if it's a connection error to LLM service
-        if "Connection refused" in str(e) or "Max retries exceeded" in str(e):
+        elif "timeout" in error_msg.lower():
             return Response({
-                'error': 'LLM service is not available. Please configure LLM_PROVIDER and API key in environment variables.',
-                'summary_unavailable': True
-            }, status=503)
-
-        return Response({
-            'error': f'An error occurred: {str(e)}'
-        }, status=500)
+                'error': 'Request timed out. The clustering analysis is taking too long to process.'
+            }, status=504)
+        elif "API key" in error_msg or "401" in error_msg:
+            return Response({
+                'error': 'Invalid API key. Please check your LLM provider configuration.'
+            }, status=502)
+        else:
+            return Response({
+                'error': f'An error occurred: {error_msg}'
+            }, status=500)
 
 
 @api_view(['POST'])
