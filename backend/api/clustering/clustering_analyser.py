@@ -41,10 +41,22 @@ CUSTOM_STOPWORDS = {"he", "she", "was", "for", "on", "as", "with", "at", "by", "
 NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPWORDS)
 
-# ------------------ Embeddings Loader ------------------ #
-from backend.download_embeddings import ConceptNetEmbeddings
+model = None  # global
 
-model = None
+def load_embeddings():
+    global model
+    if model is None:
+        try:
+            import torch
+            from backend.data.download_embeddings import ConceptNetEmbeddings
+            print("Loading ConceptNet embeddings...")
+            model = ConceptNetEmbeddings()
+            print("✅ ConceptNet embeddings loaded.")
+        except Exception as e:
+            print(f"⚠️ Failed to load embeddings: {e}")
+            model = None
+    return model
+
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
@@ -238,7 +250,6 @@ def cluster_text(text, top_words_per_cluster=10):
 # ------------------ Django Endpoint ------------------ #
 @csrf_exempt
 def clustering_analysis(request):
-    global model
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request method."}, status=400)
 
@@ -251,16 +262,8 @@ def clustering_analysis(request):
     if not text:
         return JsonResponse({"error": "No text provided."}, status=400)
 
-    # Load ConceptNet embeddings if not already loaded
-    if model is None:
-        try:
-            print("Loading ConceptNet embeddings (deferred)...")
-            model = ConceptNetEmbeddings()
-            # NOTE: do NOT call model.load() yet
-            print("✅ ConceptNet embeddings loader ready.")
-        except Exception as e:
-            print(f"⚠️ Failed to prepare ConceptNet embeddings: {e}")
-            model = None
+    # Lazy load embeddings
+    load_embeddings()
 
     # Perform clustering
     try:
