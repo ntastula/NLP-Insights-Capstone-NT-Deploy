@@ -64,7 +64,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
         if (showChart && clusters.length > 0) {
             generateChartSummary();
         }
-    }, [showChart, selectedCluster, clusters.length]);
+    }, [showChart, selectedCluster, clusters]);
     
     // Function for general summary (placeholder for later)
     const generateGeneralSummary = async () => {
