@@ -43,7 +43,7 @@ const prepareClusterSummary = (clusters, selectedCluster) => {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                cluster_summary: clusterSummary,  // Send summary instead of raw data
+                cluster_summary: clusterSummary,  
                 top_terms: topTerms,
                 themes: themes,
                 selected_cluster: selectedCluster,
@@ -72,12 +72,12 @@ const prepareClusterSummary = (clusters, selectedCluster) => {
         }
     }, [showChart, selectedCluster, clusters]);
 
-    // Generate summary when new clusters are first loaded
-useEffect(() => {
-    if (clusters.length > 0 && !isLoadingChartSummary) {
-        generateChartSummary();
-    }
-}, [clusters]);
+//     // Generate summary when new clusters are first loaded
+// useEffect(() => {
+//     if (clusters.length > 0 && !isLoadingChartSummary) {
+//         generateChartSummary();
+//     }
+// }, [clusters]);
 
     
     // Function for general summary (placeholder for later)
