@@ -156,7 +156,7 @@ def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: floa
     """
     global _HF_PIPELINE
 
-    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-small"
+    model_name = os.environ.get("HUGGINGFACE_MODEL") or "./onnx-model"
 
     if _HF_PIPELINE is None:
         print(f"📦 Loading lightweight Hugging Face model via ONNXRuntime: {model_name}")
