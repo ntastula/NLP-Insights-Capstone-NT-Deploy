@@ -49,15 +49,15 @@ ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPW
 # ======================
 # Embeddings loader
 # ======================
-from backend.download_embeddings import get_model
+from backend.download_embeddings import ConceptNetEmbeddings
 
-model = None
+_embeddings = None
 
 def get_conceptnet_model():
-    global model
-    if model is None:
-        model = get_model()
-    return model
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = ConceptNetEmbeddings()
+    return _embeddings
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
