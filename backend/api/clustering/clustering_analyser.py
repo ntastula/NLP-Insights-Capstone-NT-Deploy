@@ -49,7 +49,15 @@ ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPW
 # ======================
 # Embeddings loader
 # ======================
-from backend.download_embeddings import model
+from backend.download_embeddings import get_model
+
+model = None
+
+def get_conceptnet_model():
+    global model
+    if model is None:
+        model = get_model()
+    return model
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
@@ -125,6 +133,7 @@ GENERAL_THEMES = {
 # Theme helper
 # ======================
 def suggest_theme(cluster_words, model):
+    model = get_conceptnet_model()
     if not cluster_words:
         return "Unknown"
     theme_scores = {theme: 0.0 for theme in GENERAL_THEMES}
@@ -150,6 +159,7 @@ def suggest_theme(cluster_words, model):
 # Clustering function
 # ======================
 def cluster_text(text, top_words_per_cluster=10):
+    model = get_conceptnet_model()
     if not text.strip():
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
@@ -248,6 +258,7 @@ def cluster_text(text, top_words_per_cluster=10):
 # ======================
 @csrf_exempt
 def clustering_analysis(request):
+    model = get_conceptnet_model()
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request method."}, status=400)
 
