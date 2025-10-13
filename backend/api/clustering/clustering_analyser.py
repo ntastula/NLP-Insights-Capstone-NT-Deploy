@@ -49,7 +49,7 @@ ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPW
 # ======================
 # Embeddings loader
 # ======================
-from backend.data.download_embeddings import model
+from backend.download_embeddings import model
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
