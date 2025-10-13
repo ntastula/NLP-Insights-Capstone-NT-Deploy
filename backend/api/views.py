@@ -1490,68 +1490,49 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
 
 @api_view(['POST'])
 def summarise_clustering_chart(request):
-    """Generate AI summary of clustering analysis - memory optimized."""
-    log_memory_usage("summarise_clustering_chart start")
+    """Generate AI summary of clustering analysis from raw cluster points."""
+    try:
+        cluster_points = request.data.get('cluster_summary', [])
+        top_terms = request.data.get('top_terms', {})
+        themes = request.data.get('themes', {})
+        selected_cluster = request.data.get('selected_cluster', 'all')
+        chart_title = request.data.get('title', 'Clustering Analysis')
 
-    # NEW: Accept pre-processed cluster summary from frontend
-    cluster_summary = request.data.get('cluster_summary', {})
-    top_terms = request.data.get('top_terms', {})
-    themes = request.data.get('themes', {})
-    selected_cluster = request.data.get('selected_cluster', 'all')
-    chart_title = request.data.get('title', 'Clustering Analysis')
+        if not cluster_points or not isinstance(cluster_points, list):
+            return Response({'error': 'No clustering data provided.'}, status=400)
 
-    if not cluster_summary:
-        logger.warning("No clustering summary provided")
-        return Response({'error': 'No clustering data provided.'}, status=400)
+        # Aggregate cluster statistics
+        cluster_stats = defaultdict(lambda: {"count": 0, "sum_x": 0, "sum_y": 0, "sample_docs": []})
+        for c in cluster_points:
+            label = c['label']
+            cluster_stats[label]["count"] += 1
+            cluster_stats[label]["sum_x"] += c['x']
+            cluster_stats[label]["sum_y"] += c['y']
+            if len(cluster_stats[label]["sample_docs"]) < 3:
+                cluster_stats[label]["sample_docs"].append(c.get("doc", ""))
 
-    # Extract summary data (already processed on frontend)
-    total_documents = cluster_summary.get('total_documents', 0)
-    num_clusters = cluster_summary.get('num_clusters', 0)
-    clusters = cluster_summary.get('clusters', [])
+        # Finalize averages
+        for stats in cluster_stats.values():
+            stats["avg_x"] = stats["sum_x"] / stats["count"]
+            stats["avg_y"] = stats["sum_y"] / stats["count"]
 
-    logger.info(f"Generating clustering summary: {total_documents} docs, {num_clusters} clusters")
+        total_documents = len(cluster_points)
+        num_clusters = len(cluster_stats)
 
-    # OPTIMIZATION: Data is already summarized, just format it
-    cluster_stats = {
-        c['label']: {
-            'count': c['count'],
-            'avg_x': c['avg_x'],
-            'avg_y': c['avg_y'],
-            'sample_docs': c.get('sample_docs', [])
-        }
-        for c in clusters
-    }
+        # Build cluster summary text
+        cluster_summary_text = []
+        for label, stats in sorted(cluster_stats.items(), key=lambda x: x[1]['count'], reverse=True):
+            terms_text = ", ".join(top_terms.get(str(label), [])[:3]) or "No terms"
+            theme_text = themes.get(str(label), "No theme")
+            cluster_summary_text.append(
+                f"Cluster {label}: {stats['count']} docs, terms: {terms_text}, theme: {theme_text}"
+            )
 
-    gc.collect()
+        cluster_text = "\n".join(cluster_summary_text)
+        scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster}"
 
-    # Generate concise cluster summary
-    cluster_summary_text = []
-
-    # OPTIMIZATION: Data already limited to top 10 from frontend
-    for label, stats in sorted(cluster_stats.items(), key=lambda x: x[1]['count'], reverse=True):
-        # Get top terms for this cluster (limit to 3)
-        cluster_terms = top_terms.get(str(label), [])[:3]
-        terms_text = ", ".join(cluster_terms) if cluster_terms else "No terms"
-
-        # Get theme if available
-        theme = themes.get(str(label), "No theme")
-
-        # Simplified cluster info
-        cluster_info = (
-            f"Cluster {label}: {stats['count']} docs, "
-            f"terms: {terms_text}, theme: {theme}"
-        )
-
-        cluster_summary_text.append(cluster_info)
-
-    # OPTIMIZATION: Keep prompt concise
-    cluster_text = "\n".join(cluster_summary_text)
-
-    # Build scope description
-    scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster}"
-
-    # OPTIMIZATION: Shorter, more focused prompt
-    prompt = f"""Analyze this document clustering visualization:
+        # Build LLM prompt
+        prompt = f"""Analyze this document clustering visualization:
 
 Title: {chart_title}
 Scope: {scope_desc}
@@ -1562,39 +1543,25 @@ Top Clusters:
 
 Provide a brief analysis:
 
-1. **Summary** (2-3 sentences): Overall clustering patterns and quality
-
-2. **Key Insights** (3-4 points):
+1. Summary (2-3 sentences): Overall clustering patterns and quality
+2. Key Insights (3-4 points):
 - Cluster distribution and separation
 - Thematic patterns from top terms
 - Notable findings
-
-3. **Recommendations** (1-2 sentences): Suggested next steps
+3. Recommendations (1-2 sentences): Suggested next steps
 
 Keep analysis concise and actionable."""
 
-    # OPTIMIZATION: Clear large objects
-    del cluster_summary, top_terms, themes, cluster_stats
-    gc.collect()
-
-    try:
-        log_memory_usage("before LLM call")
-
-        # Generate analysis with reduced token count
+        # Generate AI analysis (replace with your LLM function)
         analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.7)
-
         if not analysis:
-            logger.error("No response from LLM")
             return Response({'error': 'No response from model.'}, status=500)
 
         analysis = analysis.strip()
 
-        # OPTIMIZATION 8: Clear prompt from memory
-        del prompt
+        # Cleanup large objects
+        del cluster_points, cluster_stats, prompt
         gc.collect()
-
-        logger.info(f"Clustering summary generated: {len(analysis)} chars")
-        log_memory_usage("summarise_clustering_chart end")
 
         return Response({
             "chart_title": chart_title,
@@ -1609,25 +1576,7 @@ Keep analysis concise and actionable."""
         logger.exception(f"Error in summarise_clustering_chart: {e}")
         traceback.print_exc()
         gc.collect()
-
-        # Provide helpful error messages
-        error_msg = str(e)
-        if "rate limit" in error_msg.lower():
-            return Response({
-                'error': 'Rate limit exceeded. Please try again in a moment.'
-            }, status=429)
-        elif "timeout" in error_msg.lower():
-            return Response({
-                'error': 'Request timed out. The clustering analysis is taking too long to process.'
-            }, status=504)
-        elif "API key" in error_msg or "401" in error_msg:
-            return Response({
-                'error': 'Invalid API key. Please check your LLM provider configuration.'
-            }, status=502)
-        else:
-            return Response({
-                'error': f'An error occurred: {error_msg}'
-            }, status=500)
+        return Response({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
 @api_view(['POST'])
