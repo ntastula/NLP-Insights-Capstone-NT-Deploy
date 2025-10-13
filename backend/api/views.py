@@ -31,11 +31,10 @@ from api.keyness.keyness_analyser import (
 )
 import spacy
 import mimetypes
-import torch
 import time
 from django.core.files.uploadedfile import UploadedFile
 from .models import KeynessResult
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 import logging
 from pathlib import Path  # <-- ADDED (minimal import required)
 import math               # <-- used by compute_keyness_from_counts
@@ -45,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 _HF_MODEL = None
 _HF_TOKENIZER = None
+_HF_PIPELINE = None
 
 try:
     import psutil
@@ -74,16 +74,14 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 
     try:
         if provider == "huggingface":
-            return _generate_huggingface(prompt, num_predict, temperature)
+            result = _generate_huggingface(prompt, num_predict, temperature)
         elif provider == "groq":
-            return _generate_groq(prompt, num_predict, temperature)
+            result = _generate_groq(prompt, num_predict, temperature)
         else:
-            return _generate_ollama(prompt, num_predict, temperature)
+            result = _generate_ollama(prompt, num_predict, temperature)
 
-        # Clear memory after generation
         gc.collect()
         log_memory_usage("LLM request end")
-
         return result
 
     except Exception as e:
@@ -153,42 +151,30 @@ def _generate_groq(prompt: str, num_predict: int, temperature: float) -> str:
 
 def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
     """
-    Generate text using HuggingFace Transformers locally.
-    Uses google/flan-t5-base by default.
+    Generate text using Hugging Face Transformers locally, without PyTorch.
+    Uses google/flan-t5-small by default (runs with ONNXRuntime).
     """
-    global _HF_MODEL, _HF_TOKENIZER
+    global _HF_PIPELINE
 
-    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-base"
+    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-small"
 
-    if _HF_MODEL is None or _HF_TOKENIZER is None:
-        print(f"📦 Loading local Hugging Face model: {model_name}")
-        _HF_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
-        _HF_MODEL = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        _HF_MODEL.eval()
-        if torch.cuda.is_available():
-            _HF_MODEL.to("cuda")
+    if _HF_PIPELINE is None:
+        print(f"📦 Loading lightweight Hugging Face model via ONNXRuntime: {model_name}")
+        _HF_PIPELINE = pipeline(
+            "text2text-generation",
+            model=model_name,
+            framework="onnx"  # ✅ ensures torch is not used
+        )
 
-    # Optional: truncate prompt if extremely long
+    # Optional: truncate extremely long prompts
     max_input_length = 1024
     if len(prompt) > max_input_length:
         prompt = prompt[:max_input_length]
 
-    inputs = _HF_TOKENIZER(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
+    # Generate response
+    result = _HF_PIPELINE(prompt, max_length=num_predict, temperature=temperature)
+    generated_text = result[0]["generated_text"]
 
-    if torch.cuda.is_available():
-        inputs = {k: v.to("cuda") for k, v in inputs.items()}
-
-    # Generation
-    with torch.no_grad():
-        output_ids = _HF_MODEL.generate(
-            **inputs,
-            max_new_tokens=num_predict,
-            do_sample=True,
-            temperature=temperature,
-            top_p=0.9,
-        )
-
-    generated_text = _HF_TOKENIZER.decode(output_ids[0], skip_special_tokens=True)
     return generated_text.strip()
 
 
