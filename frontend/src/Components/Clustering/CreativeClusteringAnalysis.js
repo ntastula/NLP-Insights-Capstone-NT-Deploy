@@ -70,7 +70,7 @@ const prepareClusterSummary = (clusters, selectedCluster) => {
         if (showChart && clusters.length > 0) {
             generateChartSummary();
         }
-    }, [showChart, selectedCluster, clusters]);
+    }, [showChart, selectedCluster, clusters.length]);
 
 //     // Generate summary when new clusters are first loaded
 // useEffect(() => {
