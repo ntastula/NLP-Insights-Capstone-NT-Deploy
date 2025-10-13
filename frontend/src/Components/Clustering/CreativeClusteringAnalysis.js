@@ -27,6 +27,12 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
     setIsLoadingChartSummary(true);
     setChartSummaryError(null);
 
+    // Helper function to prepare cluster summary
+const prepareClusterSummary = (clusters, selectedCluster) => {
+    if (selectedCluster === 'all') return clusters;
+    return clusters.filter(c => c.label === selectedCluster);
+};
+
     try {
         // OPTIMIZATION: Pre-process data on frontend instead of sending everything
         const clusterSummary = prepareClusterSummary(clusters, selectedCluster);
