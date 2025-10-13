@@ -31,15 +31,20 @@ from api.keyness.keyness_analyser import (
 )
 import spacy
 import mimetypes
+import torch
 import time
 from django.core.files.uploadedfile import UploadedFile
 from .models import KeynessResult
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import logging
 from pathlib import Path  # <-- ADDED (minimal import required)
 import math               # <-- used by compute_keyness_from_counts
 
 MAX_TEXT_LENGTH = 100000
 logger = logging.getLogger(__name__)
+
+_HF_MODEL = None
+_HF_TOKENIZER = None
 
 try:
     import psutil
@@ -62,19 +67,18 @@ def log_memory_usage(label):
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
     Generate text using Groq, HuggingFace, or Ollama.
-    Priority: Groq > HuggingFace > Ollama
     """
     log_memory_usage("LLM request start")
 
-    provider = (os.environ.get("LLM_PROVIDER") or "groq").strip().lower()
+    provider = (os.environ.get("LLM_PROVIDER") or "huggingface").strip().lower()
 
     try:
-        if provider == "groq":
-            result = _generate_groq(prompt, num_predict, temperature)
-        elif provider == "huggingface":
-            result = _generate_huggingface(prompt, num_predict, temperature)
-        else:  # ollama
-            result = _generate_ollama(prompt, num_predict, temperature)
+        if provider == "huggingface":
+            return _generate_huggingface(prompt, num_predict, temperature)
+        elif provider == "groq":
+            return _generate_groq(prompt, num_predict, temperature)
+        else:
+            return _generate_ollama(prompt, num_predict, temperature)
 
         # Clear memory after generation
         gc.collect()
@@ -147,81 +151,45 @@ def _generate_groq(prompt: str, num_predict: int, temperature: float) -> str:
     raise ValueError("Unexpected response format from Groq API")
 
 
-def _generate_huggingface(prompt: str, num_predict: int, temperature: float) -> str:
-    """Generate text using Hugging Face API."""
-    hf_token = os.environ.get("HUGGINGFACE_API_TOKEN")
-    model = os.environ.get("HUGGINGFACE_MODEL") or "gpt2"
+def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
+    """
+    Generate text using HuggingFace Transformers locally.
+    Uses google/flan-t5-base by default.
+    """
+    global _HF_MODEL, _HF_TOKENIZER
 
-    if not hf_token:
-        raise ValueError("HUGGINGFACE_API_TOKEN is not set")
+    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-base"
 
-    url = f"https://api-inference.huggingface.co/models/{model}"
-    headers = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json"
-    }
+    if _HF_MODEL is None or _HF_TOKENIZER is None:
+        print(f"📦 Loading local Hugging Face model: {model_name}")
+        _HF_TOKENIZER = AutoTokenizer.from_pretrained(model_name)
+        _HF_MODEL = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        _HF_MODEL.eval()
+        if torch.cuda.is_available():
+            _HF_MODEL.to("cuda")
 
-    max_prompt_length = 1500
-    if len(prompt) > max_prompt_length:
-        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
-        prompt = prompt[:max_prompt_length]
+    # Optional: truncate prompt if extremely long
+    max_input_length = 1024
+    if len(prompt) > max_input_length:
+        prompt = prompt[:max_input_length]
 
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": min(num_predict, 300),
-            "temperature": temperature,
-            "top_p": 0.9,
-            "do_sample": True,
-            "return_full_text": False
-        },
-        "options": {
-            "wait_for_model": True,
-            "use_cache": True
-        }
-    }
+    inputs = _HF_TOKENIZER(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
 
-    logger.info(f"Calling Hugging Face API with model: {model}")
+    if torch.cuda.is_available():
+        inputs = {k: v.to("cuda") for k, v in inputs.items()}
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+    # Generation
+    with torch.no_grad():
+        output_ids = _HF_MODEL.generate(
+            **inputs,
+            max_new_tokens=num_predict,
+            do_sample=True,
+            temperature=temperature,
+            top_p=0.9,
+        )
 
-            if response.status_code == 503:
-                wait_time = (attempt + 1) * 10
-                logger.warning(f"Model loading, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-                continue
-
-            if response.status_code == 200:
-                break
-
-            response.raise_for_status()
-
-        except requests.exceptions.Timeout:
-            if attempt < max_retries - 1:
-                logger.warning(f"Request timeout, retrying (attempt {attempt + 1}/{max_retries})")
-                time.sleep(5)
-                continue
-            raise
-
-    data = response.json()
-
-    if isinstance(data, list) and len(data) > 0:
-        if isinstance(data[0], dict):
-            text = data[0].get("generated_text", "")
-            if text:
-                return text.strip()
-
-    if isinstance(data, dict):
-        if "error" in data:
-            raise ValueError(f"Hugging Face API Error: {data['error']}")
-        text = data.get("generated_text", "")
-        if text:
-            return text.strip()
-
-    raise ValueError("Failed to parse response from Hugging Face API")
+    generated_text = _HF_TOKENIZER.decode(output_ids[0], skip_special_tokens=True)
+    return generated_text.strip()
 
 
 def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
@@ -1200,7 +1168,7 @@ def get_synonyms(request):
 
     prompt = f"""You are a linguistic expert specializing in word analysis and semantic differences.
 
-Task: Provide exactly 5 synonyms for the word "{word}" and analyze their subtle differences.
+Task: Provide exactly 5 synonyms for the word "{word}" and analyse their subtle differences.
 
 Format your response as follows:
 
@@ -1345,7 +1313,7 @@ def summarise_keyness_chart(request):
     chart_data = chart_data[:max_data_points]
 
     try:
-        # Generate prompts optimized for LLM understanding
+        # Generate prompts optimised for LLM understanding
         if chart_type == "bar":
             chart_text = "\n".join([
                 f"- {item['label']}: {item['value']:.3f}"
@@ -1354,9 +1322,9 @@ def summarise_keyness_chart(request):
 
             prompt = f"""You are an expert data analyst and computational linguist.
 
-Task: Analyze the bar chart titled "{chart_title}" showing keyness analysis results.
+Task: Analyse the bar chart titled "{chart_title}" showing keyness analysis results.
 
-Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analyzed text compared to a reference corpus.
+Context: This chart displays the most statistically significant words from a text analysis, where higher values indicate words that are more distinctive or characteristic of the analysed text compared to a reference corpus.
 
 Chart Data (Top {len(chart_data)} keywords):
 {chart_text}
@@ -1384,7 +1352,7 @@ Keep the analysis concise but insightful, focusing on what these keywords reveal
 
             prompt = f"""You are an expert data analyst and computational linguist.
 
-Task: Analyze the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
+Task: Analyse the scatter plot titled "{chart_title}" showing the relationship between word frequency and keyness scores.
 
 Context: This visualization plots words based on their frequency (how often they appear) versus their keyness score (how distinctive they are). The most interesting words are often those with moderate-to-high frequency but very high keyness scores.
 
@@ -1431,7 +1399,7 @@ Focus on what the frequency-keyness relationship reveals about the text's lingui
             "chart_type": chart_type,
             "analysis": analysis,
             "success": True,
-            "data_points_analyzed": min(len(request.data.get('chart_data', [])), max_data_points)
+            "data_points_analysed": min(len(request.data.get('chart_data', [])), max_data_points)
         })
 
     except requests.exceptions.Timeout:
@@ -1511,7 +1479,7 @@ def summarise_clustering_chart(request):
             if len(cluster_stats[label]["sample_docs"]) < 3:
                 cluster_stats[label]["sample_docs"].append(c.get("doc", ""))
 
-        # Finalize averages
+        # Finalise averages
         for stats in cluster_stats.values():
             stats["avg_x"] = stats["sum_x"] / stats["count"]
             stats["avg_y"] = stats["sum_y"] / stats["count"]
@@ -1532,7 +1500,7 @@ def summarise_clustering_chart(request):
         scope_desc = f"all {num_clusters} clusters" if selected_cluster == 'all' else f"Cluster {selected_cluster}"
 
         # Build LLM prompt
-        prompt = f"""Analyze this document clustering visualization:
+        prompt = f"""Analyse this document clustering visualisation:
 
 Title: {chart_title}
 Scope: {scope_desc}
@@ -1644,14 +1612,14 @@ Additional Context from Clustering Analysis:
 
     Data Source: {data_source}
     Total Documents: {total_docs}
-    Sample Analyzed: {sample_size} documents
+    Sample Analysed: {sample_size} documents
 
     Document Sample:
     {documents_text}
     {clustering_context}
 
     Instructions:
-    Analyze the provided text to identify dominant themes, recurring ideas, and key topics. Look for both explicit topics (directly stated) and implicit themes (underlying patterns, sentiments, or conceptual frameworks).
+    Analyse the provided text to identify dominant themes, recurring ideas, and key topics. Look for both explicit topics (directly stated) and implicit themes (underlying patterns, sentiments, or conceptual frameworks).
 
     Please provide your analysis in the following structured format:
 
@@ -1674,7 +1642,7 @@ Additional Context from Clustering Analysis:
     - What underlying assumptions or frameworks are present?
 
     **Key Terms and Phrases:**
-    List the most significant terms, phrases, or concepts that characterize this collection:
+    List the most significant terms, phrases, or concepts that characterise this collection:
     - High-frequency meaningful terms
     - Distinctive vocabulary or jargon
     - Emotionally charged or significant phrases
@@ -1682,7 +1650,7 @@ Additional Context from Clustering Analysis:
     **Summary Insight:**
     Provide a 2-3 sentence synthesis of what this collection is fundamentally about - its core purpose, perspective, or focus.
 
-    Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritize themes that appear across multiple documents rather than isolated topics."""
+    Focus on actionable insights that reveal the essential character and intellectual content of this document collection. Prioritise themes that appear across multiple documents rather than isolated topics."""
 
     try:
         analysis = generate_text_with_fallback(prompt, num_predict=700, temperature=0.6)
@@ -1696,7 +1664,7 @@ Additional Context from Clustering Analysis:
             "analysis_title": analysis_title,
             "data_source": data_source,
             "total_documents": total_docs,
-            "documents_analyzed": sample_size,
+            "documents_analysed": sample_size,
             "analysis": analysis,
             "success": True,
             "has_clustering_context": bool(clustering_context)
@@ -1768,11 +1736,11 @@ Additional Context from Clustering Analysis:
 
     prompt = f"""You are an expert in discourse analysis and thematic development, specializing in understanding how themes evolve, interconnect, and flow throughout text collections.
 
-Task: Analyze the thematic flow and relationships in the document collection titled "{analysis_title}".
+Task: Analyse the thematic flow and relationships in the document collection titled "{analysis_title}".
 
 Data Source: {data_source}
 Total Documents: {total_docs}
-Sample Analyzed: {sample_size} documents
+Sample Analysed: {sample_size} documents
 
 Document Sample:
 {documents_text}
@@ -1833,7 +1801,7 @@ Provide insights that reveal the dynamic, interconnected nature of themes and ho
             "analysis_title": analysis_title,
             "data_source": data_source,
             "total_documents": total_docs,
-            "documents_analyzed": sample_size,
+            "documents_analsed": sample_size,
             "analysis": analysis,
             "success": True,
             "has_clustering_context": bool(clustering_context)
@@ -1905,11 +1873,11 @@ Additional Context from Clustering Analysis:
 
     prompt = f"""You are an expert writing analyst and style critic specializing in identifying patterns of overuse, repetition, and stylistic habits in text collections.
 
-Task: Analyze patterns of overuse and underuse in the document collection titled "{analysis_title}".
+Task: Analyse patterns of overuse and underuse in the document collection titled "{analysis_title}".
 
 Data Source: {data_source}
 Total Documents: {total_docs}
-Sample Analyzed: {sample_size} documents
+Sample Analysed: {sample_size} documents
 
 Document Sample:
 {documents_text}
@@ -1978,7 +1946,7 @@ Be specific with examples and constructive in your critique. Focus on patterns t
             "analysis_title": analysis_title,
             "data_source": data_source,
             "total_documents": total_docs,
-            "documents_analyzed": sample_size,
+            "documents_analysed": sample_size,
             "analysis": analysis,
             "success": True,
             "has_clustering_context": bool(clustering_context)
