@@ -18,6 +18,9 @@ roman
 psutil==5.9.8
 openAI
 plotly
+torch
+transformers
+sentencepiece
 
 # spaCy models
 https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz#egg=en_core_web_sm
