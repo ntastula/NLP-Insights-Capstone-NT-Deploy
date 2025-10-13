@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import sys
 import numpy as np
 from collections import Counter
 from sklearn.decomposition import PCA
@@ -12,6 +13,9 @@ from pathlib import Path
 import nltk
 from num2words import num2words
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+sys.path.append(str(BASE_DIR))
 
 # ------------------ Tokenization & Stopwords ------------------ #
 SAFE_WORD_RE = r"[A-Za-z]+(?:n't|'t|'re|'ve|'ll|'d|'m|'s)?"
@@ -38,7 +42,7 @@ NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPWORDS)
 
 # ------------------ Embeddings Loader ------------------ #
-from data.download_embeddings import ConceptNetEmbeddings
+from backend.download_embeddings import ConceptNetEmbeddings
 
 model = None
 
@@ -250,12 +254,12 @@ def clustering_analysis(request):
     # Load ConceptNet embeddings if not already loaded
     if model is None:
         try:
-            print("Loading ConceptNet embeddings (local or streaming)...")
+            print("Loading ConceptNet embeddings (deferred)...")
             model = ConceptNetEmbeddings()
-            print("✅ ConceptNet embeddings loaded successfully.")
+            # NOTE: do NOT call model.load() yet
+            print("✅ ConceptNet embeddings loader ready.")
         except Exception as e:
-            print(f"⚠️ Failed to load ConceptNet embeddings: {e}")
-            print("⚠️ Falling back to TF-IDF embeddings.")
+            print(f"⚠️ Failed to prepare ConceptNet embeddings: {e}")
             model = None
 
     # Perform clustering
