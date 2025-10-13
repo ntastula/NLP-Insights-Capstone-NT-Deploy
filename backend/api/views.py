@@ -1606,6 +1606,8 @@ Keep analysis concise and actionable."""
 
     except Exception as e:
         logger.exception(f"Error in summarise_clustering_chart: {e}")
+        import traceback
+        traceback.print_exc()
         gc.collect()
 
         # Provide helpful error messages
