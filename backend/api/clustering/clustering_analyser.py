@@ -14,10 +14,15 @@ import nltk
 from num2words import num2words
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+# ======================
+# Paths
+# ======================
 BASE_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(BASE_DIR))
 
-# ------------------ Tokenization & Stopwords ------------------ #
+# ======================
+# Tokenization & Stopwords
+# ======================
 SAFE_WORD_RE = r"[A-Za-z]+(?:n't|'t|'re|'ve|'ll|'d|'m|'s)?"
 
 def safe_word_tokens(text):
@@ -41,22 +46,10 @@ CUSTOM_STOPWORDS = {"he", "she", "was", "for", "on", "as", "with", "at", "by", "
 NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPWORDS)
 
-model = None  # global
-
-def load_embeddings():
-    global model
-    if model is None:
-        try:
-            import torch
-            from backend.data.download_embeddings import ConceptNetEmbeddings
-            print("Loading ConceptNet embeddings...")
-            model = ConceptNetEmbeddings()
-            print("✅ ConceptNet embeddings loaded.")
-        except Exception as e:
-            print(f"⚠️ Failed to load embeddings: {e}")
-            model = None
-    return model
-
+# ======================
+# Embeddings loader
+# ======================
+from backend.data.download_embeddings import model
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
@@ -128,7 +121,9 @@ GENERAL_THEMES = {
                         "bread", "water", "wine", "fruit", "meat", "taste", "devour"],
 }
 
-# ------------------ Helper Functions ------------------ #
+# ======================
+# Theme helper
+# ======================
 def suggest_theme(cluster_words, model):
     if not cluster_words:
         return "Unknown"
@@ -142,7 +137,6 @@ def suggest_theme(cluster_words, model):
                 for word in cluster_words:
                     word_vec = model.get_vector(word)
                     if word_vec is not None:
-                        # Cosine similarity
                         theme_scores[theme] += np.dot(kw_vec, word_vec) / (
                             np.linalg.norm(kw_vec) * np.linalg.norm(word_vec)
                         )
@@ -152,9 +146,10 @@ def suggest_theme(cluster_words, model):
             theme_scores[theme] += overlap
     return max(theme_scores, key=theme_scores.get)
 
-# ------------------ Clustering ------------------ #
+# ======================
+# Clustering function
+# ======================
 def cluster_text(text, top_words_per_cluster=10):
-    global model
     if not text.strip():
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
@@ -172,6 +167,7 @@ def cluster_text(text, top_words_per_cluster=10):
     if not chunk_words:
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
+    # Use ConceptNet embeddings if available
     use_vectors = False
     if model is not None:
         for cleaned in chunk_words:
@@ -247,7 +243,9 @@ def cluster_text(text, top_words_per_cluster=10):
         "num_docs": n_docs,
     }
 
-# ------------------ Django Endpoint ------------------ #
+# ======================
+# Django Endpoint
+# ======================
 @csrf_exempt
 def clustering_analysis(request):
     if request.method != "POST":
@@ -262,10 +260,6 @@ def clustering_analysis(request):
     if not text:
         return JsonResponse({"error": "No text provided."}, status=400)
 
-    # Lazy load embeddings
-    load_embeddings()
-
-    # Perform clustering
     try:
         result = cluster_text(text, top_words_per_cluster=20)
         suggested = {cid: suggest_theme(words, model) for cid, words in result["top_terms"].items()}
