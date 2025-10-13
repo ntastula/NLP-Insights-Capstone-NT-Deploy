@@ -29,7 +29,7 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
 
     // Helper function to prepare cluster summary
 const prepareClusterSummary = (clusters, selectedCluster) => {
-    if (selectedCluster === 'all') return clusters;
+    if (!clusters || clusters.length === 0) return [];
     return clusters.filter(c => c.label === selectedCluster);
 };
 
