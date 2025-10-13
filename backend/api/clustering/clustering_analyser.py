@@ -8,25 +8,17 @@ from sklearn.cluster import KMeans
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from pathlib import Path
-from gensim.models import KeyedVectors
 
 import nltk
 from num2words import num2words
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Avoid import-time downloads and heavy loads
-DOWNLOAD_EXTERNAL_MODELS = False
-
 # ------------------ Tokenization & Stopwords ------------------ #
-# Lightweight tokenization: words and common contractions
 SAFE_WORD_RE = r"[A-Za-z]+(?:n't|'t|'re|'ve|'ll|'d|'m|'s)?"
-
 
 def safe_word_tokens(text):
     return re.findall(SAFE_WORD_RE, text)
 
-
-# Stopwords fallback (small static set)
 STATIC_STOPWORDS = {
     'the', 'and', 'is', 'in', 'to', 'of', 'a', 'that', 'it', 'on', 'for', 'as', 'with', 'at', 'by', 'an', 'be', 'this',
     'from', 'or', 'are', 'was', 'were', 'but', 'not', 'have', 'has', 'had', 'which', 'you', 'your', 'their', 'his',
@@ -35,28 +27,20 @@ STATIC_STOPWORDS = {
 
 try:
     from nltk.corpus import stopwords as nltk_stopwords
-
     NLTK_STOPWORDS = set(nltk_stopwords.words("english"))
 except Exception:
     NLTK_STOPWORDS = STATIC_STOPWORDS
 
-
-def generate_roman_numerals(limit=1000):
-    from roman import toRoman
-    return {toRoman(i).lower() for i in range(1, limit + 1)}
-
-
-ROMAN_STOPWORDS = generate_roman_numerals(1000)
+from roman import toRoman
+ROMAN_STOPWORDS = {toRoman(i).lower() for i in range(1, 1001)}
 CUSTOM_STOPWORDS = {"he", "she", "was", "for", "on", "as", "with", "at", "by", "an", "chapter"}
 NUMBER_WORDS = {num2words(i) for i in range(1, 1001)}
 ALL_STOPWORDS = NLTK_STOPWORDS.union(CUSTOM_STOPWORDS, NUMBER_WORDS, ROMAN_STOPWORDS)
 
-# ------------------ Embeddings Setup ------------------ #
-model = None  # ConceptNet model
+# ------------------ Embeddings Loader ------------------ #
+from data.download_embeddings import ConceptNetEmbeddings
 
-# Paths for ConceptNet file if pre-provisioned
-DATA_DIR = Path(__file__).resolve().parents[2] / "backend" / "data"
-EMBEDDINGS_PATH = DATA_DIR / "numberbatch-en.txt"
+model = None
 
 # ------------------ General Themes ------------------ #
 GENERAL_THEMES = {
@@ -128,44 +112,36 @@ GENERAL_THEMES = {
                         "bread", "water", "wine", "fruit", "meat", "taste", "devour"],
 }
 
-
 # ------------------ Helper Functions ------------------ #
 def suggest_theme(cluster_words, model):
-    """Suggest a theme for a cluster based on ConceptNet similarity."""
     if not cluster_words:
         return "Unknown"
-
     theme_scores = {theme: 0.0 for theme in GENERAL_THEMES}
-
     if model is not None:
-        # Use ConceptNet similarity
         for theme, keywords in GENERAL_THEMES.items():
             for kw in keywords:
-                if kw in model:
-                    for word in cluster_words:
-                        if word in model:
-                            theme_scores[theme] += model.similarity(word, kw)
+                kw_vec = model.get_vector(kw)
+                if kw_vec is None:
+                    continue
+                for word in cluster_words:
+                    word_vec = model.get_vector(word)
+                    if word_vec is not None:
+                        # Cosine similarity
+                        theme_scores[theme] += np.dot(kw_vec, word_vec) / (
+                            np.linalg.norm(kw_vec) * np.linalg.norm(word_vec)
+                        )
     else:
-        # Fallback: overlap score
         for theme, keywords in GENERAL_THEMES.items():
             overlap = len(set(cluster_words) & set(keywords))
             theme_scores[theme] += overlap
-
     return max(theme_scores, key=theme_scores.get)
-
 
 # ------------------ Clustering ------------------ #
 def cluster_text(text, top_words_per_cluster=10):
-    """
-    Cluster text into groups using ConceptNet embeddings if available, otherwise TF-IDF fallback.
-    Each cluster point includes a 'words' array for display in scatterplots.
-    """
     global model
-
     if not text.strip():
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
-    # ------------------ Split into chunks and clean ------------------ #
     vectors, valid_chunks, chunk_words = [], [], []
     chunks = [c.strip() for c in re.split(r'[.!?]\s+', text) if len(c.strip()) > 5]
 
@@ -180,16 +156,15 @@ def cluster_text(text, top_words_per_cluster=10):
     if not chunk_words:
         return {"clusters": [], "top_terms": {}, "themes": {}, "num_clusters": 0, "num_docs": 0}
 
-    # ------------------ Build vectors ------------------ #
     use_vectors = False
     if model is not None:
         for cleaned in chunk_words:
-            vecs = [model[w] for w in cleaned if w in model]
+            vecs = [model.get_vector(w) for w in cleaned if model.get_vector(w) is not None]
             if vecs:
                 vectors.append(np.mean(vecs, axis=0))
         use_vectors = len(vectors) == len(chunk_words)
 
-    # TF-IDF fallback if ConceptNet is unavailable
+    # TF-IDF fallback
     if not use_vectors:
         docs = [" ".join(words) for words in chunk_words]
         tfidf = TfidfVectorizer(token_pattern=SAFE_WORD_RE, min_df=1)
@@ -198,7 +173,7 @@ def cluster_text(text, top_words_per_cluster=10):
 
     n_docs = len(valid_chunks)
 
-    # ------------------ Determine number of clusters ------------------ #
+    # Determine number of clusters
     if n_docs < 20:
         num_clusters = 2
     elif n_docs < 100:
@@ -209,11 +184,9 @@ def cluster_text(text, top_words_per_cluster=10):
         num_clusters = 10
     else:
         num_clusters = min(20, n_docs // 200)
-    # Clamp to valid range to avoid KMeans errors
     num_clusters = max(1, min(num_clusters, n_docs))
 
-    # ------------------ PCA for dimensionality reduction ------------------ #
-    # Use at most 10 components and respect sample count; then keep first 2 for plotting
+    # PCA for plotting
     vectors = np.asarray(vectors)
     n_components = min(10, vectors.shape[1], vectors.shape[0])
     if n_components < 2:
@@ -226,20 +199,20 @@ def cluster_text(text, top_words_per_cluster=10):
         if reduced.shape[1] >= 2:
             reduced = reduced[:, :2]
 
-    # ------------------ KMeans clustering ------------------ #
+    # KMeans clustering
     labels = KMeans(n_clusters=num_clusters, random_state=42, n_init=10).fit_predict(reduced)
     clusters = [
         {
             "label": int(lbl),
             "doc": doc,
-            "words": words[:top_words_per_cluster],  # keep only top N words per chunk
-            "x": float(r[0]),  # include PCA coords for plotting
+            "words": words[:top_words_per_cluster],
+            "x": float(r[0]),
             "y": float(r[1]),
         }
         for doc, words, lbl, r in zip(valid_chunks, chunk_words, labels, reduced)
     ]
 
-    # ------------------ Top terms per cluster ------------------ #
+    # Top terms per cluster
     top_terms = {}
     for i in range(num_clusters):
         cluster_docs = [chunk_words[j] for j, lbl in enumerate(labels) if lbl == i]
@@ -247,7 +220,7 @@ def cluster_text(text, top_words_per_cluster=10):
         counts = Counter(tokens)
         top_terms[i] = [w for w, _ in counts.most_common(top_words_per_cluster)]
 
-    # ------------------ Suggest themes ------------------ #
+    # Suggested themes
     themes = {i: suggest_theme(words, model) for i, words in top_terms.items()}
 
     return {
@@ -258,16 +231,13 @@ def cluster_text(text, top_words_per_cluster=10):
         "num_docs": n_docs,
     }
 
-
 # ------------------ Django Endpoint ------------------ #
 @csrf_exempt
 def clustering_analysis(request):
     global model
-
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request method."}, status=400)
 
-    # Parse JSON request
     try:
         data = json.loads(request.body)
     except Exception:
@@ -278,23 +248,20 @@ def clustering_analysis(request):
         return JsonResponse({"error": "No text provided."}, status=400)
 
     # Load ConceptNet embeddings if not already loaded
-    if model is None and EMBEDDINGS_PATH.exists():
+    if model is None:
         try:
-            print("Loading ConceptNet embeddings...")
-            model = KeyedVectors.load_word2vec_format(EMBEDDINGS_PATH, binary=False)
+            print("Loading ConceptNet embeddings (local or streaming)...")
+            model = ConceptNetEmbeddings()
             print("✅ ConceptNet embeddings loaded successfully.")
         except Exception as e:
             print(f"⚠️ Failed to load ConceptNet embeddings: {e}")
             print("⚠️ Falling back to TF-IDF embeddings.")
             model = None
 
-    # Perform clustering (uses TF-IDF fallback if ConceptNet unavailable)
+    # Perform clustering
     try:
         result = cluster_text(text, top_words_per_cluster=20)
-
-        # Suggest themes
-        suggested = {cid: suggest_theme(words, model)
-                     for cid, words in result["top_terms"].items()}
+        suggested = {cid: suggest_theme(words, model) for cid, words in result["top_terms"].items()}
 
         return JsonResponse({
             "clusters": result["clusters"],
@@ -303,7 +270,6 @@ def clustering_analysis(request):
             "num_clusters": result["num_clusters"],
             "num_docs": result["num_docs"],
         })
-
     except Exception as e:
         import traceback
         traceback.print_exc()
