@@ -192,10 +192,8 @@ LOGGING = {
             'class': 'logging.StreamHandler',
         },
     },
-    'loggers': {
-        'your_app_name': {  # Replace with your actual app name
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',  # or DEBUG to see more
     },
 }

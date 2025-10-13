@@ -12,6 +12,7 @@ import json
 import os
 import re
 import requests
+import traceback
 from django.conf import settings
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
@@ -1606,7 +1607,6 @@ Keep analysis concise and actionable."""
 
     except Exception as e:
         logger.exception(f"Error in summarise_clustering_chart: {e}")
-        import traceback
         traceback.print_exc()
         gc.collect()
 
