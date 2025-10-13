@@ -30,7 +30,28 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
     // Helper function to prepare cluster summary
 const prepareClusterSummary = (clusters, selectedCluster) => {
     if (!clusters || clusters.length === 0) return [];
-    return clusters.filter(c => c.label === selectedCluster);
+
+    if (selectedCluster === 'all') {
+        // Flatten all clusters
+        return clusters.map(c => ({
+            label: c.label ?? 'unknown',
+            doc: c.doc ?? '',
+            words: c.words ?? [],
+            x: c.x ?? 0,
+            y: c.y ?? 0
+        }));
+    }
+
+    // Filter for selected cluster
+    return clusters
+        .filter(c => c.label === selectedCluster)
+        .map(c => ({
+            label: c.label ?? 'unknown',
+            doc: c.doc ?? '',
+            words: c.words ?? [],
+            x: c.x ?? 0,
+            y: c.y ?? 0
+        }));
 };
 
     try {
