@@ -43,15 +43,39 @@ class ConceptNetEmbeddings:
         print(f"📂 Loading embeddings from local file: {self.local_path} ...")
         with open(self.local_path, "rb") as f:
             self._data = torch.load(f, map_location="cpu")
-        self._vocab = self._data["vocab"]
-        self._embeddings = np.array(self._data["embeddings"], copy=False)
+
+        # Handle both dict and tuple formats
+        if isinstance(self._data, dict):
+            self._vocab = self._data.get("vocab")
+            self._embeddings = np.array(self._data.get("embeddings"), copy=False)
+        elif isinstance(self._data, (list, tuple)) and len(self._data) == 2:
+            self._vocab, self._embeddings = self._data
+            self._embeddings = np.array(self._embeddings, copy=False)
+        else:
+            raise ValueError("❌ Unrecognised embedding file format.")
+
+        # Convert vocab list to dict if needed
+        if isinstance(self._vocab, list):
+            self._vocab = {word: i for i, word in enumerate(self._vocab)}
 
     def _load_from_stream(self):
         buf = download_embeddings_stream(self.hf_url)
         print("📡 Loading embeddings from stream ...")
         self._data = torch.load(buf, map_location="cpu")
-        self._vocab = self._data["vocab"]
-        self._embeddings = np.array(self._data["embeddings"], copy=False)
+
+        # Handle both dict and tuple formats
+        if isinstance(self._data, dict):
+            self._vocab = self._data.get("vocab")
+            self._embeddings = np.array(self._data.get("embeddings"), copy=False)
+        elif isinstance(self._data, (list, tuple)) and len(self._data) == 2:
+            self._vocab, self._embeddings = self._data
+            self._embeddings = np.array(self._embeddings, copy=False)
+        else:
+            raise ValueError("❌ Unrecognised embedding file format.")
+
+        # Convert vocab list to dict if needed
+        if isinstance(self._vocab, list):
+            self._vocab = {word: i for i, word in enumerate(self._vocab)}
 
     @property
     def data(self):
