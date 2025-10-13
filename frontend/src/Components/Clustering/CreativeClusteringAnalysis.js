@@ -65,6 +65,14 @@ const CreativeClusteringAnalysis = ({ clusters, topTerms, themes, textDocuments 
             generateChartSummary();
         }
     }, [showChart, selectedCluster, clusters]);
+
+    // Generate summary when new clusters are first loaded
+useEffect(() => {
+    if (clusters.length > 0 && !isLoadingChartSummary) {
+        generateChartSummary();
+    }
+}, [clusters]);
+
     
     // Function for general summary (placeholder for later)
     const generateGeneralSummary = async () => {
