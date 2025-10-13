@@ -8,7 +8,7 @@ import shutil
 # Configuration
 # ======================
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR
+DATA_DIR = BASE_DIR / "data"          # ✅ change location to data folder
 DATA_DIR.mkdir(exist_ok=True)
 
 # Full file download
@@ -16,7 +16,6 @@ EMBEDDINGS_URL = "https://conceptnet.s3.amazonaws.com/downloads/2017/numberbatch
 FULL_PATH_GZ = DATA_DIR / "numberbatch-en.txt.gz"
 FULL_PATH = DATA_DIR / "numberbatch-en.txt"
 SUBSET_PATH = DATA_DIR / "numberbatch-en-top50k-fp16.npz"
-
 
 # ======================
 # Step 1: Download if missing
@@ -42,7 +41,6 @@ def download_full_embeddings():
     FULL_PATH_GZ.unlink(missing_ok=True)
     print(f"✅ Download complete! Saved to {FULL_PATH}")
     return FULL_PATH
-
 
 # ======================
 # Step 2: Create subset file
@@ -80,7 +78,6 @@ def make_subset(n_words=50_000):
     print(f"✅ Saved subset to {SUBSET_PATH}")
     return SUBSET_PATH
 
-
 # ======================
 # Step 3: Loader class
 # ======================
@@ -102,4 +99,5 @@ class ConceptNetEmbeddings:
 
 if __name__ == "__main__":
     make_subset()
+
 
