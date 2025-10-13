@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 # ======================
 # Paths
 # ======================
-BASE_DIR = Path(__file__).resolve().parents[3]
+BASE_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(BASE_DIR))
 
 # ======================
