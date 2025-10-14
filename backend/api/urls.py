@@ -22,6 +22,7 @@ urlpatterns = [
     path('analyse-thematic-flow/', views.analyse_thematic_flow, name='analyse_thematic_flow'),
     path('analyse-overused-themes/', views.analyse_overused_themes, name='analyse_overused_themes'),
     path('create-temp-corpus/', views.create_temp_corpus, name='create_temp_corpus'),
+    path("health/", views.health, name="health"),
 ]
 
 
