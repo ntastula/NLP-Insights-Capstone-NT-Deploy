@@ -152,11 +152,11 @@ def _generate_groq(prompt: str, num_predict: int, temperature: float) -> str:
 def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
     """
     Generate text using Hugging Face Transformers locally, without PyTorch.
-    Uses google/flan-t5-small by default (runs with ONNXRuntime).
+    Uses google/flan-t5-large by default (runs with ONNXRuntime).
     """
     global _HF_PIPELINE
 
-    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-small"
+    model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-large"
 
     if _HF_PIPELINE is None:
         print(f"📦 Loading lightweight Hugging Face model via ONNXRuntime: {model_name}")
