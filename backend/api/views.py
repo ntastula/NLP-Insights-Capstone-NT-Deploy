@@ -1075,17 +1075,22 @@ def corpus_preview_keyness(request):
         logger.exception(f"Error generating keyness corpus preview: {e}")
         return JsonResponse({"preview": ""}, status=500)
 
+
 @api_view(['POST'])
 def get_keyness_summary(request):
     keyness_results = request.data.get('keyness_results', [])
-    top_words = keyness_results[:50]
+    top_words = keyness_results[:30]  # Can use more words with large model
+
+    # Format the words concisely
+    words_list = ", ".join([f"{word['word']}" for word in top_words])
+
     prompt = (
-        "You are an expert NLP analyst. Here are the top 50 key words in a text, along with their keyness scores and part-of-speech tags:\n"
-        f"{top_words}\n"
-        "Write a summary (2-3 paragraphs) about what these results reveal about the word choices in the text. "
-        "Do not explain statistical columns; instead, interpret the meaning and possible implications of these words in the context of the document."
+        f"These are the most distinctive words in a literary text: {words_list}. "
+        "Write a paragraph explaining what these word choices reveal about the text's themes, "
+        "style, and subject matter. Focus on interpretation, not statistics."
     )
-    analysis = generate_text_with_fallback(prompt, num_predict=400, temperature=0.6)
+
+    analysis = generate_text_with_fallback(prompt, num_predict=250, temperature=0.7)
     if not analysis:
         return Response({"error": "No response from model."}, status=500)
     return Response({"summary": analysis})
