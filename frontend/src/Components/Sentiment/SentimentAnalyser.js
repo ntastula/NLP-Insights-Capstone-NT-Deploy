@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import SentimentResults from "./SentimentResults";
 
-const API_URL = "http://localhost:8000/api/analyse-sentiment/";
+const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api/analyse-sentiment/`;
 
 export default function SentimentAnalyser({ uploadedText, uploadedPreview, corpusPreview, onBack, genre }) {
     const [data, setData] = useState(null);
