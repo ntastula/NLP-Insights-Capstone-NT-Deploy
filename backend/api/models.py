@@ -7,7 +7,7 @@ import uuid
 class UserSession(models.Model):
     """Track user sessions and their data"""
     session_key = models.CharField(max_length=40, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # For logged-in users
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
     last_activity = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -44,8 +44,8 @@ class UserAnalysisHistory(models.Model):
     """Store analysis results per session"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(UserSession, on_delete=models.CASCADE)
-    analysis_type = models.CharField(max_length=50)  # 'keyness', 'sentiment', etc.
-    input_text_preview = models.TextField(max_length=500)  # First 500 chars
+    analysis_type = models.CharField(max_length=50)
+    input_text_preview = models.TextField(max_length=500)
     results = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 

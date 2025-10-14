@@ -2,11 +2,8 @@ from django.urls import path, include
 from . import views
 from .clustering.clustering_analyser import clustering_analysis
 from django.http import HttpResponse, JsonResponse
-from .views import test_huggingface
-from .views import test_groq
 
 urlpatterns = [
-    path('', lambda request: HttpResponse("✅ Django backend is running!"), name='home'),
     path("corpora/", views.list_corpora, name="list_corpora"),
     path("corpus-preview/", views.get_corpus_preview, name="corpus_preview"),
     path("analyse-keyness/", views.analyse_keyness, name="keyness_view"),
@@ -25,9 +22,6 @@ urlpatterns = [
     path('analyse-thematic-flow/', views.analyse_thematic_flow, name='analyse_thematic_flow'),
     path('analyse-overused-themes/', views.analyse_overused_themes, name='analyse_overused_themes'),
     path('create-temp-corpus/', views.create_temp_corpus, name='create_temp_corpus'),
-    path("health/", views.health, name="health"),
-    path('test-huggingface/', test_huggingface, name='test_huggingface'),
-    path('test-groq/', test_groq, name='test_groq'),
 ]
 
 

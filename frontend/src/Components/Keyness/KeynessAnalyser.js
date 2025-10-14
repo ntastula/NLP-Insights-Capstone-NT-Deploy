@@ -8,31 +8,30 @@ import './KeynessAnalyser.css';
 
 console.log("KeynessAnalyser file loaded");
 
-// Add this helper function
 function useWhyDidYouUpdate(name, props) {
-  const previousProps = useRef();
-  
-  useEffect(() => {
-    if (previousProps.current) {
-      const allKeys = Object.keys({ ...previousProps.current, ...props });
-      const changedProps = {};
-      
-      allKeys.forEach(key => {
-        if (previousProps.current[key] !== props[key]) {
-          changedProps[key] = {
-            from: previousProps.current[key],
-            to: props[key]
-          };
+    const previousProps = useRef();
+
+    useEffect(() => {
+        if (previousProps.current) {
+            const allKeys = Object.keys({ ...previousProps.current, ...props });
+            const changedProps = {};
+
+            allKeys.forEach(key => {
+                if (previousProps.current[key] !== props[key]) {
+                    changedProps[key] = {
+                        from: previousProps.current[key],
+                        to: props[key]
+                    };
+                }
+            });
+
+            if (Object.keys(changedProps).length > 0) {
+                console.log('[why-did-you-update]', name, changedProps);
+            }
         }
-      });
-      
-      if (Object.keys(changedProps).length > 0) {
-        console.log('[why-did-you-update]', name, changedProps);
-      }
-    }
-    
-    previousProps.current = props;
-  });
+
+        previousProps.current = props;
+    });
 }
 
 /**
@@ -75,9 +74,9 @@ const KeynessAnalyser = ({
     genre,
     onWordDetail,
     onResults
-    
+
 }) => {
-        const [comparisonResults, setComparisonResults] = useState([]);
+    const [comparisonResults, setComparisonResults] = useState([]);
     const [stats, setStats] = useState({ uploadedTotal: 0, corpusTotal: 0, totalSignificant: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -88,23 +87,23 @@ const KeynessAnalyser = ({
     const [showResults, setShowResults] = useState(false);
 
     const handleChangeMethod = useCallback(() => {
-    console.log("handleChangeMethod called!");
-    setAnalysisDone(false);
-    setSelectedMethod("");
-    setShowLibraryOptions(true);
-    setComparisonResults([]);
-    setShowResults(false);
-}, []);
+        console.log("handleChangeMethod called!");
+        setAnalysisDone(false);
+        setSelectedMethod("");
+        setShowLibraryOptions(true);
+        setComparisonResults([]);
+        setShowResults(false);
+    }, []);
 
-useWhyDidYouUpdate('KeynessAnalyser', { 
-    comparisonResults, 
-    selectedMethod, 
-    analysisDone,
-    uploadedText,
-    genre,
-    stats,
-    loading
-  });
+    useWhyDidYouUpdate('KeynessAnalyser', {
+        comparisonResults,
+        selectedMethod,
+        analysisDone,
+        uploadedText,
+        genre,
+        stats,
+        loading
+    });
 
     console.log("KeynessAnalyser component rendered");
     console.log("handleChangeMethod exists:", typeof handleChangeMethod);
@@ -169,7 +168,7 @@ useWhyDidYouUpdate('KeynessAnalyser', {
         try {
             const payload = {
                 comparison_mode: comparisonMode,
-                uploaded_text: uploadedText,   
+                uploaded_text: uploadedText,
                 reference_text: comparisonMode === "user_text" ? referenceText : undefined,
                 method: methodName.toLowerCase(),
                 filter_mode: filterMode,

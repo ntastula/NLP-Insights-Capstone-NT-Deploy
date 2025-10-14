@@ -24,7 +24,7 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
     primary: { summary: "", loading: false, error: null },
     secondary: { summary: "", loading: false, error: null }
   });
-  const [activeChartType, setActiveChartType] = useState("primary"); 
+  const [activeChartType, setActiveChartType] = useState("primary");
 
   const safeResults = Array.isArray(results) ? results : [];
 
@@ -47,95 +47,86 @@ const CreativeKeynessResults = ({ results, stats, method, uploadedText, genre, o
   }, [safeResults]);
 
   const fetchChartSummary = async (chartType, data, forceRefresh = false) => {
-  // Check if summary already exists (unless forcing refresh)
-  if (chartSummaries[chartType].summary && !forceRefresh) return;
+    if (chartSummaries[chartType].summary && !forceRefresh) return;
 
-  setChartSummaries(prev => ({
-    ...prev,
-    [chartType]: { ...prev[chartType], loading: true, error: null }
-  }));
+    setChartSummaries(prev => ({
+      ...prev,
+      [chartType]: { ...prev[chartType], loading: true, error: null }
+    }));
 
-  try {
-    const payload = chartType === "primary"
-      ? {
+    try {
+      const payload = chartType === "primary"
+        ? {
           title: `${method.toUpperCase()} Keyness Analysis - Top Keywords`,
           chart_type: "bar",
           chart_data: data,
         }
-      : {
+        : {
           title: `${method.toUpperCase()} Keyness Analysis - Frequency vs Keyness`,
           chart_type: "scatter",
           chart_data: data,
         };
 
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-keyness-chart/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/summarise-keyness-chart/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+
+      setChartSummaries(prev => ({
+        ...prev,
+        [chartType]: {
+          summary: responseData.analysis || "No summary available.",
+          loading: false,
+          error: null
+        }
+      }));
+    } catch (err) {
+      console.error(`Error fetching ${chartType} chart summary:`, err);
+      setChartSummaries(prev => ({
+        ...prev,
+        [chartType]: {
+          summary: "",
+          loading: false,
+          error: `Failed to fetch ${chartType} chart summary.`
+        }
+      }));
+    }
+  };
+
+  const hasFetchedSummaries = useRef(false);
+
+  // Effect to fetch chart summaries when Charts tab becomes active
+  useEffect(() => {
+    if (activeView !== "charts" || chartData.primary.length === 0) {
+      return;
+    }
+    if (hasFetchedSummaries.current) {
+      return;
     }
 
-    const responseData = await response.json();
+    hasFetchedSummaries.current = true;
+    fetchChartSummary("primary", chartData.primary);
 
-    setChartSummaries(prev => ({
-      ...prev,
-      [chartType]: {
-        summary: responseData.analysis || "No summary available.",
-        loading: false,
-        error: null
-      }
-    }));
-  } catch (err) {
-    console.error(`Error fetching ${chartType} chart summary:`, err);
-    setChartSummaries(prev => ({
-      ...prev,
-      [chartType]: {
-        summary: "",
-        loading: false,
-        error: `Failed to fetch ${chartType} chart summary.`
-      }
-    }));
-  }
-};
+    // Pre-fetch secondary chart summary in background
+    if (chartData.secondary.length > 0) {
+      setTimeout(() => {
+        fetchChartSummary("secondary", chartData.secondary);
+      }, 1000);
+    }
+  }, [activeView]);
 
-// ✅ FIXED: Use useRef to track if summaries have been fetched
-const hasFetchedSummaries = useRef(false);
-
-// ✅ Effect to fetch chart summaries when Charts tab becomes active
-useEffect(() => {
-  // Exit early if not on charts tab or no data
-  if (activeView !== "charts" || chartData.primary.length === 0) {
-    return;
-  }
-
-  // Exit if we've already fetched summaries for this data
-  if (hasFetchedSummaries.current) {
-    return;
-  }
-
-  // Mark as fetched BEFORE making requests to prevent duplicate calls
-  hasFetchedSummaries.current = true;
-
-  // Fetch primary chart summary immediately
-  fetchChartSummary("primary", chartData.primary);
-
-  // Pre-fetch secondary chart summary in background (optional)
-  if (chartData.secondary.length > 0) {
-    setTimeout(() => {
-      fetchChartSummary("secondary", chartData.secondary);
-    }, 1000); // Delay to not overwhelm the API
-  }
-}, [activeView]); // ✅ CRITICAL: Only depend on activeView, not chartData
-
-// ✅ Reset the fetch flag when analysis results change (new data)
-useEffect(() => {
-  if (chartData.primary.length > 0) {
-    hasFetchedSummaries.current = false;
-  }
-}, [chartData.primary.length]); // Only track the length, not the whole object
+  useEffect(() => {
+    if (chartData.primary.length > 0) {
+      hasFetchedSummaries.current = false;
+    }
+  }, [chartData.primary.length]);
 
   // Group by POS and filter to only words from uploaded text
   const uploadedWordsSet = useMemo(() => {
@@ -164,10 +155,17 @@ useEffect(() => {
   const fetchSummary = async () => {
     setSummaryLoading(true);
     try {
+      const filteredResults = results.filter(r => {
+        if (!uploadedWordsSet.has(r.word.toLowerCase())) return false;
+        if (r.pos === "PROPN") return false;
+        if (r.word.length <= 2 && r.word.includes("'")) return false;
+        return true;
+      });
+
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/get-keyness-summary/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyness_results: results }),
+        body: JSON.stringify({ keyness_results: filteredResults }),
       });
       const data = await response.json();
       setSummary(data.summary || "No summary available");

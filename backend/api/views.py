@@ -1,25 +1,30 @@
 import gc
-from django.http import JsonResponse, HttpResponseNotFound
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.views.decorators.http import require_POST
-from django.views.decorators.http import require_GET
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from backend.utils.session_utils import ensure_session_exists, schedule_session_cleanup
-from openai import OpenAI
 import json
 import os
 import re
 import requests
 import traceback
-from django.conf import settings
-from sklearn.feature_extraction.text import CountVectorizer
+import spacy
+import mimetypes
+import math
+import logging
 import numpy as np
 import pandas as pd
-from scipy.stats import chi2_contingency, chi2  # <-- added chi2 for p-values
+from django.http import JsonResponse, HttpResponseNotFound
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET
+from django.conf import settings
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from pathlib import Path
+from openai import OpenAI
+from sklearn.feature_extraction.text import CountVectorizer
+from scipy.stats import chi2_contingency, chi2
 from gensim import corpora, models
-from collections import defaultdict, Counter      # <-- added Counter
+from collections import defaultdict, Counter
 from api.keyness.keyness_analyser import (
     keyness_gensim,
     keyness_spacy,
@@ -29,15 +34,20 @@ from api.keyness.keyness_analyser import (
     extract_sentences,
     keyness_nltk,
 )
-import spacy
-import mimetypes
-import time
 from django.core.files.uploadedfile import UploadedFile
 from .models import KeynessResult
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
-import logging
-from pathlib import Path  # <-- ADDED (minimal import required)
-import math               # <-- used by compute_keyness_from_counts
+from backend.utils.session_utils import ensure_session_exists, schedule_session_cleanup
+
+# ---------------------------------------------------------------------------
+# File validation constants
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_FILES = 5
+ALLOWED_EXTENSIONS = {'.txt', '.doc', '.docx'}
+ALLOWED_MIME_TYPES = {
+    'text/plain',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+}
 
 MAX_TEXT_LENGTH = 100000
 logger = logging.getLogger(__name__)
@@ -45,6 +55,14 @@ logger = logging.getLogger(__name__)
 _HF_MODEL = None
 _HF_TOKENIZER = None
 _HF_PIPELINE = None
+
+CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
+SAMPLE_FILE = os.path.join(CORPUS_DIR, "sample1.txt")
+
+# --- Genre Corpus Meta  -----------
+# Looks for metadata-only corpora in backend/api/corpus_meta/*.json
+META_DIR = Path("api/corpus_meta")
+KEYNESS_DIR = Path("api/corpus_meta_keyness")
 
 try:
     import psutil
@@ -75,8 +93,6 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
     try:
         if provider == "huggingface":
             result = _generate_huggingface(prompt, num_predict, temperature)
-        elif provider == "groq":
-            result = _generate_groq(prompt, num_predict, temperature)
         else:
             result = _generate_ollama(prompt, num_predict, temperature)
 
@@ -90,68 +106,9 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
         raise
 
 
-def _generate_groq(prompt: str, num_predict: int, temperature: float) -> str:
-    """Generate text using Groq API (fast and free)."""
-    groq_api_key = os.environ.get("GROQ_API_KEY")
-
-    if not groq_api_key:
-        raise ValueError("GROQ_API_KEY is not set. Get one free at https://console.groq.com/keys")
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {groq_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    # Groq has a context limit, so truncate if needed
-    max_prompt_length = 6000
-    if len(prompt) > max_prompt_length:
-        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
-        prompt = prompt[:max_prompt_length]
-
-    # Use Llama 3.1 8B - fast and high quality
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are an expert data analyst and computational linguist. Provide clear, concise analysis."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "max_tokens": min(num_predict, 1000),
-        "temperature": temperature,
-        "top_p": 0.9
-    }
-
-    logger.info("Calling Groq API with llama-3.1-8b-instant")
-
-    response = requests.post(url, headers=headers, json=payload, timeout=60)
-
-    if response.status_code == 401:
-        raise ValueError("Invalid Groq API key. Check your GROQ_API_KEY environment variable.")
-    elif response.status_code == 429:
-        raise ValueError("Groq rate limit exceeded. Please try again in a moment.")
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    # Extract the generated text
-    if "choices" in data and len(data["choices"]) > 0:
-        content = data["choices"][0].get("message", {}).get("content", "")
-        if content:
-            return content.strip()
-
-    raise ValueError("Unexpected response format from Groq API")
-
-
 def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
     """
-    Generate text using Hugging Face Transformers locally, without PyTorch.
+    Generate text using Hugging Face Transformers locally.
     Uses google/flan-t5-large by default (runs with ONNXRuntime).
     """
     global _HF_PIPELINE
@@ -163,17 +120,29 @@ def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: floa
         _HF_PIPELINE = pipeline(
             "text2text-generation",
             model=model_name,
-            framework="onnx"  # ✅ ensures torch is not used
+            framework="onnx"
         )
 
-    # Optional: truncate extremely long prompts
+    # Truncate extremely long prompts
     max_input_length = 1024
     if len(prompt) > max_input_length:
         prompt = prompt[:max_input_length]
 
-    # Generate response
-    result = _HF_PIPELINE(prompt, max_length=num_predict, temperature=temperature)
+    # Generate response with better parameters
+    result = _HF_PIPELINE(
+        prompt,
+        max_new_tokens=num_predict,  # Changed from max_length
+        temperature=temperature,
+        do_sample=True,
+        early_stopping=True  # Stop at natural boundaries
+    )
     generated_text = result[0]["generated_text"]
+
+    # Trim to last complete sentence if cut off
+    if generated_text and not generated_text.endswith(('.', '!', '?')):
+        last_period = generated_text.rfind('.')
+        if last_period > 0:
+            generated_text = generated_text[:last_period + 1]
 
     return generated_text.strip()
 
@@ -205,124 +174,6 @@ def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
 
     return (response.json() or {}).get("response", "")
 
-
-@api_view(['GET'])
-def test_groq(request):
-    """Test endpoint to verify Groq API connection."""
-    groq_api_key = os.environ.get("GROQ_API_KEY", "NOT_SET")
-
-    logger.info("Testing Groq API connection...")
-
-    if groq_api_key == "NOT_SET":
-        return Response({
-            'error': 'GROQ_API_KEY not set',
-            'help': 'Get a free API key at https://console.groq.com/keys'
-        }, status=500)
-
-    # Test the API
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {groq_api_key}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "user", "content": "Say 'Hello, Groq is working!' in exactly those words."}
-        ],
-        "max_tokens": 20
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-
-        if response.status_code == 200:
-            data = response.json()
-            message = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-
-            return Response({
-                'status': 'success',
-                'message': message,
-                'model': 'llama-3.1-8b-instant',
-                'groq_working': True
-            })
-        else:
-            return Response({
-                'status': 'error',
-                'status_code': response.status_code,
-                'response': response.text[:500]
-            }, status=response.status_code)
-
-    except Exception as e:
-        return Response({
-            'error': str(e),
-            'groq_working': False
-        }, status=500)
-
-
-CORPUS_DIR = os.path.join(settings.BASE_DIR, "api", "corpus")
-SAMPLE_FILE = os.path.join(CORPUS_DIR, "sample1.txt")
-logger = logging.getLogger(__name__)
-
-# --- Genre Corpus Meta (helpers only; no other behavior changed) -----------
-# Looks for metadata-only corpora in backend/api/corpus_meta/*.json
-META_DIR = Path("api/corpus_meta")
-KEYNESS_DIR = Path("api/corpus_meta_keyness")
-
-
-@api_view(['GET'])
-def test_huggingface(request):
-    """Test endpoint to debug HuggingFace API connection."""
-    import requests
-
-    hf_token = os.environ.get("HUGGINGFACE_API_TOKEN", "NOT_SET")
-    hf_model = os.environ.get("HUGGINGFACE_MODEL", "gpt2")
-
-    logger.info("Testing HuggingFace API connection...")
-    logger.info(f"Token present: {hf_token != 'NOT_SET'}")
-    logger.info(f"Token length: {len(hf_token) if hf_token != 'NOT_SET' else 0}")
-    logger.info(f"Token starts with 'hf_': {hf_token.startswith('hf_') if hf_token != 'NOT_SET' else False}")
-    logger.info(f"Model: {hf_model}")
-
-    if hf_token == "NOT_SET":
-        return Response({
-            'error': 'HUGGINGFACE_API_TOKEN not set',
-            'model': hf_model
-        }, status=500)
-
-    # Test the API
-    url = f"https://api-inference.huggingface.co/models/{hf_model}"
-    headers = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "inputs": "Hello, I am",
-        "parameters": {
-            "max_new_tokens": 10
-        }
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-
-        return Response({
-            'status_code': response.status_code,
-            'model': hf_model,
-            'url': url,
-            'token_length': len(hf_token),
-            'token_starts_correctly': hf_token.startswith('hf_'),
-            'response': response.text[:500]
-        })
-    except Exception as e:
-        return Response({
-            'error': str(e),
-            'model': hf_model,
-            'token_length': len(hf_token)
-        }, status=500)
-
 def list_corpus_files(analysis_type=None):
     if analysis_type == "keyness":
         folder = KEYNESS_DIR
@@ -332,7 +183,7 @@ def list_corpus_files(analysis_type=None):
     if not folder.exists():
         return []
 
-    files = [f.stem for f in folder.glob("*.json")]  # <- use stem (no .json)
+    files = [f.stem for f in folder.glob("*.json")]
 
     if analysis_type == "keyness":
         # strip _keyness suffix
@@ -376,31 +227,14 @@ def list_corpora(request):
         analysis_type = request.GET.get("analysis")
         files = list_corpus_files(analysis_type)
 
-        # Log what was found
-        logger.info("list_corpora -> analysis_type=%s, files=%s", analysis_type, files)
-
         # If keyness, add the suffix back for the frontend
         if analysis_type == "keyness":
             files = [f"{f}_keyness" if f != "general_fiction" else f"{f}_keyness" for f in files]
-
-            # Log what was found
-            logger.info("list_corpora -> analysis_type=%s, files=%s", analysis_type, files)
 
         return JsonResponse({"corpora": files})
     except Exception as e:
         logger.exception("Error in list_corpora")
         return JsonResponse({"error": str(e)}, status=500)
-# ---------------------------------------------------------------------------
-
-# File validation constants
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-MAX_FILES = 5
-ALLOWED_EXTENSIONS = {'.txt', '.doc', '.docx'}
-ALLOWED_MIME_TYPES = {
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-}
 
 def validate_file(uploaded_file: UploadedFile) -> tuple[bool, str]:
     """
@@ -464,16 +298,16 @@ def process_text_file(uploaded_file: UploadedFile) -> tuple[str, str]:
 
             text_content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
 
+            # Basic content validation
+            if len(text_content.strip()) == 0:
+                return "", "File appears to be empty or contains only whitespace"
+
         elif file_extension == 'doc':
 
             return "", ".doc files not supported. Please convert to .docx or .txt"
 
         else:
             return "", f"Unsupported file type: {file_extension}"
-
-        # Basic content validation
-        if len(text_content.strip()) == 0:
-            return "", "File appears to be empty or contains only whitespace"
 
         # Check for reasonable content length
         if len(text_content) > 1000000:  # 1MB of text
@@ -1079,10 +913,14 @@ def corpus_preview_keyness(request):
 @api_view(['POST'])
 def get_keyness_summary(request):
     keyness_results = request.data.get('keyness_results', [])
-    top_words = keyness_results[:30]  # Can use more words with large model
 
-    # Format the words concisely
-    words_list = ", ".join([f"{word['word']}" for word in top_words])
+    # Filter to match frontend logic
+    filtered_words = [
+        word for word in keyness_results
+        if word.get('pos') != 'PROPN'  # Skip proper nouns like frontend
+    ][:30]
+
+    words_list = ", ".join([f"{word['word']}" for word in filtered_words])
 
     prompt = (
         f"These are the most distinctive words in a literary text: {words_list}. "
@@ -1090,9 +928,19 @@ def get_keyness_summary(request):
         "style, and subject matter. Focus on interpretation, not statistics."
     )
 
-    analysis = generate_text_with_fallback(prompt, num_predict=250, temperature=0.7)
+    # Updated generation parameters
+    analysis = generate_text_with_fallback(
+        prompt,
+        num_predict=300,
+        temperature=0.7,
+    )
+
     if not analysis:
         return Response({"error": "No response from model."}, status=500)
+
+    # Optional: trim to last complete sentence if still cut off
+    analysis = analysis.rsplit('.', 1)[0] + '.' if '.' in analysis else analysis
+
     return Response({"summary": analysis})
 
 @require_http_methods(["GET"])
@@ -2038,6 +1886,3 @@ def create_temp_corpus(request):
         return JsonResponse({"success": True, "filename": str(temp_file)})
 
     return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)
-
-def health(request):
-    return JsonResponse({"status": "ok"})
