@@ -17,21 +17,21 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN curl -Lo /app/localai https://github.com/mudler/LocalAI/releases/download/v2.21.1/local-ai-Linux-x86_64 && \
     chmod +x /app/localai
 
-# Download model for LocalAI
+# Download TinyLlama model (much smaller - ~700MB vs 4GB+)
 RUN mkdir -p /models && \
-    curl -L https://huggingface.co/mys/ggml-mpt-7b-instruct-q4/resolve/main/mpt-7b-instruct-q4.gguf \
-    -o /models/mpt-7b-instruct.gguf
+    curl -L https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+    -o /models/tinyllama.gguf
 
-# Create LocalAI model configuration
-RUN echo 'name: mpt-7b-instruct\n\
+# Create LocalAI model configuration for TinyLlama
+RUN echo 'name: tinyllama\n\
 backend: llama\n\
 parameters:\n\
-  model: mpt-7b-instruct.gguf\n\
+  model: tinyllama.gguf\n\
   temperature: 0.7\n\
   top_p: 0.9\n\
 context_size: 2048\n\
 f16: true\n\
-threads: 4' > /models/mpt-7b-instruct.yaml
+threads: 2' > /models/tinyllama.yaml
 
 # Copy backend code
 COPY backend/ ./backend/
@@ -40,7 +40,7 @@ COPY backend/ ./backend/
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-echo "Starting LocalAI..."\n\
+echo "Starting LocalAI with TinyLlama..."\n\
 /app/localai --models-path /models --address 0.0.0.0:8080 &\n\
 LOCALAI_PID=$!\n\
 \n\
