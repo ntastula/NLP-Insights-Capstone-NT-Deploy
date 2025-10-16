@@ -13,8 +13,9 @@ RUN apt-get update && apt-get install -y \
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download LocalAI binary
-RUN curl -sSL https://install.localai.io | bash && chmod +x ./localai
+# Download LocalAI binary directly (for Linux x86_64)
+RUN curl -Lo /app/localai https://github.com/mudler/LocalAI/releases/download/v2.21.1/local-ai-Linux-x86_64 && \
+    chmod +x /app/localai
 
 # Download model for LocalAI
 RUN mkdir -p /models && \
@@ -40,7 +41,7 @@ RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
 echo "Starting LocalAI..."\n\
-./localai serve --models-path /models --address 0.0.0.0:8080 &\n\
+/app/localai --models-path /models --address 0.0.0.0:8080 &\n\
 LOCALAI_PID=$!\n\
 \n\
 echo "Waiting for LocalAI to be ready..."\n\
@@ -51,6 +52,7 @@ for i in {1..60}; do\n\
   fi\n\
   if [ $i -eq 60 ]; then\n\
     echo "LocalAI failed to start in time"\n\
+    kill $LOCALAI_PID 2>/dev/null || true\n\
     exit 1\n\
   fi\n\
   echo "Waiting for LocalAI... ($i/60)"\n\
