@@ -84,17 +84,15 @@ def log_memory_usage(label):
 
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
-    Generate text using Groq, HuggingFace, or Ollama.
+    Generate text using Ollama locally or Hugging Face API when deployed.
     """
     log_memory_usage("LLM request start")
 
     provider = (os.environ.get("LLM_PROVIDER") or "huggingface").strip().lower()
 
-    print(f"🔍 LLM_PROVIDER detected: {provider}", flush=True)
-
     try:
         if provider == "huggingface":
-            result = _generate_huggingface(prompt, num_predict, temperature)
+            result = _generate_huggingface_api(prompt, num_predict, temperature)
         else:
             result = _generate_ollama(prompt, num_predict, temperature)
 
@@ -108,35 +106,42 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
         raise
 
 
-def _generate_huggingface(prompt, num_predict, temperature):
-    from transformers import AutoTokenizer
-    try:
-        from optimum.onnxruntime import ORTModelForSeq2SeqLM
-        import onnxruntime
+def _generate_huggingface_api(prompt: str, num_predict: int = 200, temperature: float = 0.7) -> str:
+    """
+    Generate text using Hugging Face hosted API (small model for free tier).
+    """
+    HF_MODEL = "google/flan-t5-small"  # small enough for Render free tier
+    HF_TOKEN = os.environ.get("HUGGINGFACE_API_TOKEN")  # must be set in Render
 
-        model_name = "google/flan-t5-large"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = ORTModelForSeq2SeqLM.from_pretrained(model_name, export=False)
+    if not HF_TOKEN:
+        raise ValueError("Missing HUGGINGFACE_API_TOKEN environment variable")
 
-        inputs = tokenizer(prompt, return_tensors="pt")
-        outputs = model.generate(**inputs, max_new_tokens=num_predict, temperature=temperature)
-        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    url = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    payload = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": num_predict, "temperature": temperature}
+    }
 
-    except Exception as e:
-        print("❌ ONNX generation failed:", e)
-        return "Model error: ONNX runtime not available on this environment."
+    response = requests.post(url, headers=headers, json=payload, timeout=60)
+    response.raise_for_status()
+    data = response.json()
+
+    # Some API responses can be [{'generated_text': '...'}] or [{'error': '...'}]
+    if "error" in data[0]:
+        raise RuntimeError(f"Hugging Face API error: {data[0]['error']}")
+
+    return data[0]["generated_text"].strip()
 
 
 
-def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
-    """Generate text using Ollama local API."""
+
+def _generate_ollama(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
+    """
+    Generate text using Ollama local API (offline dev).
+    """
     base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
     model = os.environ.get("OLLAMA_MODEL") or "llama3"
-
-    max_prompt_length = 4000
-    if len(prompt) > max_prompt_length:
-        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
-        prompt = prompt[:max_prompt_length]
 
     payload = {
         "model": model,
@@ -152,8 +157,8 @@ def _generate_ollama(prompt: str, num_predict: int, temperature: float) -> str:
     logger.info(f"Calling Ollama API: {model}")
     response = requests.post(base_url, json=payload, timeout=180)
     response.raise_for_status()
+    return (response.json() or {}).get("response", "").strip()
 
-    return (response.json() or {}).get("response", "")
 
 def list_corpus_files(analysis_type=None):
     if analysis_type == "keyness":
