@@ -10,8 +10,9 @@ WORKDIR /app
 # Copy project files into container
 COPY . /app
 
-# Download and make LocalAI executable
-RUN curl -sSL https://install.localai.io | bash && chmod +x ./localai
+# Download LocalAI binary directly (no systemd dependencies)
+RUN curl -L https://github.com/mudler/LocalAI/releases/latest/download/local-ai-linux-amd64 -o /usr/local/bin/localai \
+    && chmod +x /usr/local/bin/localai
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
@@ -29,5 +30,8 @@ ENV LOCALAI_URL=http://localhost:8080/v1/generate
 ENV LOCALAI_MODEL=mpt-7b-instruct
 
 # Start LocalAI and Django
-CMD ./localai --port ${LOCALAI_PORT:-8080} & gunicorn backend.wsgi:application --bind 0.0.0.0:${DJANGO_PORT:-8000}
+CMD /usr/local/bin/localai --port 8080 & \
+    python manage.py migrate && \
+    gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
+
 
