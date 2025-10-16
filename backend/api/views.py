@@ -111,33 +111,58 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 def _generate_huggingface(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
     """
     Generate text using Hugging Face Transformers locally.
-    Uses google/flan-t5-large by default (runs with ONNXRuntime).
+    Uses google/flan-t5-large by default (runs with ONNXRuntime via Optimum).
     """
     global _HF_PIPELINE
+    import time
 
     model_name = os.environ.get("HUGGINGFACE_MODEL") or "google/flan-t5-large"
 
     if _HF_PIPELINE is None:
         print(f"📦 Loading lightweight Hugging Face model via ONNXRuntime: {model_name}")
-        _HF_PIPELINE = pipeline(
-            "text2text-generation",
-            model=model_name,
-            framework="onnx"
-        )
+        start_load = time.time()
+
+        try:
+            # Use Optimum's ORTModelForSeq2SeqLM for proper ONNX support
+            from optimum.onnxruntime import ORTModelForSeq2SeqLM
+            from transformers import AutoTokenizer
+
+            model = ORTModelForSeq2SeqLM.from_pretrained(model_name, export=True)
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+            _HF_PIPELINE = pipeline(
+                "text2text-generation",
+                model=model,
+                tokenizer=tokenizer
+            )
+            print(f"✅ Model loaded (ONNX) in {time.time() - start_load:.2f}s")
+        except Exception as e:
+            print(f"⚠️ ONNX failed, falling back to PyTorch: {e}")
+            _HF_PIPELINE = pipeline(
+                "text2text-generation",
+                model=model_name
+            )
+            print(f"✅ Model loaded (PyTorch) in {time.time() - start_load:.2f}s")
 
     # Truncate extremely long prompts
     max_input_length = 1024
     if len(prompt) > max_input_length:
         prompt = prompt[:max_input_length]
 
-    # Generate response with better parameters
+    # Generate response with parameters to prevent repetition
+    start_gen = time.time()
     result = _HF_PIPELINE(
         prompt,
-        max_new_tokens=num_predict,  # Changed from max_length
+        max_new_tokens=num_predict,
         temperature=temperature,
         do_sample=True,
-        early_stopping=True  # Stop at natural boundaries
+        top_p=0.9,  # Nucleus sampling
+        repetition_penalty=1.2,  # Penalize repetition
+        no_repeat_ngram_size=3,  # Prevent repeating 3-grams
+        early_stopping=True
     )
+    print(f"⏱️ Generation took {time.time() - start_gen:.2f}s")
+
     generated_text = result[0]["generated_text"]
 
     # Trim to last complete sentence if cut off
