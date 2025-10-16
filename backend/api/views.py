@@ -90,6 +90,8 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 
     provider = (os.environ.get("LLM_PROVIDER") or "huggingface").strip().lower()
 
+    print(f"🔍 LLM_PROVIDER detected: {provider}", flush=True)
+
     try:
         if provider == "huggingface":
             result = _generate_huggingface(prompt, num_predict, temperature)
