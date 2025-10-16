@@ -11,8 +11,13 @@ WORKDIR /app
 COPY . /app
 
 # Download LocalAI binary directly (no systemd dependencies)
-RUN curl -L https://github.com/mudler/LocalAI/releases/latest/download/local-ai-linux-amd64 -o /usr/local/bin/localai \
+RUN curl -L https://github.com/mudler/LocalAI/releases/download/v3.6.0/local-ai-linux-amd64 -o /usr/local/bin/localai \
     && chmod +x /usr/local/bin/localai
+
+# Download a small, compatible model for LocalAI
+RUN mkdir -p /models && \
+    curl -L https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf -o /models/mistral-7b-instruct.gguf
+
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
@@ -30,8 +35,10 @@ ENV LOCALAI_URL=http://localhost:8080/v1/generate
 ENV LOCALAI_MODEL=mpt-7b-instruct
 
 # Start LocalAI and Django
-CMD /usr/local/bin/localai --port 8080 & \
+CMD /usr/local/bin/localai --models-path /models --port 8080 & \
+    sleep 10 && \
     python manage.py migrate && \
     gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
+
 
 
