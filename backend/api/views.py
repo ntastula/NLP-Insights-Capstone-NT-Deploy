@@ -83,16 +83,17 @@ def log_memory_usage(label):
 
 def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
     """
-    Generate text using Ollama locally or Hugging Face API when deployed.
+    Generate text using Ollama locally or LocalAI when deployed on Render.
     """
     log_memory_usage("LLM request start")
 
-    provider = (os.environ.get("LLM_PROVIDER") or "huggingface").strip().lower()
+    provider = (os.environ.get("LLM_PROVIDER") or "localai").strip().lower()
 
     try:
-        if provider == "huggingface":
-            result = _generate_huggingface_api(prompt, num_predict, temperature)
+        if provider == "localai":
+            result = _generate_localai(prompt, num_predict, temperature)
         else:
+            # Use Ollama when running locally and LLM_PROVIDER is set to 'ollama'
             result = _generate_ollama(prompt, num_predict, temperature)
 
         gc.collect()
@@ -102,6 +103,44 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
     except Exception as e:
         logger.error(f"LLM generation failed with {provider}: {e}")
         gc.collect()
+        raise
+
+
+
+def _generate_localai(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
+    """
+    Generate text using LocalAI (self-hosted inference).
+    """
+    # LocalAI URL (adjust port if needed)
+    base_url = os.environ.get("LOCALAI_URL") or "http://localhost:8080/v1/generate"
+
+    # Choose your model (must be downloaded/available in LocalAI)
+    model = os.environ.get("LOCALAI_MODEL") or "mpt-7b-instruct"
+
+    # Limit prompt length to prevent memory issues
+    max_prompt_length = 4000
+    if len(prompt) > max_prompt_length:
+        logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
+        prompt = prompt[:max_prompt_length]
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "max_new_tokens": num_predict,
+        "temperature": temperature,
+        "top_p": 0.9,
+        "stop": None,
+        "stream": False
+    }
+
+    try:
+        logger.info(f"Calling LocalAI model: {model}")
+        response = requests.post(base_url, json=payload, timeout=180)
+        response.raise_for_status()
+        result = response.json()
+        return result.get("response", "").strip()
+    except requests.RequestException as e:
+        logger.error(f"LocalAI generation failed: {e}")
         raise
 
 
