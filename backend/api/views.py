@@ -109,18 +109,19 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 
 def _generate_localai(prompt: str, num_predict: int = 600, temperature: float = 0.7, max_retries: int = 3) -> str:
     """
-    Generate text using LocalAI (self-hosted inference).
+    Generate text using LocalAI (self-hosted inference with minimal memory).
     """
     base_url = os.environ.get("LOCALAI_URL") or "http://localhost:8080/v1/generate"
-
-    # Updated to use TinyLlama
     model = os.environ.get("LOCALAI_MODEL") or "tinyllama"
 
-    # Limit prompt length to prevent memory issues
-    max_prompt_length = 4000
+    # Reduced max prompt length due to smaller context window
+    max_prompt_length = 1500  # Reduced from 4000 to fit 512 context
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
         prompt = prompt[:max_prompt_length]
+
+    # Reduced max tokens to fit smaller context
+    num_predict = min(num_predict, 300)  # Cap at 300 tokens for 512 context
 
     payload = {
         "model": model,

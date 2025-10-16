@@ -17,50 +17,55 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN curl -Lo /app/localai https://github.com/mudler/LocalAI/releases/download/v2.21.1/local-ai-Linux-x86_64 && \
     chmod +x /app/localai
 
-# Download TinyLlama model (much smaller - ~700MB vs 4GB+)
+# Download ultra-small TinyLlama Q2_K quantization (~400MB)
 RUN mkdir -p /models && \
-    curl -L https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+    curl -L https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf \
     -o /models/tinyllama.gguf
 
-# Create LocalAI model configuration for TinyLlama
+# Create LocalAI model configuration with minimal memory settings
 RUN echo 'name: tinyllama\n\
 backend: llama\n\
 parameters:\n\
   model: tinyllama.gguf\n\
   temperature: 0.7\n\
   top_p: 0.9\n\
-context_size: 2048\n\
-f16: true\n\
-threads: 2' > /models/tinyllama.yaml
+context_size: 512\n\
+batch_size: 128\n\
+f16: false\n\
+low_vram: true\n\
+threads: 1\n\
+mmap: true\n\
+mlock: false' > /models/tinyllama.yaml
 
 # Copy backend code
 COPY backend/ ./backend/
 
-# Create startup script
+# Create startup script with memory-optimized settings
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-echo "Starting LocalAI with TinyLlama..."\n\
-/app/localai --models-path /models --address 0.0.0.0:8080 &\n\
+echo "Starting LocalAI with ultra-low memory TinyLlama..."\n\
+/app/localai --models-path /models --address 0.0.0.0:8080 --threads 1 --context-size 512 &\n\
 LOCALAI_PID=$!\n\
 \n\
 echo "Waiting for LocalAI to be ready..."\n\
-for i in {1..60}; do\n\
+for i in {1..90}; do\n\
   if curl -s http://localhost:8080/readyz > /dev/null 2>&1; then\n\
     echo "LocalAI is ready!"\n\
     break\n\
   fi\n\
-  if [ $i -eq 60 ]; then\n\
+  if [ $i -eq 90 ]; then\n\
     echo "LocalAI failed to start in time"\n\
+    echo "Checking LocalAI logs..."\n\
     kill $LOCALAI_PID 2>/dev/null || true\n\
     exit 1\n\
   fi\n\
-  echo "Waiting for LocalAI... ($i/60)"\n\
+  echo "Waiting for LocalAI... ($i/90)"\n\
   sleep 2\n\
 done\n\
 \n\
-echo "Starting Django..."\n\
-gunicorn backend.wsgi:application --bind 0.0.0.0:10000 --timeout 300 --workers 2' > /app/start.sh && \
+echo "Starting Django with single worker to save memory..."\n\
+gunicorn backend.wsgi:application --bind 0.0.0.0:10000 --timeout 300 --workers 1 --threads 2' > /app/start.sh && \
 chmod +x /app/start.sh
 
 # Expose Render web service port
