@@ -8,6 +8,7 @@ import spacy
 import mimetypes
 import math
 import logging
+import time
 import numpy as np
 import pandas as pd
 from django.http import JsonResponse, HttpResponseNotFound
@@ -107,17 +108,10 @@ def generate_text_with_fallback(prompt: str, num_predict: int = 600, temperature
 
 
 
-def _generate_localai(prompt: str, num_predict: int = 600, temperature: float = 0.7) -> str:
-    """
-    Generate text using LocalAI (self-hosted inference).
-    """
-    # LocalAI URL (adjust port if needed)
+def _generate_localai(prompt: str, num_predict: int = 600, temperature: float = 0.7, max_retries: int = 3) -> str:
     base_url = os.environ.get("LOCALAI_URL") or "http://localhost:8080/v1/generate"
-
-    # Choose your model (must be downloaded/available in LocalAI)
     model = os.environ.get("LOCALAI_MODEL") or "mpt-7b-instruct"
 
-    # Limit prompt length to prevent memory issues
     max_prompt_length = 4000
     if len(prompt) > max_prompt_length:
         logger.warning(f"Prompt truncated from {len(prompt)} to {max_prompt_length} chars")
@@ -129,19 +123,26 @@ def _generate_localai(prompt: str, num_predict: int = 600, temperature: float = 
         "max_new_tokens": num_predict,
         "temperature": temperature,
         "top_p": 0.9,
-        "stop": None,
         "stream": False
     }
 
-    try:
-        logger.info(f"Calling LocalAI model: {model}")
-        response = requests.post(base_url, json=payload, timeout=180)
-        response.raise_for_status()
-        result = response.json()
-        return result.get("response", "").strip()
-    except requests.RequestException as e:
-        logger.error(f"LocalAI generation failed: {e}")
-        raise
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Calling LocalAI model: {model} (attempt {attempt + 1}/{max_retries})")
+            response = requests.post(base_url, json=payload, timeout=180)
+            response.raise_for_status()
+            result = response.json()
+            return result.get("response", "").strip()
+        except requests.ConnectionError as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"LocalAI connection failed, retrying in 5s... ({e})")
+                time.sleep(5)
+            else:
+                logger.error(f"LocalAI generation failed after {max_retries} attempts: {e}")
+                raise
+        except requests.RequestException as e:
+            logger.error(f"LocalAI generation failed: {e}")
+            raise
 
 
 def _generate_huggingface_api(prompt: str, num_predict: int = 200, temperature: float = 0.7) -> str:

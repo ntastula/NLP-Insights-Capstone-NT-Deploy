@@ -1,33 +1,70 @@
-# Use a lightweight Python base image
+# Use a slim Python base image
 FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install required tools
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl git build-essential wget && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy backend requirements and install them
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install LocalAI manually
-RUN curl -L https://github.com/mudler/LocalAI/releases/download/v3.6.0/local-ai-linux-amd64 -o /usr/local/bin/localai \
-    && chmod +x /usr/local/bin/localai
+# Download LocalAI binary
+RUN curl -sSL https://install.localai.io | bash && chmod +x ./localai
 
-# Download a small model for LocalAI (adjust if needed)
+# Download model for LocalAI
 RUN mkdir -p /models && \
-    curl -L https://huggingface.co/mys/ggml-mpt-7b-instruct-q4/resolve/main/mpt-7b-instruct-q4.gguf -o /models/mpt-7b-instruct.gguf
+    curl -L https://huggingface.co/mys/ggml-mpt-7b-instruct-q4/resolve/main/mpt-7b-instruct-q4.gguf \
+    -o /models/mpt-7b-instruct.gguf
 
-# Copy the application code
-COPY . .
+# Create LocalAI model configuration
+RUN echo 'name: mpt-7b-instruct\n\
+backend: llama\n\
+parameters:\n\
+  model: mpt-7b-instruct.gguf\n\
+  temperature: 0.7\n\
+  top_p: 0.9\n\
+context_size: 2048\n\
+f16: true\n\
+threads: 4' > /models/mpt-7b-instruct.yaml
 
-# Expose Django port
-EXPOSE 8000
+# Copy backend code
+COPY backend/ ./backend/
 
-# Start both LocalAI and Django
-CMD /usr/local/bin/localai --models-path /models --port 8080 > /tmp/localai.log 2>&1 & \
-    echo "Starting LocalAI..." && sleep 15 && \
-    echo "Running migrations..." && python manage.py migrate && \
-    echo "Starting Django..." && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT
+# Create startup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "Starting LocalAI..."\n\
+./localai serve --models-path /models --address 0.0.0.0:8080 &\n\
+LOCALAI_PID=$!\n\
+\n\
+echo "Waiting for LocalAI to be ready..."\n\
+for i in {1..60}; do\n\
+  if curl -s http://localhost:8080/readyz > /dev/null 2>&1; then\n\
+    echo "LocalAI is ready!"\n\
+    break\n\
+  fi\n\
+  if [ $i -eq 60 ]; then\n\
+    echo "LocalAI failed to start in time"\n\
+    exit 1\n\
+  fi\n\
+  echo "Waiting for LocalAI... ($i/60)"\n\
+  sleep 2\n\
+done\n\
+\n\
+echo "Starting Django..."\n\
+gunicorn backend.wsgi:application --bind 0.0.0.0:10000 --timeout 300 --workers 2' > /app/start.sh && \
+chmod +x /app/start.sh
+
+# Expose Render web service port
+EXPOSE 10000
+
+# Use the startup script
+CMD ["/app/start.sh"]
+
 
