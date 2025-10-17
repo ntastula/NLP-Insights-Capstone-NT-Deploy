@@ -181,15 +181,14 @@ def _generate_huggingface_api(prompt: str, num_predict: int = 200, temperature: 
 
 
 
-def _generate_ollama(prompt: str, num_predict: int = 400, temperature: float = 0.7) -> str:
+def _generate_ollama(prompt: str, model_name: str, num_predict: int = 400, temperature: float = 0.7, max_retries: int = 3) -> str:
     """
-    Generate text using Ollama local API (offline dev).
+    Generate text using Ollama local API with a chosen model and retry logic.
     """
-    base_url = os.environ.get("OLLAMA_URL") or "http://localhost:11434/api/generate"
-    model = os.environ.get("OLLAMA_MODEL") or "llama3"
+    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/api/generate"
 
     payload = {
-        "model": model,
+        "model": model_name,
         "prompt": prompt,
         "stream": False,
         "options": {
@@ -199,10 +198,18 @@ def _generate_ollama(prompt: str, num_predict: int = 400, temperature: float = 0
         }
     }
 
-    logger.info(f"Calling Ollama API: {model}")
-    response = requests.post(base_url, json=payload, timeout=180)
-    response.raise_for_status()
-    return (response.json() or {}).get("response", "").strip()
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Calling Ollama API: {model_name} (attempt {attempt+1}/{max_retries})")
+            response = requests.post(base_url, json=payload, timeout=180)
+            response.raise_for_status()
+            return (response.json() or {}).get("response", "").strip()
+        except requests.RequestException as e:
+            logger.warning(f"Ollama call failed for {model_name}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(5)
+            else:
+                return None
 
 
 def list_corpus_files(analysis_type=None):
@@ -941,17 +948,36 @@ def corpus_preview_keyness(request):
         return JsonResponse({"preview": ""}, status=500)
 
 
+def generate_keyness_summaries(prompt: str, models: list[str] = None, num_predict: int = 400, temperature: float = 0.7) -> dict:
+    """
+    Generate summaries for a prompt using multiple models.
+    Returns a dict {model_name: generated_text}.
+    """
+    if models is None:
+        models = ["llama3.1", "llama3.2"]
+
+    results = {}
+    for model in models:
+        text = _generate_ollama(prompt, model_name=model, num_predict=num_predict, temperature=temperature)
+        if text:
+            # Trim to last complete sentence
+            text = text.rsplit('.', 1)[0] + '.' if '.' in text else text
+        results[model] = text or "[No response]"
+    return results
+
 @api_view(['POST'])
 def get_keyness_summary(request):
+    """
+    API endpoint to generate keyness summaries using multiple models.
+    """
     keyness_results = request.data.get('keyness_results', [])
 
-    # Filter to match frontend logic
     filtered_words = [
         word for word in keyness_results
-        if word.get('pos') != 'PROPN'  # Skip proper nouns like frontend
+        if word.get('pos') != 'PROPN'
     ][:30]
 
-    words_list = ", ".join([f"{word['word']}" for word in filtered_words])
+    words_list = ", ".join([word['word'] for word in filtered_words])
 
     prompt = (
         f"These are the most distinctive words in a literary text: {words_list}. "
@@ -959,20 +985,10 @@ def get_keyness_summary(request):
         "style, and subject matter. Focus on interpretation, not statistics."
     )
 
-    # Updated generation parameters
-    analysis = generate_text_with_fallback(
-        prompt,
-        num_predict=300,
-        temperature=0.7,
-    )
+    summaries = generate_keyness_summaries(prompt, models=["llama3.1", "llama3.2"], num_predict=300, temperature=0.7)
 
-    if not analysis:
-        return Response({"error": "No response from model."}, status=500)
+    return Response({"summaries": summaries})
 
-    # Optional: trim to last complete sentence if still cut off
-    analysis = analysis.rsplit('.', 1)[0] + '.' if '.' in analysis else analysis
-
-    return Response({"summary": analysis})
 
 @require_http_methods(["GET"])
 def corpus_meta_keyness(request):
