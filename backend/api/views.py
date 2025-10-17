@@ -110,7 +110,7 @@ def _generate_ollama(prompt: str, model_name: str, num_predict: int = 400, tempe
     """
     Generate text using Ollama local API with a chosen model and retry logic.
     """
-    OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/api/generate"
+    base_url = os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/api/generate"
 
     payload = {
         "model": model_name,
